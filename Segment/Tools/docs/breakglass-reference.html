@@ -1,0 +1,792 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>BreakGlass.ps1 – Zero Networks Script Reference</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+
+<!-- ═══════════════════════════════════════════════════════════
+     SIDEBAR
+════════════════════════════════════════════════════════════ -->
+<nav class="sidebar">
+  <div class="sidebar-logo">
+    <div class="brand">Zero Networks</div>
+    <div class="title">BreakGlass Reference</div>
+  </div>
+
+  <div class="sidebar-section">Overview</div>
+  <a href="#overview">What is BreakGlass?</a>
+  <a href="#prerequisites">Prerequisites</a>
+  <a href="#when-to-use">When to Use</a>
+
+  <div class="sidebar-section">BreakGlass.ps1</div>
+  <a href="#bg-synopsis">Synopsis</a>
+  <a href="#bg-syntax">Syntax</a>
+  <a href="#bg-parameters">Parameters</a>
+  <a href="#bg-examples">Examples</a>
+  <a href="#bg-outputs">Outputs</a>
+
+  <div class="sidebar-section">OTBreakGlass.ps1</div>
+  <a href="#ot-synopsis">Synopsis</a>
+  <a href="#ot-syntax">Syntax</a>
+  <a href="#ot-parameters">Parameters</a>
+  <a href="#ot-examples">Examples</a>
+
+  <div class="sidebar-section">Reference</div>
+  <a href="#modes">Mode Reference</a>
+  <a href="#param-sets">Parameter Sets</a>
+  <a href="#notes">Notes</a>
+  <a href="#changelog">Change Manifest</a>
+
+  <div class="sidebar-section">See Also</div>
+  <a href="zeronetworks-module-reference.html">ZeroNetworks Module (PSGallery)</a>
+  <a href="zntools-user-reference.html">ZNTools User Reference</a>
+  <a href="zntools-author-reference.html">ZNTools Author Reference</a>
+  <a href="index.html">&#8592; Docs Home</a>
+</nav>
+
+<!-- ═══════════════════════════════════════════════════════════
+     MAIN
+════════════════════════════════════════════════════════════ -->
+<main>
+
+  <div class="breadcrumb">
+    <a href="index.html">Docs Home</a><span>/</span>
+    <span>BreakGlass Reference</span>
+  </div>
+
+  <!-- ── OVERVIEW ── -->
+  <div id="overview" class="page-header">
+    <h1>Break Glass Scripts</h1>
+    <div class="tags">
+      <span class="tag">PowerShell 7+</span>
+      <span class="tag orange">Emergency Use</span>
+      <span class="tag">Network Segment</span>
+      <span class="tag">Identity Segment</span>
+      <span class="tag green">OT</span>
+    </div>
+    <p class="lead">
+      The Zero Networks Break Glass scripts provide emergency access recovery when
+      Zero Networks Segment Server, the portal, or IdP is unavailable or blocking critical access. They directly
+      modify firewall rules, WFP filters, and (for OT) network switch ACLs on targeted
+      assets to restore connectivity.
+    </p>
+  </div>
+
+  <div class="callout info">
+    <strong>Pre-installed scripts — not part of ZNTools</strong>
+    The scripts documented here (<code>BreakGlass.ps1</code> and <code>OTBreakGlass.ps1</code>) are
+    bundled with the Zero Networks installer and are pre-installed on all Segment Servers at
+    <code>C:\Program Files\Zero Networks\Breakglass\</code>. They are not distributed through the
+    ZNTools PowerShell module. This document is a reference for those pre-installed scripts.
+  </div>
+
+  <div class="callout">
+    <strong>Warning</strong>
+    These scripts bypass Zero Networks segmentation controls. Use only when the Zero Networks
+    Cloud Break Glass feature is unavailable and immediate access is required. Document and
+    audit every use.
+  </div>
+
+  <h2 id="prerequisites">Prerequisites</h2>
+  <table>
+    <thead><tr><th>Requirement</th><th>Details</th></tr></thead>
+    <tbody>
+      <tr><td>PowerShell version</td><td>7.0 or higher (<code>#Requires -Version 7</code>)</td></tr>
+      <tr><td>POSH-SSH module</td><td>Required for Linux operations. Script auto-installs from the internet or falls back to the bundled <code>posh-ssh.3.1.1.nupkg</code></td></tr>
+      <tr><td>segmentedAssets.json</td><td>Auto-generated and routinely updated by the Zero Networks Segment Server. Located at <code>C:\Program Files\Zero Networks\Breakglass\segmentedAssets.json</code> on the machine running the script. Do not edit manually.</td></tr>
+      <tr><td>Windows credentials</td><td>Account with WinRM/PSRemoting access to target asset(s). When omitted, the script reads <code>ForestsConfig</code> from <code>segmentedAssets.json</code> and prompts once per domain and once per OU that has <code>OuCredentials</code> configured. Supply <code>-ADUserName</code> / <code>-ADSvcPassword</code> to override with a single explicit credential for all targets.</td></tr>
+      <tr><td>Linux credentials</td><td>Assumed: Linux service account with an SSH key file. Supply <code>-LinuxUserName</code> / <code>-LinuxSvcPassword</code> to use password auth instead, or <code>-LinuxUseSSHKey</code> to be prompted for a key path at runtime. The account must have <code>sudo su</code> access on target assets.</td></tr>
+      <tr><td>Network access</td><td>Required ports (WinRM TCP 5985/5986 for Windows; SSH TCP 22 for Linux) are automatically provisioned to Segment Servers, which is where this script is intended to run.</td></tr>
+    </tbody>
+  </table>
+
+  <h2 id="when-to-use">When to Use</h2>
+  <p>Prefer the Zero Networks portal Cloud Break Glass in all normal scenarios. Use these scripts only when:</p>
+  <ul style="margin: 0.5rem 0 1rem 1.5rem; line-height: 2;">
+    <li>The Zero Networks management plane is unreachable.</li>
+    <li>Cloud Break Glass cannot be triggered fast enough for a production incident.</li>
+    <li>You need to target a specific asset that is not visible in the portal.</li>
+    <li>OT switch ACLs must be removed and no portal access is available.</li>
+  </ul>
+
+  <!-- ════════════════════════════════════════
+       BREAKGLASS.PS1
+  ═════════════════════════════════════════ -->
+  <div class="script-separator">
+    <div class="page-header" style="margin-bottom:1rem; border-bottom: none; padding-bottom: 0.5rem;">
+      <h1>BreakGlass.ps1</h1>
+      <div class="tags">
+        <span class="tag">Windows</span>
+        <span class="tag">Linux</span>
+        <span class="tag orange">Emergency</span>
+      </div>
+    </div>
+  </div>
+
+  <h2 id="bg-synopsis">Synopsis</h2>
+  <p>
+    Restores network and/or identity access to segmented Windows and Linux assets by remotely
+    modifying firewall rules, WFP filters, and Group Policy on each target.
+  </p>
+
+  <h2 id="bg-syntax">Syntax</h2>
+
+  <div class="syntax-block">
+    <span class="set-label">-- Windows assets (bulk) --</span>
+<span class="cmd">.\BreakGlass.ps1</span>
+    <span class="param">-Windows</span>
+    <span class="param">-Mode</span> { <span class="opt">Privileged</span> | <span class="opt">All</span> }
+   [<span class="param">-Network</span>] [<span class="param">-Identity</span>]
+   [<span class="param">-ServersOnly</span>] [<span class="param">-DisableBlockRule</span>]
+   [<span class="param">-ADUserName</span> &lt;string&gt;] [<span class="param">-ADSvcPassword</span> &lt;string&gt;]
+   [<span class="param">-DeploymentClusterName</span> &lt;string&gt;]
+  </div>
+
+  <div class="syntax-block">
+    <span class="set-label">-- Linux assets (bulk) --</span>
+<span class="cmd">.\BreakGlass.ps1</span>
+    <span class="param">-Linux</span>
+    <span class="param">-Mode</span> { <span class="opt">Privileged</span> | <span class="opt">All</span> }
+   [<span class="param">-Network</span>]
+   [<span class="param">-LinuxUseSSHKey</span>]
+   [<span class="param">-ServersOnly</span>]
+   [<span class="param">-LinuxUserName</span> &lt;string&gt;] [<span class="param">-LinuxSvcPassword</span> &lt;string&gt;]
+   [<span class="param">-DeploymentClusterName</span> &lt;string&gt;]
+  </div>
+
+  <div class="syntax-block">
+    <span class="set-label">-- Windows AND Linux assets (bulk) --</span>
+<span class="cmd">.\BreakGlass.ps1</span>
+    <span class="param">-WindowsAndLinux</span>
+    <span class="param">-Mode</span> { <span class="opt">Privileged</span> | <span class="opt">All</span> }
+   [<span class="param">-Network</span>] [<span class="param">-Identity</span>]
+   [<span class="param">-LinuxUseSSHKey</span>] [<span class="param">-ServersOnly</span>] [<span class="param">-DisableBlockRule</span>]
+   [<span class="param">-ADUserName</span> &lt;string&gt;] [<span class="param">-ADSvcPassword</span> &lt;string&gt;]
+   [<span class="param">-LinuxUserName</span> &lt;string&gt;] [<span class="param">-LinuxSvcPassword</span> &lt;string&gt;]
+   [<span class="param">-DeploymentClusterName</span> &lt;string&gt;]
+  </div>
+
+  <div class="syntax-block">
+    <span class="set-label">-- Single asset by name --</span>
+<span class="cmd">.\BreakGlass.ps1</span>
+    <span class="param">-Asset</span> &lt;string&gt;
+   { <span class="param">-Windows</span> | <span class="param">-Linux</span> }
+    <span class="param">-Mode</span> { <span class="opt">Privileged</span> | <span class="opt">All</span> }
+   [<span class="param">-Network</span>] [<span class="param">-Identity</span>]
+   [<span class="param">-LinuxUseSSHKey</span>]
+   [<span class="param">-ADUserName</span> &lt;string&gt;] [<span class="param">-ADSvcPassword</span> &lt;string&gt;]
+   [<span class="param">-LinuxUserName</span> &lt;string&gt;] [<span class="param">-LinuxSvcPassword</span> &lt;string&gt;]
+  </div>
+
+  <div class="syntax-block">
+    <span class="set-label">-- Single asset by IP address --</span>
+<span class="cmd">.\BreakGlass.ps1</span>
+    <span class="param">-IPAddress</span> &lt;string&gt;
+   { <span class="param">-Windows</span> | <span class="param">-Linux</span> }
+    <span class="param">-Mode</span> { <span class="opt">Privileged</span> | <span class="opt">All</span> }
+   [<span class="param">-Network</span>] [<span class="param">-Identity</span>]
+   [<span class="param">-ADUserName</span> &lt;string&gt;] [<span class="param">-ADSvcPassword</span> &lt;string&gt;]
+  </div>
+
+  <h2 id="bg-parameters">Parameters</h2>
+
+  <!-- -Windows -->
+  <div class="param-entry">
+    <div class="param-name">-Windows</div>
+    <div class="param-body">
+      <p class="param-desc">Targets Windows assets. Required when operating in the <strong>Windows</strong> parameter set. Mutually exclusive with <code>-Linux</code>; use <code>-WindowsAndLinux</code> to target both.</p>
+      <div class="param-meta">
+        <div class="param-meta-item"><span class="meta-label">Type:</span><span class="meta-value">Switch</span></div>
+        <div class="param-meta-item"><span class="meta-label">Required:</span><span class="meta-value required">True (in Windows set)</span></div>
+        <div class="param-meta-item"><span class="meta-label">Position:</span><span class="meta-value">Named</span></div>
+        <div class="param-meta-item"><span class="meta-label">Default:</span><span class="meta-value">None</span></div>
+        <div class="param-meta-item"><span class="meta-label">Pipeline input:</span><span class="meta-value">False</span></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- -Linux -->
+  <div class="param-entry">
+    <div class="param-name">-Linux</div>
+    <div class="param-body">
+      <p class="param-desc">Targets Linux assets. Required when operating in the <strong>Linux</strong> parameter set.</p>
+      <div class="param-meta">
+        <div class="param-meta-item"><span class="meta-label">Type:</span><span class="meta-value">Switch</span></div>
+        <div class="param-meta-item"><span class="meta-label">Required:</span><span class="meta-value required">True (in Linux set)</span></div>
+        <div class="param-meta-item"><span class="meta-label">Position:</span><span class="meta-value">Named</span></div>
+        <div class="param-meta-item"><span class="meta-label">Default:</span><span class="meta-value">None</span></div>
+        <div class="param-meta-item"><span class="meta-label">Pipeline input:</span><span class="meta-value">False</span></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- -WindowsAndLinux -->
+  <div class="param-entry">
+    <div class="param-name">-WindowsAndLinux</div>
+    <div class="param-body">
+      <p class="param-desc">Targets both Windows and Linux assets in a single run. Collects both AD and Linux credentials before processing.</p>
+      <div class="param-meta">
+        <div class="param-meta-item"><span class="meta-label">Type:</span><span class="meta-value">Switch</span></div>
+        <div class="param-meta-item"><span class="meta-label">Required:</span><span class="meta-value required">True (in WindowsAndLinux set)</span></div>
+        <div class="param-meta-item"><span class="meta-label">Position:</span><span class="meta-value">Named</span></div>
+        <div class="param-meta-item"><span class="meta-label">Default:</span><span class="meta-value">None</span></div>
+        <div class="param-meta-item"><span class="meta-label">Pipeline input:</span><span class="meta-value">False</span></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- -Mode -->
+  <div class="param-entry">
+    <div class="param-name">-Mode</div>
+    <div class="param-body">
+      <p class="param-desc">
+        Controls which firewall ports are opened on each target. Required whenever <code>-Network</code> is specified.
+      </p>
+      <table style="margin:0.5rem 0;">
+        <thead><tr><th>Value</th><th>Windows effect</th><th>Linux effect</th></tr></thead>
+        <tbody>
+          <tr><td><code>Privileged</code></td><td>Opens inbound RDP (TCP 3389) via Windows Firewall and WFP. Outbound unrestricted.</td><td>Opens inbound SSH (TCP 22) via iptables.</td></tr>
+          <tr><td><code>All</code></td><td>Opens all inbound traffic via Windows Firewall and WFP. Outbound unrestricted.</td><td>Accepts all inbound and outbound traffic via iptables.</td></tr>
+        </tbody>
+      </table>
+      <div class="param-meta">
+        <div class="param-meta-item"><span class="meta-label">Type:</span><span class="meta-value">String</span></div>
+        <div class="param-meta-item"><span class="meta-label">Required:</span><span class="meta-value required">Required with -Network</span></div>
+        <div class="param-meta-item"><span class="meta-label">Accepted values:</span><span class="meta-value">Privileged, All</span></div>
+        <div class="param-meta-item"><span class="meta-label">Pipeline input:</span><span class="meta-value">False</span></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- -Network -->
+  <div class="param-entry">
+    <div class="param-name">-Network</div>
+    <div class="param-body">
+      <p class="param-desc">Triggers network segmentation break glass. Adds Windows Firewall and WFP allow rules (Windows) or iptables ACCEPT rules (Linux). Must be combined with <code>-Mode</code>. Only runs on assets where <code>IsNetworkSegmented</code> is <code>$true</code>.</p>
+      <div class="param-meta">
+        <div class="param-meta-item"><span class="meta-label">Type:</span><span class="meta-value">Switch</span></div>
+        <div class="param-meta-item"><span class="meta-label">Required:</span><span class="meta-value optional">Optional</span></div>
+        <div class="param-meta-item"><span class="meta-label">Default:</span><span class="meta-value">False</span></div>
+        <div class="param-meta-item"><span class="meta-label">Pipeline input:</span><span class="meta-value">False</span></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- -Identity -->
+  <div class="param-entry">
+    <div class="param-name">-Identity</div>
+    <div class="param-body">
+      <p class="param-desc">
+        Triggers identity segmentation break glass on Windows assets. Exports the current security policy
+        (<code>secedit</code>), removes all <code>ZeroNetworks*</code> local groups from User Rights
+        assignments, re-applies the policy, and forces a Group Policy update. Only runs on assets
+        where <code>IsIdentitySegmented</code> is <code>$true</code>.
+      </p>
+      <div class="callout" style="margin:0.5rem 0;">
+        <strong>Note</strong>
+        Available for Windows and WindowsAndLinux parameter sets only. Not applicable to Linux assets.
+      </div>
+      <div class="param-meta">
+        <div class="param-meta-item"><span class="meta-label">Type:</span><span class="meta-value">Switch</span></div>
+        <div class="param-meta-item"><span class="meta-label">Required:</span><span class="meta-value optional">Optional</span></div>
+        <div class="param-meta-item"><span class="meta-label">Default:</span><span class="meta-value">False</span></div>
+        <div class="param-meta-item"><span class="meta-label">Pipeline input:</span><span class="meta-value">False</span></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- -ServersOnly -->
+  <div class="param-entry">
+    <div class="param-name">-ServersOnly</div>
+    <div class="param-body">
+      <p class="param-desc">Restricts the asset list to servers (type = 2 in <code>segmentedAssets.json</code>). Workstations and clients are skipped. Not available in the Asset or IP parameter sets since those already target a single asset explicitly.</p>
+      <div class="param-meta">
+        <div class="param-meta-item"><span class="meta-label">Type:</span><span class="meta-value">Switch</span></div>
+        <div class="param-meta-item"><span class="meta-label">Required:</span><span class="meta-value optional">Optional</span></div>
+        <div class="param-meta-item"><span class="meta-label">Default:</span><span class="meta-value">False</span></div>
+        <div class="param-meta-item"><span class="meta-label">Pipeline input:</span><span class="meta-value">False</span></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- -DisableBlockRule -->
+  <div class="param-entry">
+    <div class="param-name">-DisableBlockRule</div>
+    <div class="param-body">
+      <p class="param-desc">
+        On Windows, also disables all enabled Windows Firewall block rules and removes any WFP
+        explicit-block filters installed by Zero Networks. Use this when the standard allow rules
+        are still being overridden by block rules.
+      </p>
+      <div class="callout" style="margin:0.5rem 0;">
+        <strong>Warning</strong>
+        This disables <em>all</em> block rules currently active on the target host, not only Zero Networks rules. Use with caution.
+      </div>
+      <div class="param-meta">
+        <div class="param-meta-item"><span class="meta-label">Type:</span><span class="meta-value">Switch</span></div>
+        <div class="param-meta-item"><span class="meta-label">Required:</span><span class="meta-value optional">Optional</span></div>
+        <div class="param-meta-item"><span class="meta-label">Default:</span><span class="meta-value">False</span></div>
+        <div class="param-meta-item"><span class="meta-label">Pipeline input:</span><span class="meta-value">False</span></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- -Asset -->
+  <div class="param-entry">
+    <div class="param-name">-Asset</div>
+    <div class="param-body">
+      <p class="param-desc">Targets a single asset by hostname or FQDN. The value is resolved via DNS; a valid A record must exist. Mutually exclusive with <code>-IPAddress</code> and the bulk parameter sets.</p>
+      <div class="param-meta">
+        <div class="param-meta-item"><span class="meta-label">Type:</span><span class="meta-value">String</span></div>
+        <div class="param-meta-item"><span class="meta-label">Required:</span><span class="meta-value required">True (in Asset set)</span></div>
+        <div class="param-meta-item"><span class="meta-label">Position:</span><span class="meta-value">Named</span></div>
+        <div class="param-meta-item"><span class="meta-label">Pipeline input:</span><span class="meta-value">False</span></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- -IPAddress -->
+  <div class="param-entry">
+    <div class="param-name">-IPAddress</div>
+    <div class="param-body">
+      <p class="param-desc">Targets a single asset by IP address. The IP is resolved via a DNS PTR lookup; a valid PTR record must exist. Mutually exclusive with <code>-Asset</code>.</p>
+      <div class="param-meta">
+        <div class="param-meta-item"><span class="meta-label">Type:</span><span class="meta-value">String</span></div>
+        <div class="param-meta-item"><span class="meta-label">Required:</span><span class="meta-value required">True (in IP set)</span></div>
+        <div class="param-meta-item"><span class="meta-label">Position:</span><span class="meta-value">Named</span></div>
+        <div class="param-meta-item"><span class="meta-label">Pipeline input:</span><span class="meta-value">False</span></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- -ADUserName -->
+  <div class="param-entry">
+    <div class="param-name">-ADUserName</div>
+    <div class="param-body">
+      <p class="param-desc">
+        Active Directory credential username used to connect to Windows assets via WinRM.
+        Accepted formats: <code>DOMAIN\username</code> or <code>username@domain.com</code>.
+        Must be paired with <code>-ADSvcPassword</code>. If omitted, the script reads
+        <code>ForestsConfig</code> from <code>segmentedAssets.json</code> and prompts once
+        per primary domain, once per secondary domain, and once per OU that has
+        <code>OuCredentials</code> configured. When an asset has an
+        <code>OrganizationalUnit</code> value, the OU-specific credential is tried first,
+        then the script falls back to the domain-level credential.
+      </p>
+      <div class="param-meta">
+        <div class="param-meta-item"><span class="meta-label">Type:</span><span class="meta-value">String</span></div>
+        <div class="param-meta-item"><span class="meta-label">Required:</span><span class="meta-value optional">Optional</span></div>
+        <div class="param-meta-item"><span class="meta-label">Must pair with:</span><span class="meta-value">-ADSvcPassword</span></div>
+        <div class="param-meta-item"><span class="meta-label">Pipeline input:</span><span class="meta-value">False</span></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- -ADSvcPassword -->
+  <div class="param-entry">
+    <div class="param-name">-ADSvcPassword</div>
+    <div class="param-body">
+      <p class="param-desc">Plain-text password for the AD account specified in <code>-ADUserName</code>. Must be used together with <code>-ADUserName</code>. The value is converted to a <code>SecureString</code> internally before use.</p>
+      <div class="param-meta">
+        <div class="param-meta-item"><span class="meta-label">Type:</span><span class="meta-value">String</span></div>
+        <div class="param-meta-item"><span class="meta-label">Required:</span><span class="meta-value optional">Optional</span></div>
+        <div class="param-meta-item"><span class="meta-label">Must pair with:</span><span class="meta-value">-ADUserName</span></div>
+        <div class="param-meta-item"><span class="meta-label">Pipeline input:</span><span class="meta-value">False</span></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- -LinuxUseSSHKey -->
+  <div class="param-entry">
+    <div class="param-name">-LinuxUseSSHKey</div>
+    <div class="param-body">
+      <p class="param-desc">When present, the script uses an SSH private key file instead of a password to authenticate against Linux assets. The script will prompt interactively for the path to the key file at runtime.</p>
+      <div class="param-meta">
+        <div class="param-meta-item"><span class="meta-label">Type:</span><span class="meta-value">Switch</span></div>
+        <div class="param-meta-item"><span class="meta-label">Required:</span><span class="meta-value optional">Optional</span></div>
+        <div class="param-meta-item"><span class="meta-label">Default:</span><span class="meta-value">False (password auth)</span></div>
+        <div class="param-meta-item"><span class="meta-label">Pipeline input:</span><span class="meta-value">False</span></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- -LinuxUserName -->
+  <div class="param-entry">
+    <div class="param-name">-LinuxUserName</div>
+    <div class="param-body">
+      <p class="param-desc">SSH username for Linux assets. Must be paired with <code>-LinuxSvcPassword</code> (or <code>-LinuxUseSSHKey</code>). If omitted, the user is prompted at runtime.</p>
+      <div class="param-meta">
+        <div class="param-meta-item"><span class="meta-label">Type:</span><span class="meta-value">String</span></div>
+        <div class="param-meta-item"><span class="meta-label">Required:</span><span class="meta-value optional">Optional</span></div>
+        <div class="param-meta-item"><span class="meta-label">Pipeline input:</span><span class="meta-value">False</span></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- -LinuxSvcPassword -->
+  <div class="param-entry">
+    <div class="param-name">-LinuxSvcPassword</div>
+    <div class="param-body">
+      <p class="param-desc">Plain-text SSH password for the Linux user. Must be used together with <code>-LinuxUserName</code>. Cannot be combined with <code>-LinuxUseSSHKey</code> — if SSH key authentication is in use, this parameter is ignored.</p>
+      <div class="param-meta">
+        <div class="param-meta-item"><span class="meta-label">Type:</span><span class="meta-value">String</span></div>
+        <div class="param-meta-item"><span class="meta-label">Required:</span><span class="meta-value optional">Optional</span></div>
+        <div class="param-meta-item"><span class="meta-label">Must pair with:</span><span class="meta-value">-LinuxUserName</span></div>
+        <div class="param-meta-item"><span class="meta-label">Pipeline input:</span><span class="meta-value">False</span></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- -DeploymentClusterName -->
+  <div class="param-entry">
+    <div class="param-name">-DeploymentClusterName</div>
+    <div class="param-body">
+      <p class="param-desc">
+        Limits the asset scope to a single Zero Networks deployment cluster. The value is matched
+        case-insensitively against cluster names in <code>segmentedAssets.json</code>. Tab-completion
+        is supported — press <kbd>Tab</kbd> to cycle through available cluster names.
+        If omitted, all clusters are included.
+      </p>
+      <div class="param-meta">
+        <div class="param-meta-item"><span class="meta-label">Type:</span><span class="meta-value">String</span></div>
+        <div class="param-meta-item"><span class="meta-label">Required:</span><span class="meta-value optional">Optional</span></div>
+        <div class="param-meta-item"><span class="meta-label">Tab-complete:</span><span class="meta-value">Yes</span></div>
+        <div class="param-meta-item"><span class="meta-label">Pipeline input:</span><span class="meta-value">False</span></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── EXAMPLES ── -->
+  <h2 id="bg-examples">Examples</h2>
+
+  <div class="example">
+    <div class="example-header">
+      <span class="ex-label">Example 1</span>
+      <span class="ex-title">Open privileged ports on all Windows assets (network segment)</span>
+    </div>
+    <pre><span class="ps-prompt">PS&gt; </span><span class="ps-cmd">.\BreakGlass.ps1</span> <span class="ps-switch">-Windows</span> <span class="ps-param">-Mode</span> <span class="ps-value">Privileged</span> <span class="ps-switch">-Network</span></pre>
+    <div class="example-desc">
+      Connects to every Windows asset in <code>segmentedAssets.json</code> that has network
+      segmentation active. Adds a Windows Firewall rule allowing inbound RDP (TCP 3389) and
+      a WFP filter allowing inbound RDP and all outbound traffic.
+      Credentials are prompted interactively per AD domain found in the configuration.
+    </div>
+  </div>
+
+  <div class="example">
+    <div class="example-header">
+      <span class="ex-label">Example 2</span>
+      <span class="ex-title">Open all ports on Linux servers using SSH key</span>
+    </div>
+    <pre><span class="ps-prompt">PS&gt; </span><span class="ps-cmd">.\BreakGlass.ps1</span> <span class="ps-switch">-Linux</span> <span class="ps-switch">-LinuxUseSSHKey</span> <span class="ps-switch">-Network</span> <span class="ps-param">-Mode</span> <span class="ps-value">All</span> <span class="ps-switch">-ServersOnly</span></pre>
+    <div class="example-desc">
+      Targets only Linux server-type assets. Uses an SSH key for authentication (path
+      prompted at runtime). Inserts an iptables ACCEPT rule for all inbound and outbound
+      traffic on each target.
+    </div>
+  </div>
+
+  <div class="example">
+    <div class="example-header">
+      <span class="ex-label">Example 3</span>
+      <span class="ex-title">Single Linux server by hostname using SSH key</span>
+    </div>
+    <pre><span class="ps-prompt">PS&gt; </span><span class="ps-cmd">.\BreakGlass.ps1</span> <span class="ps-param">-Asset</span> <span class="ps-value">linuxserver.contoso.local</span> <span class="ps-switch">-Linux</span> <span class="ps-switch">-LinuxUseSSHKey</span> <span class="ps-switch">-Network</span> <span class="ps-param">-Mode</span> <span class="ps-value">All</span></pre>
+    <div class="example-desc">
+      Resolves <code>linuxserver.contoso.local</code> via DNS and runs the full-open iptables
+      break glass against that single host. The SSH key path is prompted interactively.
+    </div>
+  </div>
+
+  <div class="example">
+    <div class="example-header">
+      <span class="ex-label">Example 4</span>
+      <span class="ex-title">Single Windows asset by IP address (interactive credentials)</span>
+    </div>
+    <pre><span class="ps-prompt">PS&gt; </span><span class="ps-cmd">.\BreakGlass.ps1</span> <span class="ps-param">-IPAddress</span> <span class="ps-value">1.1.1.1</span> <span class="ps-switch">-Windows</span> <span class="ps-switch">-Network</span> <span class="ps-param">-Mode</span> <span class="ps-value">All</span></pre>
+    <div class="example-desc">
+      Resolves <code>1.1.1.1</code> via a PTR record, then prompts interactively for
+      a domain name and AD username before opening all ports on the target.
+    </div>
+  </div>
+
+  <div class="example">
+    <div class="example-header">
+      <span class="ex-label">Example 5</span>
+      <span class="ex-title">Single Windows asset by IP address (explicit credentials)</span>
+    </div>
+    <pre><span class="ps-prompt">PS&gt; </span><span class="ps-cmd">.\BreakGlass.ps1</span> <span class="ps-param">-IPAddress</span> <span class="ps-value">1.1.1.1</span> <span class="ps-switch">-Windows</span> <span class="ps-switch">-Network</span> <span class="ps-param">-Mode</span> <span class="ps-value">All</span> `
+         <span class="ps-param">-ADUserName</span> <span class="ps-value">contoso.local\Administrator</span> <span class="ps-param">-ADSvcPassword</span> <span class="ps-value">P@ssw0rd</span></pre>
+    <div class="example-desc">
+      Same as Example 4 but supplies credentials non-interactively. Suitable for scripted
+      or automated break glass runbooks.
+    </div>
+  </div>
+
+  <div class="example">
+    <div class="example-header">
+      <span class="ex-label">Example 6</span>
+      <span class="ex-title">Scope to a single deployment cluster</span>
+    </div>
+    <pre><span class="ps-prompt">PS&gt; </span><span class="ps-cmd">.\BreakGlass.ps1</span> <span class="ps-switch">-Windows</span> <span class="ps-param">-Mode</span> <span class="ps-value">All</span> <span class="ps-switch">-Network</span> <span class="ps-param">-DeploymentClusterName</span> <span class="ps-value">"zero.local"</span></pre>
+    <div class="example-desc">
+      Restricts the affected asset pool to the <code>zero.local</code> deployment cluster only.
+      Assets in other clusters are skipped entirely.
+    </div>
+  </div>
+
+  <!-- ── OUTPUTS ── -->
+  <h2 id="bg-outputs">Outputs</h2>
+  <p>The script writes two text files to the current directory on completion:</p>
+  <table>
+    <thead><tr><th>File</th><th>Contents</th></tr></thead>
+    <tbody>
+      <tr><td><code>success_list.txt</code></td><td>One FQDN per line for every asset successfully processed.</td></tr>
+      <tr><td><code>failed_list.txt</code></td><td>One FQDN + error message per line for every asset that failed.</td></tr>
+    </tbody>
+  </table>
+  <p>Console output shows connection status, applied rules, and any warnings in real time as each asset is processed (up to 100 assets in parallel).</p>
+
+
+  <!-- ════════════════════════════════════════
+       OTBREAKGLASS.PS1
+  ═════════════════════════════════════════ -->
+  <div class="script-separator">
+    <div class="page-header" style="margin-bottom:1rem; border-bottom:none; padding-bottom:0.5rem;">
+      <h1>OTBreakGlass.ps1</h1>
+      <div class="tags">
+        <span class="tag green">OT</span>
+        <span class="tag">Cisco IOS-XE</span>
+        <span class="tag orange">Emergency</span>
+      </div>
+    </div>
+  </div>
+
+  <h2 id="ot-synopsis">Synopsis</h2>
+  <p>
+    Removes Zero Networks ACLs and optionally NetFlow monitoring from Cisco IOS-XE switch
+    interfaces via RESTCONF, restoring unrestricted traffic flow on OT network segments.
+  </p>
+
+  <h2 id="ot-syntax">Syntax</h2>
+
+  <div class="syntax-block">
+<span class="cmd">.\OTBreakGlass.ps1</span>
+   [<span class="param">-SwitchPassword</span> &lt;SecureString&gt;]
+   [<span class="param">-RemoveMonitoring</span>]
+  </div>
+
+  <h2 id="ot-parameters">Parameters</h2>
+
+  <!-- -SwitchPassword -->
+  <div class="param-entry">
+    <div class="param-name">-SwitchPassword</div>
+    <div class="param-body">
+      <p class="param-desc">
+        A single shared password used for all switches. When provided, the script skips
+        per-switch password prompts. Accepts a <code>SecureString</code> — pass using
+        <code>Read-Host -AsSecureString</code> or <code>ConvertTo-SecureString</code>
+        if scripting non-interactively.
+        If omitted, the script prompts for each switch's password individually based on the
+        switch list in <code>C:\Program Files\Zero Networks\Breakglass\switches.json</code>.
+      </p>
+      <div class="param-meta">
+        <div class="param-meta-item"><span class="meta-label">Type:</span><span class="meta-value">SecureString</span></div>
+        <div class="param-meta-item"><span class="meta-label">Required:</span><span class="meta-value optional">Optional</span></div>
+        <div class="param-meta-item"><span class="meta-label">Default:</span><span class="meta-value">None (per-switch prompt)</span></div>
+        <div class="param-meta-item"><span class="meta-label">Pipeline input:</span><span class="meta-value">False</span></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- -RemoveMonitoring -->
+  <div class="param-entry">
+    <div class="param-name">-RemoveMonitoring</div>
+    <div class="param-body">
+      <p class="param-desc">
+        In addition to removing ACLs, also removes Zero Networks NetFlow monitoring
+        (IP flow records tagged <code>zeroNetworks*</code>) from switch interfaces.
+        Without this switch, only ACLs are removed and monitoring continues.
+      </p>
+      <div class="param-meta">
+        <div class="param-meta-item"><span class="meta-label">Type:</span><span class="meta-value">Switch</span></div>
+        <div class="param-meta-item"><span class="meta-label">Required:</span><span class="meta-value optional">Optional</span></div>
+        <div class="param-meta-item"><span class="meta-label">Default:</span><span class="meta-value">False</span></div>
+        <div class="param-meta-item"><span class="meta-label">Pipeline input:</span><span class="meta-value">False</span></div>
+      </div>
+    </div>
+  </div>
+
+  <h2 id="ot-examples">Examples</h2>
+
+  <div class="example">
+    <div class="example-header">
+      <span class="ex-label">Example 1</span>
+      <span class="ex-title">Remove ACLs only (prompt per switch)</span>
+    </div>
+    <pre><span class="ps-prompt">PS&gt; </span><span class="ps-cmd">.\OTBreakGlass.ps1</span></pre>
+    <div class="example-desc">
+      Reads all switches from <code>switches.json</code>. Prompts for each switch's
+      password individually, then connects to each over RESTCONF (HTTPS) and removes
+      any ACL named <code>zeroNetworks*</code> from all interfaces. NetFlow monitoring
+      is left in place.
+    </div>
+  </div>
+
+  <div class="example">
+    <div class="example-header">
+      <span class="ex-label">Example 2</span>
+      <span class="ex-title">Remove ACLs and monitoring (shared password)</span>
+    </div>
+    <pre><span class="ps-prompt">PS&gt; </span><span class="ps-cmd">.\OTBreakGlass.ps1</span> <span class="ps-switch">-RemoveMonitoring</span> <span class="ps-param">-SwitchPassword</span> <span class="ps-value">(Read-Host "Switch password" -AsSecureString)</span></pre>
+    <div class="example-desc">
+      Uses a single shared password for all switches and additionally removes Zero Networks
+      NetFlow monitors from all interfaces after removing ACLs.
+    </div>
+  </div>
+
+  <!-- ════════════════════════════════════════
+       REFERENCE TABLES
+  ═════════════════════════════════════════ -->
+  <h2 id="modes">Mode Reference</h2>
+  <table>
+    <thead>
+      <tr><th>Mode</th><th>OS</th><th>Mechanism</th><th>Result</th></tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><code>Privileged</code></td>
+        <td>Windows</td>
+        <td>Windows Firewall + WFP</td>
+        <td>Inbound RDP (TCP 3389) allowed; all outbound allowed</td>
+      </tr>
+      <tr>
+        <td><code>All</code></td>
+        <td>Windows</td>
+        <td>Windows Firewall + WFP</td>
+        <td>All inbound and outbound traffic allowed</td>
+      </tr>
+      <tr>
+        <td><code>Privileged</code></td>
+        <td>Linux</td>
+        <td>iptables (via python-iptables)</td>
+        <td>Inbound SSH (TCP 22) ACCEPT rule inserted at position 0 in INPUT chain</td>
+      </tr>
+      <tr>
+        <td><code>All</code></td>
+        <td>Linux</td>
+        <td>iptables (via python-iptables)</td>
+        <td>ACCEPT all rule inserted at position 0 in INPUT and OUTPUT chains</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <h2 id="param-sets">Parameter Sets</h2>
+  <table>
+    <thead>
+      <tr><th>Parameter Set</th><th>Required parameters</th><th>Typical use</th></tr>
+    </thead>
+    <tbody>
+      <tr><td><code>Windows</code></td><td><code>-Windows</code></td><td>Bulk Windows assets from segmentedAssets.json</td></tr>
+      <tr><td><code>Linux</code></td><td><code>-Linux</code></td><td>Bulk Linux assets from segmentedAssets.json</td></tr>
+      <tr><td><code>WindowsAndLinux</code></td><td><code>-WindowsAndLinux</code></td><td>Bulk Windows + Linux in one run</td></tr>
+      <tr><td><code>Asset</code></td><td><code>-Asset</code> + <code>-Windows</code> or <code>-Linux</code></td><td>Single asset by hostname or FQDN</td></tr>
+      <tr><td><code>IP</code></td><td><code>-IPAddress</code> + <code>-Windows</code> or <code>-Linux</code></td><td>Single asset by IP (PTR lookup required)</td></tr>
+    </tbody>
+  </table>
+
+  <h2 id="notes">Notes</h2>
+  <ul style="line-height: 2.1; margin-left: 1.5rem;">
+    <li>Rules and filters added by the break glass scripts are <strong>persistent</strong> across reboots. They must be manually removed or will be cleaned up when the Zero Networks agent next synchronises policy.</li>
+    <li>For Windows assets the script uses <strong>PowerShell Remoting (WinRM)</strong> with Negotiate authentication. Ensure WinRM is enabled and accessible on targets.</li>
+    <li>For Linux assets the script connects via <strong>SSH</strong> using the POSH-SSH module, escalates to root with <code>sudo su</code>, and manipulates iptables through a Zero Networks Python virtual environment bundled on the asset.</li>
+    <li>Both scripts create <code>success_list.txt</code> and <code>failed_list.txt</code> (or <code>ot_success_list.txt</code> / <code>ot_failed_list.txt</code> for OT) in the working directory.</li>
+    <li>Bulk operations run with <code>-ThrottleLimit 100</code> (up to 100 assets processed concurrently).</li>
+    <li>The <code>segmentedAssets.json</code> file is automatically generated and kept up to date by the Zero Networks Segment Server. It is read from <code>C:\Program Files\Zero Networks\Breakglass\</code> on the machine running the script, not on the target assets. Do not edit it manually.</li>
+    <li>For OT, switch credentials are never stored; they are held in memory only for the duration of the script run and cleared afterwards.</li>
+  </ul>
+
+  <!-- ════════════════════════════════════════
+       CHANGE MANIFEST
+  ═════════════════════════════════════════ -->
+  <div class="script-separator">
+    <div class="page-header" style="margin-bottom:1rem; border-bottom:none; padding-bottom:0.5rem;">
+      <h1 id="changelog">Change Manifest</h1>
+      <div class="tags">
+        <span class="tag purple">Documentation</span>
+      </div>
+    </div>
+  </div>
+
+  <p>Records changes to script behaviour that were previously undocumented, and documentation corrections applied to this reference.</p>
+
+  <table>
+    <thead><tr><th>Area</th><th>Change</th><th>Notes</th></tr></thead>
+    <tbody>
+      <tr>
+        <td><code>-ADUserName</code></td>
+        <td>Accepts UPN format (<code>user@domain.com</code>) in addition to <code>DOMAIN\user</code></td>
+        <td>Both formats parse correctly when supplying explicit credentials for bulk Windows operations.</td>
+      </tr>
+      <tr>
+        <td><code>-DeploymentClusterName</code></td>
+        <td>Tab-completion reads live cluster names from <code>segmentedAssets.json</code>; parameter also validates against that list and throws a descriptive error with valid options on mismatch</td>
+        <td>Tab-complete with <kbd>Tab</kbd> in PowerShell 7+. Names containing spaces are quoted automatically.</td>
+      </tr>
+      <tr>
+        <td>Windows credential collection (bulk)</td>
+        <td>Per-OU credentials are now collected and matched at runtime</td>
+        <td>The script reads <code>OuCredentials</code> from each domain in <code>ForestsConfig</code> and prompts separately for each OU. Assets with an <code>OrganizationalUnit</code> field are matched to the appropriate OU credential before falling back to the domain credential.</td>
+      </tr>
+    </tbody>
+  </table>
+
+</main>
+
+<script>
+  // Highlight active sidebar link based on scroll position
+  const sections = document.querySelectorAll('[id]');
+  const navLinks = document.querySelectorAll('nav.sidebar a');
+
+  const observer = new IntersectionObserver(entries => {
+    entries.forEach(entry => {
+      if (entry.isIntersecting) {
+        navLinks.forEach(a => a.classList.remove('active'));
+        const active = document.querySelector(`nav.sidebar a[href="#${entry.target.id}"]`);
+        if (active) active.classList.add('active');
+      }
+    });
+  }, { rootMargin: '-20% 0px -70% 0px' });
+
+  sections.forEach(s => observer.observe(s));
+
+  // Copy buttons on code examples
+  document.querySelectorAll('.example').forEach(ex => {
+    const pre = ex.querySelector('pre');
+    const header = ex.querySelector('.example-header');
+    if (!pre || !header) return;
+    const btn = document.createElement('button');
+    btn.className = 'copy-btn';
+    btn.textContent = 'Copy';
+    btn.addEventListener('click', () => {
+      navigator.clipboard.writeText(pre.innerText.replace(/^PS> /gm, '')).then(() => {
+        btn.textContent = 'Copied!';
+        btn.classList.add('copied');
+        setTimeout(() => { btn.textContent = 'Copy'; btn.classList.remove('copied'); }, 2000);
+      }).catch(() => {
+        const sel = window.getSelection(), range = document.createRange();
+        range.selectNodeContents(pre);
+        sel.removeAllRanges(); sel.addRange(range);
+      });
+    });
+    header.appendChild(btn);
+  });
+</script>
+
+</body>
+</html>
+
