@@ -1,0 +1,660 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>ZeroNetworks – PowerShell Module Reference</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+
+<!-- ═══════════════════════════════════════════════════════════
+     SIDEBAR
+════════════════════════════════════════════════════════════ -->
+<nav class="sidebar">
+  <div class="sidebar-logo">
+    <div class="brand">Zero Networks</div>
+    <div class="title">PS Module (PSGallery)</div>
+  </div>
+
+  <div class="sidebar-section">Overview</div>
+  <a href="#overview">What is this module?</a>
+  <a href="#vs-zntools">vs. ZNTools</a>
+  <a href="#install">Installation</a>
+  <a href="#auth">Authentication</a>
+
+  <div class="sidebar-section">Common Tasks</div>
+  <a href="#discovery">Discovering commands</a>
+  <a href="#assets">Asset search</a>
+  <a href="#rules">Rule review &amp; approval</a>
+  <a href="#labels">Labels</a>
+  <a href="#groups">Groups &amp; users</a>
+  <a href="#settings">Settings &amp; config</a>
+
+  <div class="sidebar-section">Patterns</div>
+  <a href="#pagination">Pagination</a>
+  <a href="#timestamps">Timestamps</a>
+  <a href="#multitenant">Multi-tenant / MSP</a>
+  <a href="#scripting">Scripting patterns</a>
+
+  <div class="sidebar-section">Reference</div>
+  <a href="#auth-ref">Auth quick reference</a>
+  <a href="#notes">Notes &amp; caveats</a>
+
+  <div class="sidebar-section">See Also</div>
+  <a href="zntools-user-reference.html">ZNTools User Reference</a>
+  <a href="breakglass-reference.html">BreakGlass Reference</a>
+  <a href="index.html">&#8592; Docs Home</a>
+</nav>
+
+<!-- ═══════════════════════════════════════════════════════════
+     MAIN
+════════════════════════════════════════════════════════════ -->
+<main>
+
+  <div class="breadcrumb">
+    <a href="index.html">Docs Home</a><span>/</span>
+    <span>ZeroNetworks Module Reference</span>
+  </div>
+
+  <!-- ── OVERVIEW ── -->
+  <div id="overview" class="page-header">
+    <h1>ZeroNetworks PowerShell Module</h1>
+    <div class="tags">
+      <span class="tag">PSGallery</span>
+      <span class="tag purple">API Wrapper</span>
+      <span class="tag">PowerShell 5.1+</span>
+      <span class="tag orange">Preview</span>
+    </div>
+    <p class="lead">
+      The <code>ZeroNetworks</code> module on PowerShell Gallery is the official API client for
+      the Zero Networks platform. It wraps the Zero Networks REST API in 700+ cmdlets covering
+      asset management, rule review, policy configuration, group management, and platform settings.
+      Use it for automation, reporting, and bulk operations against your Zero Networks environment.
+    </p>
+  </div>
+
+  <div class="callout info">
+    <strong>Preview module</strong>
+    The current release is a preview (<code>0.26.3-preview</code>). Install and update commands
+    require <code>-AllowPrerelease</code>. Cmdlet names and parameters may change between preview
+    versions. Pin a version in production automation with <code>-RequiredVersion</code>.
+  </div>
+
+  <!-- ── VS ZNTOOLS ── -->
+  <h2 id="vs-zntools">This module vs. ZNTools</h2>
+  <p>Two PowerShell modules are used alongside Zero Networks. They serve different purposes:</p>
+  <table>
+    <thead><tr><th></th><th>ZeroNetworks (PSGallery)</th><th>ZNTools (internal)</th></tr></thead>
+    <tbody>
+      <tr><td>Source</td><td>PowerShell Gallery — official Zero Networks release</td><td>Internal module in this repository</td></tr>
+      <tr><td>Scope</td><td>Full platform automation: assets, rules, policies, groups, settings</td><td>Operator utilities: health dashboard, port checks, clusters, BG asset browser, service restarts</td></tr>
+      <tr><td>Audience</td><td>Automation engineers, security teams, MSP operators</td><td>Zero Networks technical staff on Segment Servers</td></tr>
+      <tr><td>Cmdlet count</td><td>700+</td><td>~20</td></tr>
+      <tr><td>Auth</td><td><code>Connect-ZN</code> (OTP) or <code>Set-ZnAPIKey</code></td><td><code>ZN_API_KEY</code> env var or <code>-ApiKey</code></td></tr>
+      <tr><td>Runs on</td><td>Any machine with internet access to the ZN portal</td><td>Segment Servers (or admin workstations for some commands)</td></tr>
+    </tbody>
+  </table>
+
+  <!-- ── INSTALLATION ── -->
+  <div class="script-separator">
+    <div class="page-header" style="margin-bottom:1rem; border-bottom:none; padding-bottom:0.5rem;">
+      <h1 id="install">Installation</h1>
+      <div class="tags"><span class="tag">Setup</span></div>
+    </div>
+  </div>
+
+  <h2>Install</h2>
+  <div class="syntax-block">
+    <span class="set-label">PowerShellGet (PSGallery)</span><span class="cmd">Install-Module</span> <span class="param">-Name</span> ZeroNetworks <span class="param">-AllowPrerelease</span>
+  </div>
+  <div class="syntax-block">
+    <span class="set-label">PSResourceGet</span><span class="cmd">Install-PSResource</span> <span class="param">-Name</span> ZeroNetworks <span class="param">-Prerelease</span>
+  </div>
+
+  <h2>Update</h2>
+  <div class="syntax-block">
+<span class="cmd">Update-Module</span> <span class="param">-Name</span> ZeroNetworks <span class="param">-Scope</span> CurrentUser <span class="param">-Force</span> <span class="param">-AllowPrerelease</span>
+  </div>
+
+  <h2>Pin a specific version (production automation)</h2>
+  <div class="syntax-block">
+<span class="cmd">Install-Module</span> <span class="param">-Name</span> ZeroNetworks <span class="param">-RequiredVersion</span> <span class="opt">0.26.3-preview</span> <span class="param">-AllowPrerelease</span>
+  </div>
+
+  <h2>Verify</h2>
+  <div class="example">
+    <div class="example-header">
+      <span class="ex-label">Verify install</span>
+      <span class="ex-title">Confirm module loads and show version</span>
+    </div>
+    <pre><span class="ps-prompt">PS&gt; </span><span class="ps-fn">Get-Module</span> <span class="ps-param">-ListAvailable</span> ZeroNetworks | <span class="ps-fn">Select-Object</span> Name, Version</pre>
+    <div class="example-desc">Should return the installed version. If nothing is returned, the install did not complete.</div>
+  </div>
+
+  <!-- ── AUTHENTICATION ── -->
+  <div class="script-separator">
+    <div class="page-header" style="margin-bottom:1rem; border-bottom:none; padding-bottom:0.5rem;">
+      <h1 id="auth">Authentication</h1>
+      <div class="tags"><span class="tag">Setup</span></div>
+    </div>
+  </div>
+
+  <p>Two authentication methods are available. The right choice depends on how your account is configured.</p>
+
+  <div class="callout">
+    <strong>IdP users must use API key</strong>
+    If your Zero Networks account authenticates through an Identity Provider (SSO/SAML/OIDC),
+    <code>Connect-ZN</code> is not available to you. Use <code>Set-ZnAPIKey</code> with a token
+    generated from the Zero Networks portal.
+  </div>
+
+  <h2>Method 1 — Email OTP <span style="font-size:0.75rem; color:var(--text-muted); font-weight:400;">(non-IdP accounts only)</span></h2>
+  <div class="example">
+    <div class="example-header">
+      <span class="ex-label">Connect-ZN</span>
+      <span class="ex-title">Interactive OTP login</span>
+    </div>
+    <pre><span class="ps-prompt">PS&gt; </span><span class="ps-fn">Connect-ZN</span> <span class="ps-param">-Email</span> <span class="ps-value">you@company.com</span>
+<span class="ps-comment"># Check your email for a one-time code and enter it when prompted</span></pre>
+    <div class="example-desc">Sends a one-time passcode to the supplied email address. Suitable for interactive sessions.</div>
+  </div>
+
+  <h2>Method 2 — API key <span style="font-size:0.75rem; color:var(--text-muted); font-weight:400;">(recommended for automation and IdP accounts)</span></h2>
+  <div class="example">
+    <div class="example-header">
+      <span class="ex-label">Set-ZnAPIKey</span>
+      <span class="ex-title">Authenticate with a portal-generated token</span>
+    </div>
+    <pre><span class="ps-prompt">PS&gt; </span><span class="ps-fn">Set-ZnAPIKey</span> <span class="ps-param">-ApiKey</span> <span class="ps-value">"eyJ..."</span></pre>
+    <div class="example-desc">Set the API key once per session. Generate tokens in the Zero Networks portal under <strong>Settings → API</strong>. For automation, load the key from a secrets manager or environment variable rather than embedding it in script.</div>
+  </div>
+
+  <div class="example">
+    <div class="example-header">
+      <span class="ex-label">API key from env var</span>
+      <span class="ex-title">Recommended pattern for scripts and pipelines</span>
+    </div>
+    <pre><span class="ps-prompt">PS&gt; </span><span class="ps-fn">Set-ZnAPIKey</span> <span class="ps-param">-ApiKey</span> $env:ZN_API_KEY</pre>
+    <div class="example-desc">Reads the key from the <code>ZN_API_KEY</code> environment variable — consistent with the ZNTools convention and avoids hardcoding credentials in scripts.</div>
+  </div>
+
+  <h2>Sign out</h2>
+  <div class="example">
+    <div class="example-header">
+      <span class="ex-label">Disconnect-ZN</span>
+      <span class="ex-title">End the current session</span>
+    </div>
+    <pre><span class="ps-prompt">PS&gt; </span><span class="ps-fn">Disconnect-ZN</span></pre>
+    <div class="example-desc">Clears the current authentication context. Not required at end-of-script, but useful in interactive sessions when switching accounts.</div>
+  </div>
+
+  <!-- ── DISCOVERING COMMANDS ── -->
+  <div class="script-separator">
+    <div class="page-header" style="margin-bottom:1rem; border-bottom:none; padding-bottom:0.5rem;">
+      <h1 id="discovery">Discovering Commands</h1>
+      <div class="tags"><span class="tag green">Read-only</span></div>
+    </div>
+  </div>
+
+  <p>The module contains 700+ cmdlets. Use <code>Get-Command</code> and <code>Get-Help</code> to explore.</p>
+
+  <div class="example">
+    <div class="example-header">
+      <span class="ex-label">List all cmdlets</span>
+      <span class="ex-title">See everything the module exports</span>
+    </div>
+    <pre><span class="ps-prompt">PS&gt; </span><span class="ps-fn">Get-Command</span> <span class="ps-param">-Module</span> ZeroNetworks | <span class="ps-fn">Sort-Object</span> Name</pre>
+    <div class="example-desc">Useful for exploring the full surface area of the module. Pipe to <code>| Out-GridView</code> for a searchable window.</div>
+  </div>
+
+  <div class="example">
+    <div class="example-header">
+      <span class="ex-label">Find by noun</span>
+      <span class="ex-title">Search by functional area</span>
+    </div>
+    <pre><span class="ps-prompt">PS&gt; </span><span class="ps-fn">Get-Command</span> <span class="ps-param">-Name</span> <span class="ps-value">'*ZNAsset*'</span>      <span class="ps-comment"># all asset commands</span>
+<span class="ps-prompt">PS&gt; </span><span class="ps-fn">Get-Command</span> <span class="ps-param">-Name</span> <span class="ps-value">'*ZNGroup*'</span>      <span class="ps-comment"># group management</span>
+<span class="ps-prompt">PS&gt; </span><span class="ps-fn">Get-Command</span> <span class="ps-param">-Name</span> <span class="ps-value">'*ZNSetting*'</span>    <span class="ps-comment"># platform settings</span>
+<span class="ps-prompt">PS&gt; </span><span class="ps-fn">Get-Command</span> <span class="ps-param">-Name</span> <span class="ps-value">'Approve-ZN*'</span>    <span class="ps-comment"># all approval cmdlets</span>
+<span class="ps-prompt">PS&gt; </span><span class="ps-fn">Get-Command</span> <span class="ps-param">-Name</span> <span class="ps-value">'*Mfa*'</span>          <span class="ps-comment"># MFA policy cmdlets</span></pre>
+    <div class="example-desc">The naming pattern is <code>Verb-ZN&lt;Noun&gt;</code>. Common nouns: Asset, Group, Rule, Policy, Setting, Label, User, Tag.</div>
+  </div>
+
+  <div class="example">
+    <div class="example-header">
+      <span class="ex-label">Get-Help</span>
+      <span class="ex-title">Read parameter documentation and examples</span>
+    </div>
+    <pre><span class="ps-prompt">PS&gt; </span><span class="ps-fn">Get-Help</span> <span class="ps-fn">Get-ZNAsset</span> <span class="ps-param">-Full</span>
+<span class="ps-prompt">PS&gt; </span><span class="ps-fn">Get-Help</span> <span class="ps-fn">Approve-ZNAssetInboundRuleReview</span> <span class="ps-param">-Examples</span></pre>
+    <div class="example-desc">Every cmdlet has comment-based help with parameter descriptions and at least one example. <code>-Examples</code> is the fastest way to see intended usage.</div>
+  </div>
+
+  <!-- ── ASSET SEARCH ── -->
+  <div class="script-separator">
+    <div class="page-header" style="margin-bottom:1rem; border-bottom:none; padding-bottom:0.5rem;">
+      <h1 id="assets">Asset Search &amp; Discovery</h1>
+      <div class="tags"><span class="tag green">Read-only</span></div>
+    </div>
+  </div>
+
+  <p>
+    Most operations start with resolving an asset identity. Use <code>Search-ZNAsset</code> to
+    find an asset by FQDN, then pass its ID to other cmdlets.
+  </p>
+
+  <div class="example">
+    <div class="example-header">
+      <span class="ex-label">Example 1</span>
+      <span class="ex-title">Find an asset by FQDN</span>
+    </div>
+    <pre><span class="ps-prompt">PS&gt; </span>$asset = <span class="ps-fn">Search-ZNAsset</span> <span class="ps-param">-Fqdn</span> <span class="ps-value">"dc01.contoso.local"</span>
+<span class="ps-prompt">PS&gt; </span>$asset</pre>
+    <div class="example-desc">Returns an asset identity object. The <code>.AssetId</code> property is used as input to most other cmdlets.</div>
+  </div>
+
+  <div class="example">
+    <div class="example-header">
+      <span class="ex-label">Example 2</span>
+      <span class="ex-title">List assets (first page)</span>
+    </div>
+    <pre><span class="ps-prompt">PS&gt; </span>(<span class="ps-fn">Get-ZNAsset</span> <span class="ps-param">-Limit</span> <span class="ps-value">50</span>).Items | <span class="ps-fn">Select-Object</span> Name, Fqdn, AssetStatus</pre>
+    <div class="example-desc">Returns up to 50 assets. The response wraps results in an <code>.Items</code> property. Use <code>-Offset</code> for subsequent pages — see <a href="#pagination">Pagination</a>.</div>
+  </div>
+
+  <div class="example">
+    <div class="example-header">
+      <span class="ex-label">Example 3</span>
+      <span class="ex-title">Get detailed properties for a specific asset</span>
+    </div>
+    <pre><span class="ps-prompt">PS&gt; </span>$asset = <span class="ps-fn">Search-ZNAsset</span> <span class="ps-param">-Fqdn</span> <span class="ps-value">"server01.contoso.local"</span>
+<span class="ps-prompt">PS&gt; </span><span class="ps-fn">Get-ZNAsset</span> <span class="ps-param">-AssetId</span> $asset.AssetId</pre>
+    <div class="example-desc">Retrieves the full asset object including health state, segmentation status, and platform metadata.</div>
+  </div>
+
+  <div class="example">
+    <div class="example-header">
+      <span class="ex-label">Example 4</span>
+      <span class="ex-title">List all assets (full enumeration)</span>
+    </div>
+    <pre><span class="ps-prompt">PS&gt; </span>$all = [System.Collections.Generic.List[object]]::new()
+<span class="ps-prompt">PS&gt; </span>$limit = 400; $offset = 0
+<span class="ps-prompt">PS&gt; </span>do {
+<span class="ps-prompt">  </span>    $page = (<span class="ps-fn">Get-ZNAsset</span> <span class="ps-param">-Limit</span> $limit <span class="ps-param">-Offset</span> $offset).Items
+<span class="ps-prompt">  </span>    $all.AddRange($page)
+<span class="ps-prompt">  </span>    $offset += $page.Count
+<span class="ps-prompt">PS&gt; </span>} while ($page.Count -eq $limit)
+<span class="ps-prompt">PS&gt; </span>"Total assets: $($all.Count)"</pre>
+    <div class="example-desc">Paginates through the full asset inventory. Suitable for reporting scripts or feeding asset IDs into bulk operations.</div>
+  </div>
+
+  <div class="example">
+    <div class="example-header">
+      <span class="ex-label">Example 5</span>
+      <span class="ex-title">View asset audit history</span>
+    </div>
+    <pre><span class="ps-prompt">PS&gt; </span>$asset = <span class="ps-fn">Search-ZNAsset</span> <span class="ps-param">-Fqdn</span> <span class="ps-value">"dc01.contoso.local"</span>
+<span class="ps-prompt">PS&gt; </span>(<span class="ps-fn">Get-ZNAssetAudit</span> <span class="ps-param">-AssetId</span> $asset.AssetId).Items | <span class="ps-fn">Select-Object</span> -First <span class="ps-value">20</span></pre>
+    <div class="example-desc">Returns the audit log for a specific asset, showing policy changes, segmentation events, and administrator actions.</div>
+  </div>
+
+  <!-- ── RULES ── -->
+  <div class="script-separator">
+    <div class="page-header" style="margin-bottom:1rem; border-bottom:none; padding-bottom:0.5rem;">
+      <h1 id="rules">Rule Review &amp; Approval</h1>
+      <div class="tags"><span class="tag orange">Write</span></div>
+    </div>
+  </div>
+
+  <p>
+    Zero Networks generates rules via machine learning and queues them for review.
+    The module provides cmdlets to enumerate pending rules and approve or deny them,
+    optionally modifying parameters before approval.
+  </p>
+
+  <div class="example">
+    <div class="example-header">
+      <span class="ex-label">Example 1</span>
+      <span class="ex-title">List inbound rules for an asset</span>
+    </div>
+    <pre><span class="ps-prompt">PS&gt; </span>$asset = <span class="ps-fn">Search-ZNAsset</span> <span class="ps-param">-Fqdn</span> <span class="ps-value">"dc01.contoso.local"</span>
+<span class="ps-prompt">PS&gt; </span>(<span class="ps-fn">Get-ZNAssetInboundRule</span> <span class="ps-param">-AssetId</span> $asset.AssetId).Items | <span class="ps-fn">Format-Table</span> -AutoSize</pre>
+    <div class="example-desc">Returns all inbound rules associated with the asset. Add <code>-AddBuiltins</code> to include global rules, or <code>-AddAncestors</code> to include rules inherited from group membership.</div>
+  </div>
+
+  <div class="example">
+    <div class="example-header">
+      <span class="ex-label">Example 2</span>
+      <span class="ex-title">Approve an inbound rule as-is</span>
+    </div>
+    <pre><span class="ps-prompt">PS&gt; </span>$asset = <span class="ps-fn">Search-ZNAsset</span> <span class="ps-param">-Fqdn</span> <span class="ps-value">"dc01.contoso.local"</span>
+<span class="ps-prompt">PS&gt; </span><span class="ps-fn">Approve-ZNAssetInboundRuleReview</span> <span class="ps-param">-AssetId</span> $asset.AssetId `
+<span class="ps-prompt">  </span>    <span class="ps-param">-RuleId</span> <span class="ps-value">"9d275288-4fc3-46e5-a5a0-ff0626214b87"</span></pre>
+    <div class="example-desc">Approves the rule without modification. The rule becomes active immediately after approval.</div>
+  </div>
+
+  <div class="example">
+    <div class="example-header">
+      <span class="ex-label">Example 3</span>
+      <span class="ex-title">Approve with expiry and a review comment</span>
+    </div>
+    <pre><span class="ps-prompt">PS&gt; </span>$expiry = <span class="ps-fn">ConvertTo-ZNEpochMS</span> <span class="ps-param">-Date</span> ((<span class="ps-fn">Get-Date</span>).AddDays(<span class="ps-value">90</span>))
+<span class="ps-prompt">PS&gt; </span><span class="ps-fn">Approve-ZNAssetInboundRuleReview</span> <span class="ps-param">-AssetId</span> $asset.AssetId `
+<span class="ps-prompt">  </span>    <span class="ps-param">-RuleId</span>     <span class="ps-value">"e4a170be-c192-414a-9d36-380a4483583a"</span> `
+<span class="ps-prompt">  </span>    <span class="ps-param">-ExpiresAt</span>  $expiry `
+<span class="ps-prompt">  </span>    <span class="ps-param">-Reason</span>     <span class="ps-value">"Other"</span> `
+<span class="ps-prompt">  </span>    <span class="ps-param">-Details</span>    <span class="ps-value">"Approved for 90 days per change request CHG-1042"</span></pre>
+    <div class="example-desc">Uses <code>ConvertTo-ZNEpochMS</code> to build the expiry timestamp. Review comments are visible in the portal audit log.</div>
+  </div>
+
+  <div class="example">
+    <div class="example-header">
+      <span class="ex-label">Example 4</span>
+      <span class="ex-title">Deny a rule</span>
+    </div>
+    <pre><span class="ps-prompt">PS&gt; </span><span class="ps-fn">Deny-ZNAssetInboundRuleReview</span> <span class="ps-param">-AssetId</span> $asset.AssetId `
+<span class="ps-prompt">  </span>    <span class="ps-param">-RuleId</span>  <span class="ps-value">"b49360ce-3b4b-4e67-a613-42d4704d097f"</span> `
+<span class="ps-prompt">  </span>    <span class="ps-param">-Reason</span>  <span class="ps-value">"Other"</span> `
+<span class="ps-prompt">  </span>    <span class="ps-param">-Details</span> <span class="ps-value">"Denied — traffic pattern not expected from this host"</span></pre>
+    <div class="example-desc">Marks the rule as denied. The traffic will not be permitted.</div>
+  </div>
+
+  <div class="example">
+    <div class="example-header">
+      <span class="ex-label">Example 5</span>
+      <span class="ex-title">Review outbound rules</span>
+    </div>
+    <pre><span class="ps-prompt">PS&gt; </span>$asset = <span class="ps-fn">Search-ZNAsset</span> <span class="ps-param">-Fqdn</span> <span class="ps-value">"workstation01.contoso.local"</span>
+<span class="ps-prompt">PS&gt; </span>(<span class="ps-fn">Get-ZNAssetOutboundRule</span> <span class="ps-param">-AssetId</span> $asset.AssetId <span class="ps-switch">-AddBuiltins</span>).Items |
+<span class="ps-prompt">  </span>    <span class="ps-fn">Where-Object</span> Status <span class="ps-param">-eq</span> <span class="ps-value">"Pending"</span> |
+<span class="ps-prompt">  </span>    <span class="ps-fn">Select-Object</span> RuleId, Description, CreatedAt</pre>
+    <div class="example-desc">Filters to only pending outbound rules. The same <code>Approve-ZNAssetOutboundRuleReview</code> / <code>Deny-ZNAssetOutboundRuleReview</code> pattern applies.</div>
+  </div>
+
+  <!-- ── LABELS ── -->
+  <div class="script-separator">
+    <div class="page-header" style="margin-bottom:1rem; border-bottom:none; padding-bottom:0.5rem;">
+      <h1 id="labels">Labels</h1>
+      <div class="tags"><span class="tag orange">Write</span></div>
+    </div>
+  </div>
+
+  <p>Labels are key-value tags attached to assets. They drive policy targeting and reporting segments.</p>
+
+  <div class="example">
+    <div class="example-header">
+      <span class="ex-label">Example 1</span>
+      <span class="ex-title">Add a label to an asset</span>
+    </div>
+    <pre><span class="ps-prompt">PS&gt; </span>$asset = <span class="ps-fn">Search-ZNAsset</span> <span class="ps-param">-Fqdn</span> <span class="ps-value">"server01.contoso.local"</span>
+<span class="ps-prompt">PS&gt; </span><span class="ps-fn">Add-ZNAssetLabel</span> <span class="ps-param">-AssetId</span> $asset.AssetId `
+<span class="ps-prompt">  </span>    <span class="ps-param">-Labels</span> @(@{ key = <span class="ps-value">"Environment"</span>; value = <span class="ps-value">"Production"</span> })</pre>
+    <div class="example-desc">Labels are key-value pairs. Pass multiple labels as an array of hashtables.</div>
+  </div>
+
+  <div class="example">
+    <div class="example-header">
+      <span class="ex-label">Example 2</span>
+      <span class="ex-title">Bulk-label assets from a CSV</span>
+    </div>
+    <pre><span class="ps-prompt">PS&gt; </span><span class="ps-fn">Import-Csv</span> <span class="ps-value">assets.csv</span> | <span class="ps-fn">ForEach-Object</span> {
+<span class="ps-prompt">  </span>    $asset = <span class="ps-fn">Search-ZNAsset</span> <span class="ps-param">-Fqdn</span> $_.Fqdn
+<span class="ps-prompt">  </span>    <span class="ps-fn">Add-ZNAssetLabel</span> <span class="ps-param">-AssetId</span> $asset.AssetId `
+<span class="ps-prompt">  </span>        <span class="ps-param">-Labels</span> @(@{ key = <span class="ps-value">"Tier"</span>; value = $_.Tier })
+<span class="ps-prompt">PS&gt; </span>}</pre>
+    <div class="example-desc">CSV columns: <code>Fqdn</code>, <code>Tier</code>. Useful for initial classification of a large asset inventory.</div>
+  </div>
+
+  <!-- ── GROUPS ── -->
+  <div class="script-separator">
+    <div class="page-header" style="margin-bottom:1rem; border-bottom:none; padding-bottom:0.5rem;">
+      <h1 id="groups">Groups &amp; Users</h1>
+      <div class="tags"><span class="tag orange">Write</span></div>
+    </div>
+  </div>
+
+  <div class="example">
+    <div class="example-header">
+      <span class="ex-label">Example 1</span>
+      <span class="ex-title">Add an asset to a custom group</span>
+    </div>
+    <pre><span class="ps-prompt">PS&gt; </span><span class="ps-fn">Add-ZNCustomGroupsMember</span> <span class="ps-param">-GroupId</span> <span class="ps-value">"&lt;group-id&gt;"</span> <span class="ps-param">-MembersId</span> @($asset.AssetId)</pre>
+    <div class="example-desc">Use <code>Get-ZNCustomGroups</code> to find the group ID first.</div>
+  </div>
+
+  <div class="example">
+    <div class="example-header">
+      <span class="ex-label">Example 2</span>
+      <span class="ex-title">Assign an asset manager</span>
+    </div>
+    <pre><span class="ps-prompt">PS&gt; </span>$asset = <span class="ps-fn">Search-ZNAsset</span> <span class="ps-param">-Fqdn</span> <span class="ps-value">"server01.contoso.local"</span>
+<span class="ps-prompt">PS&gt; </span><span class="ps-fn">Add-ZNAssetManager</span> <span class="ps-param">-AssetId</span> $asset.AssetId <span class="ps-param">-ManagerIds</span> @(<span class="ps-value">"&lt;user-id&gt;"</span>)</pre>
+    <div class="example-desc">Asset managers receive notifications for rule reviews on the assets they manage. Use <code>Get-ZNUser</code> to resolve user IDs.</div>
+  </div>
+
+  <!-- ── SETTINGS ── -->
+  <div class="script-separator">
+    <div class="page-header" style="margin-bottom:1rem; border-bottom:none; padding-bottom:0.5rem;">
+      <h1 id="settings">Settings &amp; Configuration</h1>
+      <div class="tags"><span class="tag orange">Write</span></div>
+    </div>
+  </div>
+
+  <div class="example">
+    <div class="example-header">
+      <span class="ex-label">Example 1</span>
+      <span class="ex-title">Read current notification settings</span>
+    </div>
+    <pre><span class="ps-prompt">PS&gt; </span><span class="ps-fn">Get-ZNSetting</span></pre>
+    <div class="example-desc">Returns the current platform configuration. Use <code>Get-Command -Name '*ZNSetting*'</code> for available setting cmdlets.</div>
+  </div>
+
+  <div class="example">
+    <div class="example-header">
+      <span class="ex-label">Example 2</span>
+      <span class="ex-title">Update notification settings</span>
+    </div>
+    <pre><span class="ps-prompt">PS&gt; </span><span class="ps-fn">Update-ZNNotificationSetting</span> <span class="ps-param">-SendWeeklyReports</span> <span class="ps-value">$true</span></pre>
+    <div class="example-desc">Use <code>Get-Help Update-ZNNotificationSetting -Full</code> to see all available notification toggles.</div>
+  </div>
+
+  <!-- ── PATTERNS ── -->
+  <div class="script-separator">
+    <div class="page-header" style="margin-bottom:1rem; border-bottom:none; padding-bottom:0.5rem;">
+      <h1>Patterns</h1>
+      <div class="tags"><span class="tag purple">Reference</span></div>
+    </div>
+  </div>
+
+  <h2 id="pagination">Pagination</h2>
+  <p>
+    All list cmdlets return a wrapper object. Results are in the <code>.Items</code> property.
+    Use <code>-Limit</code> (max results per call) and <code>-Offset</code> (skip count) to paginate.
+    The default limit is 10; the practical maximum is 400.
+  </p>
+
+  <div class="example">
+    <div class="example-header">
+      <span class="ex-label">Pagination pattern</span>
+      <span class="ex-title">Collect all results across pages</span>
+    </div>
+    <pre>$all = [System.Collections.Generic.List[object]]::new()
+$limit = 400; $offset = 0
+do {
+    $page = (<span class="ps-fn">Get-ZNAsset</span> <span class="ps-param">-Limit</span> $limit <span class="ps-param">-Offset</span> $offset).Items
+    $all.AddRange($page)
+    $offset += $page.Count
+} while ($page.Count -eq $limit)</pre>
+    <div class="example-desc">The loop exits when a page returns fewer results than the limit, indicating the last page. Swap <code>Get-ZNAsset</code> for any list cmdlet.</div>
+  </div>
+
+  <h2 id="timestamps">Timestamps</h2>
+  <p>Parameters that accept dates (such as <code>-ExpiresAt</code>) expect epoch milliseconds. Use the bundled helper:</p>
+
+  <div class="example">
+    <div class="example-header">
+      <span class="ex-label">ConvertTo-ZNEpochMS</span>
+      <span class="ex-title">Build timestamp parameters</span>
+    </div>
+    <pre><span class="ps-comment"># 90 days from now</span>
+$expiry = <span class="ps-fn">ConvertTo-ZNEpochMS</span> <span class="ps-param">-Date</span> ((<span class="ps-fn">Get-Date</span>).AddDays(<span class="ps-value">90</span>))
+
+<span class="ps-comment"># Specific date</span>
+$expiry = <span class="ps-fn">ConvertTo-ZNEpochMS</span> <span class="ps-param">-Date</span> (<span class="ps-fn">Get-Date</span> <span class="ps-value">"2026-12-31"</span>)</pre>
+    <div class="example-desc">Always use this helper rather than calculating epoch timestamps manually — it handles UTC conversion correctly.</div>
+  </div>
+
+  <h2 id="multitenant">Multi-tenant / MSP</h2>
+  <p>
+    If you manage multiple customer tenants, use <code>-AccountName</code> to target a specific
+    account. When omitted, the account is derived automatically from the token's JWT audience.
+  </p>
+
+  <div class="example">
+    <div class="example-header">
+      <span class="ex-label">-AccountName</span>
+      <span class="ex-title">Target a specific customer account</span>
+    </div>
+    <pre><span class="ps-prompt">PS&gt; </span><span class="ps-fn">Get-ZNAsset</span> <span class="ps-param">-AccountName</span> <span class="ps-value">"customer-tenant-id"</span> <span class="ps-param">-Limit</span> <span class="ps-value">50</span></pre>
+    <div class="example-desc"><code>-AccountName</code> is available on virtually every cmdlet. It is optional for single-tenant deployments.</div>
+  </div>
+
+  <h2 id="scripting">Scripting patterns</h2>
+
+  <div class="example">
+    <div class="example-header">
+      <span class="ex-label">Background jobs</span>
+      <span class="ex-title">Run long operations asynchronously</span>
+    </div>
+    <pre><span class="ps-comment"># Many write cmdlets accept -AsJob</span>
+$job = <span class="ps-fn">Approve-ZNAssetInboundRuleReview</span> <span class="ps-param">-AssetId</span> $asset.AssetId `
+    <span class="ps-param">-RuleId</span> $ruleId <span class="ps-switch">-AsJob</span>
+<span class="ps-fn">Wait-Job</span> $job | <span class="ps-fn">Receive-Job</span></pre>
+    <div class="example-desc">Use <code>-AsJob</code> when approving or modifying many rules in sequence to avoid blocking the session.</div>
+  </div>
+
+  <div class="example">
+    <div class="example-header">
+      <span class="ex-label">Error handling</span>
+      <span class="ex-title">Catch API errors in automation</span>
+    </div>
+    <pre>try {
+    $asset = <span class="ps-fn">Search-ZNAsset</span> <span class="ps-param">-Fqdn</span> <span class="ps-value">"unknown.contoso.local"</span>
+} catch {
+    <span class="ps-fn">Write-Warning</span> <span class="ps-value">"Asset lookup failed: $($_.Exception.Message)"</span>
+}</pre>
+    <div class="example-desc">API errors surface as terminating exceptions. Wrap bulk operations in try/catch and log failures to a list rather than aborting the whole script.</div>
+  </div>
+
+  <div class="example">
+    <div class="example-header">
+      <span class="ex-label">Bulk approval from a list</span>
+      <span class="ex-title">Approve a set of known rule IDs</span>
+    </div>
+    <pre>$ruleIds = @(
+    "9d275288-4fc3-46e5-a5a0-ff0626214b87",
+    "e4a170be-c192-414a-9d36-380a4483583a"
+)
+$asset = <span class="ps-fn">Search-ZNAsset</span> <span class="ps-param">-Fqdn</span> <span class="ps-value">"dc01.contoso.local"</span>
+$failed = @()
+
+foreach ($id in $ruleIds) {
+    try {
+        <span class="ps-fn">Approve-ZNAssetInboundRuleReview</span> <span class="ps-param">-AssetId</span> $asset.AssetId <span class="ps-param">-RuleId</span> $id
+        <span class="ps-fn">Write-Host</span> <span class="ps-value">"Approved $id"</span> <span class="ps-param">-ForegroundColor</span> Green
+    } catch {
+        $failed += $id
+        <span class="ps-fn">Write-Warning</span> <span class="ps-value">"Failed $id`: $_"</span>
+    }
+}
+<span class="ps-fn">Write-Host</span> <span class="ps-value">"Done. $($failed.Count) failure(s)."</span></pre>
+    <div class="example-desc">Collects failures without aborting. Review the <code>$failed</code> array after the loop.</div>
+  </div>
+
+  <!-- ── REFERENCE ── -->
+  <div class="script-separator">
+    <div class="page-header" style="margin-bottom:1rem; border-bottom:none; padding-bottom:0.5rem;">
+      <h1>Reference</h1>
+      <div class="tags"><span class="tag purple">Quick Reference</span></div>
+    </div>
+  </div>
+
+  <h2 id="auth-ref">Authentication quick reference</h2>
+  <table>
+    <thead><tr><th>Scenario</th><th>Method</th><th>Command</th></tr></thead>
+    <tbody>
+      <tr>
+        <td>Interactive session, no IdP</td>
+        <td>Email OTP</td>
+        <td><code>Connect-ZN -Email you@company.com</code></td>
+      </tr>
+      <tr>
+        <td>IdP / SSO account</td>
+        <td>API key</td>
+        <td><code>Set-ZnAPIKey -ApiKey $env:ZN_API_KEY</code></td>
+      </tr>
+      <tr>
+        <td>Automated script / CI pipeline</td>
+        <td>API key from env var or vault</td>
+        <td><code>Set-ZnAPIKey -ApiKey $env:ZN_API_KEY</code></td>
+      </tr>
+      <tr>
+        <td>Multi-tenant (MSP)</td>
+        <td>API key + AccountName per call</td>
+        <td><code>Set-ZnAPIKey -ApiKey ...; Get-ZNAsset -AccountName "tenant"</code></td>
+      </tr>
+    </tbody>
+  </table>
+
+  <h2 id="notes">Notes &amp; caveats</h2>
+  <ul style="line-height: 2.1; margin-left: 1.5rem;">
+    <li>The module is currently in <strong>preview</strong>. Cmdlet signatures may change between versions. Pin <code>-RequiredVersion</code> in production scripts and test upgrades before rolling out.</li>
+    <li><strong>API token permissions</strong> vary by token type. Some cmdlets require a read/write token; read-only tokens will return a <code>Permission Denied</code> error on write operations. Generate tokens at the correct permission level for the task.</li>
+    <li><strong>Rate limiting</strong> applies on the Zero Networks API. For bulk operations over large asset sets, add a short <code>Start-Sleep -Milliseconds 100</code> between iterations if you observe throttling errors.</li>
+    <li><strong>AssetId vs. Fqdn</strong> — Most cmdlets require an asset ID (a GUID), not an FQDN. Always resolve via <code>Search-ZNAsset -Fqdn</code> first and cache the result rather than calling Search on every iteration of a loop.</li>
+    <li><strong>Response object structure</strong> — List cmdlets wrap results in a response object. Always access <code>.Items</code> to get the actual array: <code>(Get-ZNAsset).Items</code>.</li>
+    <li><strong>Source</strong> — GitHub: <code>https://github.com/zeronetworks/zero-powershell</code>. The <code>/src/ZN/docs</code> folder has a markdown file for every cmdlet.</li>
+    <li><strong>Support</strong> — <code>support@zeronetworks.com</code> or open an issue on the GitHub repository.</li>
+  </ul>
+
+</main>
+
+<script>
+  const sections = document.querySelectorAll('[id]');
+  const navLinks = document.querySelectorAll('nav.sidebar a');
+  const observer = new IntersectionObserver(entries => {
+    entries.forEach(entry => {
+      if (entry.isIntersecting) {
+        navLinks.forEach(a => a.classList.remove('active'));
+        const active = document.querySelector(`nav.sidebar a[href="#${entry.target.id}"]`);
+        if (active) active.classList.add('active');
+      }
+    });
+  }, { rootMargin: '-20% 0px -70% 0px' });
+  sections.forEach(s => observer.observe(s));
+
+  document.querySelectorAll('.example').forEach(ex => {
+    const pre = ex.querySelector('pre');
+    const header = ex.querySelector('.example-header');
+    if (!pre || !header) return;
+    const btn = document.createElement('button');
+    btn.className = 'copy-btn';
+    btn.textContent = 'Copy';
+    btn.addEventListener('click', () => {
+      navigator.clipboard.writeText(pre.innerText.replace(/^PS> /gm, '')).then(() => {
+        btn.textContent = 'Copied!';
+        btn.classList.add('copied');
+        setTimeout(() => { btn.textContent = 'Copy'; btn.classList.remove('copied'); }, 2000);
+      }).catch(() => {
+        const sel = window.getSelection(), range = document.createRange();
+        range.selectNodeContents(pre);
+        sel.removeAllRanges(); sel.addRange(range);
+      });
+    });
+    header.appendChild(btn);
+  });
+</script>
+
+</body>
+</html>

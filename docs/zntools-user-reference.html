@@ -1,0 +1,580 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>ZNTools – User Reference</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+
+<!-- ═══════════════════════════════════════════════════════════
+     SIDEBAR
+════════════════════════════════════════════════════════════ -->
+<nav class="sidebar">
+  <div class="sidebar-logo">
+    <div class="brand">Zero Networks</div>
+    <div class="title">ZNTools (Users)</div>
+  </div>
+
+  <div class="sidebar-section">Overview</div>
+  <a href="#overview">What is ZNTools?</a>
+  <a href="#quickstart">Quick start</a>
+  <a href="#auth">Authentication</a>
+
+  <div class="sidebar-section">API Commands</div>
+  <a href="#cmd-test-port">Test-ZNPort</a>
+  <a href="#cmd-linux-profile">Get-ZNLinuxProfile</a>
+  <a href="#cmd-segment-cluster">Get-ZNSegmentCluster</a>
+  <a href="#cmd-health-dashboard">Show-ZNHealthDashboard</a>
+
+  <div class="sidebar-section">Service Management</div>
+  <a href="#cmd-invoke-services">Invoke-ZNServices</a>
+
+  <div class="sidebar-section">BG Asset Browser</div>
+  <a href="#cmd-import-asset-data">Import-ZNBG-AssetData</a>
+  <a href="#cmd-asset-queries">Query commands</a>
+  <a href="#cmd-asset-clusters">Cluster commands</a>
+  <a href="#cmd-asset-environment">Environment commands</a>
+
+  <div class="sidebar-section">See Also</div>
+  <a href="zntools-author-reference.html">ZNTools Author Reference</a>
+  <a href="zeronetworks-module-reference.html">ZeroNetworks Module (PSGallery)</a>
+  <a href="breakglass-reference.html">BreakGlass Reference</a>
+  <a href="index.html">&#8592; Docs Home</a>
+</nav>
+
+<!-- ═══════════════════════════════════════════════════════════
+     MAIN
+════════════════════════════════════════════════════════════ -->
+<main>
+
+  <div class="breadcrumb">
+    <a href="index.html">Docs Home</a><span>/</span>
+    <span>ZNTools User Reference</span>
+  </div>
+
+  <div id="overview" class="page-header">
+    <h1>ZNTools</h1>
+    <div class="tags">
+      <span class="tag">PowerShell 7+</span>
+      <span class="tag purple">Module</span>
+      <span class="tag green">User Reference</span>
+      <span class="tag">v1.1</span>
+    </div>
+    <p class="lead">
+      ZNTools is a PowerShell module for Zero Networks operators. It provides network
+      connectivity checks, Linux configuration profiles, segment server clusters, environment
+      health data, asset browser queries against local JSON snapshots, and ZN service
+      lifecycle management.
+    </p>
+  </div>
+
+  <div class="callout info">
+    <strong>Prefixing</strong>
+    All commands are exported with the <code>ZN</code> prefix via the module manifest.
+    Use <code>Test-ZNPort</code>, <code>Get-ZNBG-Asset</code>, <code>Invoke-ZNServices</code>, etc.
+  </div>
+
+  <h2 id="quickstart">Quick start</h2>
+  <div class="syntax-block">
+<span class="cmd">Import-Module</span> <span class="param">.\ZNTools\ZNTools.psd1</span>
+  </div>
+
+  <div class="callout info">
+    <strong>Extending ZNTools?</strong>
+    If you want to add new commands or modify module internals, see the
+    <a href="zntools-author-reference.html">ZNTools Author Reference</a> for the module
+    structure, required patterns, and private helper documentation.
+  </div>
+
+  <h2 id="auth">Authentication</h2>
+  <p>
+    API-backed commands use the <code>ZN_API_KEY</code> environment variable (a JWT).
+    Override per command with <code>-ApiKey</code> and/or <code>-ApiUrl</code>.
+    Asset browser commands work offline — no API key required after loading data.
+  </p>
+
+  <!-- ════════════════════════════════════════
+       Test-ZNPort
+  ═════════════════════════════════════════ -->
+  <div class="script-separator">
+    <div class="page-header" style="margin-bottom:1rem; border-bottom:none; padding-bottom:0.5rem;">
+      <h1 id="cmd-test-port">Test-ZNPort</h1>
+      <div class="tags">
+        <span class="tag">Networking</span>
+        <span class="tag green">Read-only</span>
+      </div>
+    </div>
+  </div>
+
+  <h2>Synopsis</h2>
+  <p>Tests TCP connectivity to a host/port and reports the source IP used.</p>
+
+  <h2>Syntax</h2>
+  <div class="syntax-block">
+<span class="cmd">Test-ZNPort</span>
+  <span class="param">-Computer</span> &lt;string&gt;
+  <span class="param">-Port</span> &lt;int&gt;
+ [<span class="param">-Millisecond</span> &lt;int&gt;]
+ [<span class="param">-Continuous</span>]
+ [<span class="param">-PreferIPv4</span>]
+  </div>
+
+  <h2>Parameters</h2>
+  <div class="param-entry">
+    <div class="param-name">-Computer</div>
+    <div class="param-body"><p class="param-desc">Target hostname or FQDN.</p></div>
+  </div>
+  <div class="param-entry">
+    <div class="param-name">-Port</div>
+    <div class="param-body"><p class="param-desc">TCP port to test.</p></div>
+  </div>
+  <div class="param-entry">
+    <div class="param-name">-Millisecond</div>
+    <div class="param-body"><p class="param-desc">Timeout in milliseconds. Default: 1000.</p></div>
+  </div>
+  <div class="param-entry">
+    <div class="param-name">-Continuous</div>
+    <div class="param-body"><p class="param-desc">Continuous loop mode with live pass/fail output.</p></div>
+  </div>
+  <div class="param-entry">
+    <div class="param-name">-PreferIPv4</div>
+    <div class="param-body"><p class="param-desc">Prefer IPv4 resolution and sockets.</p></div>
+  </div>
+
+  <h2>Examples</h2>
+  <div class="example">
+    <div class="example-header">
+      <span class="ex-label">Example 1</span>
+      <span class="ex-title">Single probe</span>
+    </div>
+    <pre><span class="ps-prompt">PS&gt; </span><span class="ps-fn">Test-ZNPort</span> <span class="ps-param">-Computer</span> <span class="ps-value">server01</span> <span class="ps-param">-Port</span> <span class="ps-value">443</span></pre>
+    <div class="example-desc">Performs one TCP connection attempt and returns an object with SourceIP and Success.</div>
+  </div>
+  <div class="example">
+    <div class="example-header">
+      <span class="ex-label">Example 2</span>
+      <span class="ex-title">Continuous IPv4-only checks</span>
+    </div>
+    <pre><span class="ps-prompt">PS&gt; </span><span class="ps-fn">Test-ZNPort</span> <span class="ps-param">-Computer</span> <span class="ps-value">server01</span> <span class="ps-param">-Port</span> <span class="ps-value">22</span> <span class="ps-switch">-Continuous</span> <span class="ps-switch">-PreferIPv4</span></pre>
+    <div class="example-desc">Forces IPv4 resolution and prints live results until stopped with Ctrl+C.</div>
+  </div>
+
+  <!-- ════════════════════════════════════════
+       Get-ZNLinuxProfile
+  ═════════════════════════════════════════ -->
+  <div class="script-separator">
+    <div class="page-header" style="margin-bottom:1rem; border-bottom:none; padding-bottom:0.5rem;">
+      <h1 id="cmd-linux-profile">Get-ZNLinuxProfile</h1>
+      <div class="tags">
+        <span class="tag">Linux</span>
+        <span class="tag orange">R/W API Key Required</span>
+      </div>
+    </div>
+  </div>
+
+  <h2>Synopsis</h2>
+  <p>Lists Linux configuration profiles (Name/Id).</p>
+
+  <div class="callout">
+    <strong>API Key Permissions</strong>
+    This command requires an API key with read <em>and</em> write permissions.
+    A read-only key will result in a <code>Permission Denied</code> error.
+  </div>
+
+  <h2>Syntax</h2>
+  <div class="syntax-block">
+<span class="cmd">Get-ZNLinuxProfile</span>
+ [<span class="param">-ApiKey</span> &lt;string&gt;]
+ [<span class="param">-ApiUrl</span> &lt;string&gt;]
+  </div>
+
+  <h2>Examples</h2>
+  <div class="example">
+    <div class="example-header">
+      <span class="ex-label">Example 1</span>
+      <span class="ex-title">List profiles</span>
+    </div>
+    <pre><span class="ps-prompt">PS&gt; </span><span class="ps-fn">Get-ZNLinuxProfile</span></pre>
+    <div class="example-desc">Returns each profile's Name and Id.</div>
+  </div>
+
+  <!-- ════════════════════════════════════════
+       Get-ZNSegmentCluster
+  ═════════════════════════════════════════ -->
+  <div class="script-separator">
+    <div class="page-header" style="margin-bottom:1rem; border-bottom:none; padding-bottom:0.5rem;">
+      <h1 id="cmd-segment-cluster">Get-ZNSegmentCluster</h1>
+      <div class="tags">
+        <span class="tag">Segment</span>
+        <span class="tag green">Read-only</span>
+      </div>
+    </div>
+  </div>
+
+  <h2>Synopsis</h2>
+  <p>Lists Segment Server infrastructure clusters and their member servers.</p>
+
+  <h2>Syntax</h2>
+  <div class="syntax-block">
+<span class="cmd">Get-ZNSegmentCluster</span>
+ [<span class="param">-ApiKey</span> &lt;string&gt;]
+ [<span class="param">-ApiUrl</span> &lt;string&gt;]
+  </div>
+
+  <h2>Examples</h2>
+  <div class="example">
+    <div class="example-header">
+      <span class="ex-label">Example 1</span>
+      <span class="ex-title">List clusters</span>
+    </div>
+    <pre><span class="ps-prompt">PS&gt; </span><span class="ps-fn">Get-ZNSegmentCluster</span></pre>
+    <div class="example-desc">Returns each cluster's name, id, and the list of Segment Server names.</div>
+  </div>
+
+  <!-- ════════════════════════════════════════
+       Show-ZNHealthDashboard
+  ═════════════════════════════════════════ -->
+  <div class="script-separator">
+    <div class="page-header" style="margin-bottom:1rem; border-bottom:none; padding-bottom:0.5rem;">
+      <h1 id="cmd-health-dashboard">Show-ZNHealthDashboard</h1>
+      <div class="tags">
+        <span class="tag">Health</span>
+        <span class="tag orange">Console Output</span>
+      </div>
+    </div>
+  </div>
+
+  <h2>Synopsis</h2>
+  <p>Displays a health dashboard for unhealthy assets and optionally exports CSV.</p>
+
+  <h2>Syntax</h2>
+  <div class="syntax-block">
+<span class="cmd">Show-ZNHealthDashboard</span>
+ [<span class="param">-ApiKey</span> &lt;string&gt;]
+ [<span class="param">-ApiUrl</span> &lt;string&gt;]
+ [<span class="param">-ExportCsv</span> &lt;string&gt;]
+ [<span class="param">-IncludeNA</span>]
+ [<span class="param">-IncludeDisconnected</span>]
+ [<span class="param">-IncludeDisconnectedDays</span> &lt;int&gt;]
+  </div>
+
+  <h2>Examples</h2>
+  <div class="example">
+    <div class="example-header">
+      <span class="ex-label">Example 1</span>
+      <span class="ex-title">Health dashboard</span>
+    </div>
+    <pre><span class="ps-prompt">PS&gt; </span><span class="ps-fn">Show-ZNHealthDashboard</span></pre>
+    <div class="example-desc">Shows system health and unhealthy asset details.</div>
+  </div>
+  <div class="example">
+    <div class="example-header">
+      <span class="ex-label">Example 2</span>
+      <span class="ex-title">Include disconnected assets</span>
+    </div>
+    <pre><span class="ps-prompt">PS&gt; </span><span class="ps-fn">Show-ZNHealthDashboard</span> <span class="ps-switch">-IncludeDisconnected</span></pre>
+    <div class="example-desc">Adds a disconnected assets section to the output.</div>
+  </div>
+  <div class="example">
+    <div class="example-header">
+      <span class="ex-label">Example 3</span>
+      <span class="ex-title">Export CSV</span>
+    </div>
+    <pre><span class="ps-prompt">PS&gt; </span><span class="ps-fn">Show-ZNHealthDashboard</span> <span class="ps-param">-ExportCsv</span> <span class="ps-value">health.csv</span></pre>
+    <div class="example-desc">Exports health rows to a CSV file.</div>
+  </div>
+
+  <!-- ════════════════════════════════════════
+       Invoke-ZNServices
+  ═════════════════════════════════════════ -->
+  <div class="script-separator">
+    <div class="page-header" style="margin-bottom:1rem; border-bottom:none; padding-bottom:0.5rem;">
+      <h1 id="cmd-invoke-services">Invoke-ZNServices</h1>
+      <div class="tags">
+        <span class="tag">Services</span>
+        <span class="tag orange">Destructive</span>
+      </div>
+    </div>
+  </div>
+
+  <h2>Synopsis</h2>
+  <p>
+    Stops, starts, or restarts all Zero Networks services (<code>zn*</code>) on the local machine,
+    a single remote Segment Server, or every Segment Server discovered via the ZN API.
+  </p>
+
+  <div class="callout">
+    <strong>Requirements</strong>
+    Local scope requires an Administrator session. Remote and AllServers scopes require WinRM (PSRemoting)
+    to be enabled and reachable on each target Segment Server.
+  </div>
+
+  <h2>Syntax</h2>
+  <div class="syntax-block">
+    <span class="set-label">Local (default) — requires Administrator</span><span class="cmd">Invoke-ZNServices</span>
+  <span class="param">-Action</span> &lt;Stop|Start|Restart&gt;
+  </div>
+  <div class="syntax-block">
+    <span class="set-label">Remote — single Segment Server</span><span class="cmd">Invoke-ZNServices</span>
+  <span class="param">-Action</span> &lt;Stop|Start|Restart&gt;
+  <span class="param">-ComputerName</span> &lt;string&gt;
+ [<span class="param">-Credential</span> &lt;PSCredential&gt;]
+  </div>
+  <div class="syntax-block">
+    <span class="set-label">AllServers — all Segment Servers via API</span><span class="cmd">Invoke-ZNServices</span>
+  <span class="param">-Action</span> &lt;Stop|Start|Restart&gt;
+  <span class="param">-AllServers</span>
+ [<span class="param">-ClusterName</span> &lt;string&gt;]
+ [<span class="param">-Credential</span> &lt;PSCredential&gt;]
+ [<span class="param">-ApiKey</span> &lt;string&gt;]
+ [<span class="param">-ApiUrl</span> &lt;string&gt;]
+  </div>
+
+  <h2>Parameters</h2>
+  <div class="param-entry">
+    <div class="param-name">-Action</div>
+    <div class="param-body"><p class="param-desc">Required. <code>Stop</code>, <code>Start</code>, or <code>Restart</code>.</p></div>
+  </div>
+  <div class="param-entry">
+    <div class="param-name">-ComputerName</div>
+    <div class="param-body"><p class="param-desc">Hostname or IP of a single remote Segment Server. Enables the Remote parameter set.</p></div>
+  </div>
+  <div class="param-entry">
+    <div class="param-name">-AllServers</div>
+    <div class="param-body"><p class="param-desc">Discover all Segment Servers from the ZN API and target each. Requires API access.</p></div>
+  </div>
+  <div class="param-entry">
+    <div class="param-name">-ClusterName</div>
+    <div class="param-body"><p class="param-desc">With <code>-AllServers</code>: limit to Segment Servers in this cluster. Partial match, case-insensitive. Uses in-memory cluster data if <code>Import-ZNBG-AssetData</code> has been run.</p></div>
+  </div>
+  <div class="param-entry">
+    <div class="param-name">-Credential</div>
+    <div class="param-body"><p class="param-desc">PSCredential for PSRemoting. If omitted, the current session identity is used.</p></div>
+  </div>
+
+  <h2>Examples</h2>
+  <div class="example">
+    <div class="example-header">
+      <span class="ex-label">Example 1</span>
+      <span class="ex-title">Restart services locally</span>
+    </div>
+    <pre><span class="ps-prompt">PS&gt; </span><span class="ps-fn">Invoke-ZNServices</span> <span class="ps-param">-Action</span> <span class="ps-value">Restart</span></pre>
+    <div class="example-desc">Restarts all <code>zn*</code> services on the local machine. Requires Administrator.</div>
+  </div>
+  <div class="example">
+    <div class="example-header">
+      <span class="ex-label">Example 2</span>
+      <span class="ex-title">Restart on a single remote server</span>
+    </div>
+    <pre><span class="ps-prompt">PS&gt; </span><span class="ps-fn">Invoke-ZNServices</span> <span class="ps-param">-Action</span> <span class="ps-value">Restart</span> <span class="ps-param">-ComputerName</span> <span class="ps-value">segment02.zero.local</span></pre>
+    <div class="example-desc">Connects via PSRemoting and restarts services on the target server.</div>
+  </div>
+  <div class="example">
+    <div class="example-header">
+      <span class="ex-label">Example 3</span>
+      <span class="ex-title">Restart across all Segment Servers</span>
+    </div>
+    <pre><span class="ps-prompt">PS&gt; </span><span class="ps-fn">Invoke-ZNServices</span> <span class="ps-param">-Action</span> <span class="ps-value">Restart</span> <span class="ps-switch">-AllServers</span></pre>
+    <div class="example-desc">Discovers all Segment Servers from the ZN API and restarts services on each.</div>
+  </div>
+  <div class="example">
+    <div class="example-header">
+      <span class="ex-label">Example 4</span>
+      <span class="ex-title">Stop services in a specific cluster</span>
+    </div>
+    <pre><span class="ps-prompt">PS&gt; </span><span class="ps-fn">Invoke-ZNServices</span> <span class="ps-param">-Action</span> <span class="ps-value">Stop</span> <span class="ps-switch">-AllServers</span> <span class="ps-param">-ClusterName</span> <span class="ps-value">"zero.local"</span></pre>
+    <div class="example-desc">Limits the operation to Segment Servers in the zero.local cluster.</div>
+  </div>
+
+  <!-- ════════════════════════════════════════
+       ASSET BROWSER
+  ═════════════════════════════════════════ -->
+  <div class="script-separator">
+    <div class="page-header" style="margin-bottom:1rem; border-bottom:none; padding-bottom:0.5rem;">
+      <h1 id="cmd-import-asset-data">Asset Browser</h1>
+      <div class="tags">
+        <span class="tag">Offline</span>
+        <span class="tag green">Read-only</span>
+        <span class="tag purple">BreakGlass JSON</span>
+      </div>
+    </div>
+  </div>
+
+  <p>
+    The BreakGlass asset browser loads a local snapshot of segmented asset data — the
+    <code>segmentedAssets.json</code> file maintained by the Zero Networks BreakGlass
+    installation — into session memory and exposes it as queryable PowerShell objects.
+    It's basically a fancy ConvertFrom-Json with some added enrichment and helper functions 
+    for common queries. 
+    No API calls are made after the initial load. All query functions return objects — pipe
+    them freely with <code>Where-Object</code>, <code>Group-Object</code>,
+    <code>Export-Csv</code>, and so on.
+  </p>
+
+  <p>
+    All commands in this section use the <code>ZNBG-</code> noun prefix to clearly distinguish
+    them from API-backed ZNTools commands.
+  </p>
+
+  <div class="callout info">
+    <strong>Workflow</strong>
+    Run <code>Import-ZNBG-AssetData</code> once per session. The data stays in memory until you
+    re-import or close the session. All query commands below will throw if called before
+    <code>Import-ZNBG-AssetData</code>.
+  </div>
+
+  <!-- Import-ZNBG-AssetData -->
+  <h2 id="cmd-import-asset-data">Import-ZNBG-AssetData</h2>
+  <p>Loads <code>segmentedAssets.json</code> and <code>switches.json</code> into the ZNTools session.</p>
+
+  <div class="syntax-block">
+<span class="cmd">Import-ZNBG-AssetData</span>
+ [<span class="param">-DataPath</span> &lt;string&gt;]
+ [<span class="param">-SwitchesPath</span> &lt;string&gt;]
+  </div>
+
+  <div class="param-entry">
+    <div class="param-name">-DataPath</div>
+    <div class="param-body"><p class="param-desc">Path to <code>segmentedAssets.json</code>. Defaults to <code>C:\Program Files\Zero Networks\Breakglass\segmentedAssets.json</code>.</p></div>
+  </div>
+  <div class="param-entry">
+    <div class="param-name">-SwitchesPath</div>
+    <div class="param-body"><p class="param-desc">Path to <code>switches.json</code>. Defaults to the same Breakglass installation directory.</p></div>
+  </div>
+
+  <div class="example">
+    <div class="example-header">
+      <span class="ex-label">Example 1</span>
+      <span class="ex-title">Load from default path</span>
+    </div>
+    <pre><span class="ps-prompt">PS&gt; </span><span class="ps-fn">Import-ZNBG-AssetData</span></pre>
+    <div class="example-desc">Loads from the Breakglass installation directory on the local machine.</div>
+  </div>
+  <div class="example">
+    <div class="example-header">
+      <span class="ex-label">Example 2</span>
+      <span class="ex-title">Load from a custom path</span>
+    </div>
+    <pre><span class="ps-prompt">PS&gt; </span><span class="ps-fn">Import-ZNBG-AssetData</span> <span class="ps-param">-DataPath</span> <span class="ps-value">.\segmentedAssets.json</span></pre>
+    <div class="example-desc">Loads from the current directory — useful when working with an exported copy.</div>
+  </div>
+
+  <!-- Query commands -->
+  <h2 id="cmd-asset-queries">Asset query commands</h2>
+
+  <table class="fn-table">
+    <thead>
+      <tr><th>Command</th><th>Description</th></tr>
+    </thead>
+    <tbody>
+      <tr><td>Get-ZNBG-AssetSummary</td><td>High-level counts: total assets, OS, type, segmentation, clusters.</td></tr>
+      <tr><td>Get-ZNBG-Asset</td><td>All assets as enriched objects — the base for piped queries.</td></tr>
+      <tr><td>Find-ZNBG-Asset -Name &lt;string&gt;</td><td>Find assets by partial FQDN or hostname (case-insensitive).</td></tr>
+      <tr><td>Get-ZNBG-WindowsAsset</td><td>Windows assets only.</td></tr>
+      <tr><td>Get-ZNBG-LinuxAsset</td><td>Linux assets only.</td></tr>
+      <tr><td>Get-ZNBG-ServerAsset</td><td>Server-type assets (all OS).</td></tr>
+      <tr><td>Get-ZNBG-ClientAsset</td><td>Client/workstation-type assets.</td></tr>
+      <tr><td>Get-ZNBG-NetworkSegmentedAsset</td><td>Assets with network segmentation active.</td></tr>
+      <tr><td>Get-ZNBG-IdentitySegmentedAsset</td><td>Assets with identity segmentation active.</td></tr>
+      <tr><td>Get-ZNBG-AssetBySource</td><td>Asset counts grouped by entity source (AD, Ansible, Workgroup, etc.).</td></tr>
+    </tbody>
+  </table>
+
+  <div class="example">
+    <div class="example-header">
+      <span class="ex-label">Examples</span>
+      <span class="ex-title">Pipeline queries</span>
+    </div>
+    <pre><span class="ps-prompt">PS&gt; </span><span class="ps-fn">Get-ZNBG-Asset</span> | <span class="ps-fn">Where-Object</span> { $_.OS -eq 'Linux' -and $_.NetworkSegmented }
+<span class="ps-prompt">PS&gt; </span><span class="ps-fn">Get-ZNBG-ServerAsset</span> | <span class="ps-fn">Group-Object</span> Cluster | <span class="ps-fn">Select-Object</span> Name, Count
+<span class="ps-prompt">PS&gt; </span><span class="ps-fn">Find-ZNBG-Asset</span> <span class="ps-value">"dc01"</span> | <span class="ps-fn">Select-Object</span> FQDN, Cluster, NetworkSegmented
+<span class="ps-prompt">PS&gt; </span><span class="ps-fn">Get-ZNBG-Asset</span> | <span class="ps-fn">Export-Csv</span> <span class="ps-value">assets.csv</span> -NoTypeInformation</pre>
+    <div class="example-desc">All query functions return objects with FQDN, Cluster, OS, Type, Source, NetworkSegmented, IdentitySegmented, and OU properties.</div>
+  </div>
+
+  <!-- Cluster commands -->
+  <h2 id="cmd-asset-clusters">Cluster commands</h2>
+
+  <table class="fn-table">
+    <thead>
+      <tr><th>Command</th><th>Description</th></tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td>Get-ZNBG-AssetCluster</td>
+        <td>All asset clusters with per-cluster breakdown (counts, OS, type, segmentation). Note: this reflects asset data clusters, not Segment Server infrastructure clusters (<code>Get-ZNSegmentCluster</code>).</td>
+      </tr>
+      <tr>
+        <td>Get-ZNBG-ClusterMemberAsset -ClusterName &lt;string&gt;</td>
+        <td>Assets in a specific cluster. Partial name match, case-insensitive.</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <div class="example">
+    <div class="example-header">
+      <span class="ex-label">Examples</span>
+      <span class="ex-title">Cluster queries</span>
+    </div>
+    <pre><span class="ps-prompt">PS&gt; </span><span class="ps-fn">Get-ZNBG-AssetCluster</span> | <span class="ps-fn">Sort-Object</span> TotalAssets -Descending
+<span class="ps-prompt">PS&gt; </span><span class="ps-fn">Get-ZNBG-ClusterMemberAsset</span> <span class="ps-value">"zero.local"</span>
+<span class="ps-prompt">PS&gt; </span><span class="ps-fn">Get-ZNBG-ClusterMemberAsset</span> <span class="ps-value">"zero.local"</span> | <span class="ps-fn">Where-Object</span> OS -eq Linux</pre>
+  </div>
+
+  <!-- Environment commands -->
+  <h2 id="cmd-asset-environment">Environment commands</h2>
+
+  <table class="fn-table">
+    <thead>
+      <tr><th>Command</th><th>Description</th></tr>
+    </thead>
+    <tbody>
+      <tr><td>Get-ZNBG-AssetForest</td><td>AD forest and domain configuration with service account info.</td></tr>
+      <tr><td>Get-ZNBG-AssetSwitch</td><td>OT switches loaded from <code>switches.json</code>.</td></tr>
+    </tbody>
+  </table>
+
+</main>
+
+<script>
+  // Sidebar active-link tracking
+  const sections = document.querySelectorAll('[id]');
+  const navLinks = document.querySelectorAll('nav.sidebar a');
+  const observer = new IntersectionObserver(entries => {
+    entries.forEach(entry => {
+      if (entry.isIntersecting) {
+        navLinks.forEach(a => a.classList.remove('active'));
+        const active = document.querySelector(`nav.sidebar a[href="#${entry.target.id}"]`);
+        if (active) active.classList.add('active');
+      }
+    });
+  }, { rootMargin: '-20% 0px -70% 0px' });
+  sections.forEach(s => observer.observe(s));
+
+  // Copy buttons on code examples
+  document.querySelectorAll('.example').forEach(ex => {
+    const pre = ex.querySelector('pre');
+    const header = ex.querySelector('.example-header');
+    if (!pre || !header) return;
+    const btn = document.createElement('button');
+    btn.className = 'copy-btn';
+    btn.textContent = 'Copy';
+    btn.addEventListener('click', () => {
+      navigator.clipboard.writeText(pre.innerText.replace(/^PS> /gm, '')).then(() => {
+        btn.textContent = 'Copied!';
+        btn.classList.add('copied');
+        setTimeout(() => { btn.textContent = 'Copy'; btn.classList.remove('copied'); }, 2000);
+      }).catch(() => {
+        const sel = window.getSelection(), range = document.createRange();
+        range.selectNodeContents(pre);
+        sel.removeAllRanges(); sel.addRange(range);
+      });
+    });
+    header.appendChild(btn);
+  });
+</script>
+
+</body>
+</html>
