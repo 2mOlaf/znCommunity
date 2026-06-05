@@ -1,0 +1,666 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Asset Management Scripts – Zero Networks Community</title>
+  <link rel="stylesheet" href="styles.css" />
+  <style>
+    .github-link {
+      display: inline-block;
+      font-size: 0.82rem;
+      color: var(--accent);
+      text-decoration: none;
+      margin-bottom: 0.6rem;
+    }
+    .github-link:hover { text-decoration: underline; }
+  </style>
+</head>
+<body>
+
+<nav class="sidebar">
+  <div class="sidebar-logo">
+    <div class="brand">Zero Networks</div>
+    <div class="title">Asset Management</div>
+  </div>
+
+  <div class="sidebar-section">Overview</div>
+  <a href="#overview">About These Scripts</a>
+  <a href="#prerequisites">Prerequisites</a>
+
+  <div class="sidebar-section">Asset Lifecycle</div>
+  <a href="#add-assets-to-learning">Add-AssetsToLearning</a>
+  <a href="#move-protect-to-learning">Move-ProtectToLearning</a>
+  <a href="#set-extend-learning">set-extendLearning</a>
+  <a href="#unprotect-learning-not-connected">Unprotect-ZNLearningButNotConnected</a>
+  <a href="#create-learn-with-blocks">Create-LearnWithBlocks</a>
+
+  <div class="sidebar-section">Queries &amp; Auditing</div>
+  <a href="#audit-monitored-assets">auditMonitoredAssets</a>
+  <a href="#get-asset-audit-dates">get-assetAuditDates</a>
+  <a href="#get-assets-stale-connection">get-AssetsStaleConnection</a>
+  <a href="#get-no-ip-assets">Get-NoIPAssets</a>
+  <a href="#get-segment-simulation-blocks">Get-SegmentSimulationBlocks</a>
+
+  <div class="sidebar-section">Groups</div>
+  <a href="#add-assets-to-tag-group">Add-AssetsToTagGroup</a>
+  <a href="#add-ip-to-custom-group">add-ipToCustomGroup</a>
+  <a href="#create-group-env">create-GroupEnv</a>
+  <a href="#update-zn-group-members">Update-ZNGroupMembers</a>
+
+  <div class="sidebar-section">Labels &amp; Import</div>
+  <a href="#import-asset-labels">Import-AssetLabels</a>
+  <a href="#import-asimily">Parse-AsimilyExport</a>
+
+  <div class="sidebar-section">OT / IoT</div>
+  <a href="#create-ot-assets">CreateOTAssets</a>
+  <a href="#new-ot-asset">New-OtAsset</a>
+
+  <div class="sidebar-section">Cluster Pinning</div>
+  <a href="#pin-assets-to-clusters">Pin-AssetsToClusters</a>
+
+  <div class="sidebar-section">Linux Enrollment</div>
+  <a href="#enroll-linux-asset">enrollLinuxAsset</a>
+
+  <div class="sidebar-section">See Also</div>
+  <a href="zeronetworks-module-reference.html">ZeroNetworks Module (PSGallery)</a>
+  <a href="community-scripts-rules-mfa.html">Rules &amp; MFA Scripts</a>
+  <a href="community-scripts-identity-segment.html">Identity Segment Scripts</a>
+  <a href="index.html">&#8592; Docs Home</a>
+</nav>
+
+<main>
+
+  <div class="breadcrumb">
+    <a href="index.html">Docs Home</a><span>/</span>
+    <a href="index.html#community-scripts">Community Scripts</a><span>/</span>
+    <span>Asset Management</span>
+  </div>
+
+  <div id="overview" class="page-header">
+    <h1>Asset Management Scripts</h1>
+    <div class="tags">
+      <span class="tag">PowerShell</span>
+      <span class="tag purple">Community</span>
+      <span class="tag green">ZN API</span>
+    </div>
+    <p class="lead">
+      Community scripts for managing assets throughout their lifecycle in Zero Networks Segment —
+      from enrollment and learning through protection, plus group management, auditing, label import,
+      OT/IoT asset creation, and cluster pinning.
+    </p>
+  </div>
+
+  <div class="callout info">
+    <strong>Community scripts — not part of ZNTools or the PSGallery module</strong>
+    These scripts are standalone utilities in the community repository under
+    <code>Segment/Segment/Asset Management/</code>. Most require a Zero Networks API key.
+    Review and configure each script before running in production.
+  </div>
+
+  <h2 id="prerequisites">Prerequisites</h2>
+  <table>
+    <thead><tr><th>Requirement</th><th>Details</th></tr></thead>
+    <tbody>
+      <tr><td>API Key</td><td>Most scripts require a read/write Zero Networks API key set in the script or passed as a parameter.</td></tr>
+      <tr><td>ZeroNetworks module</td><td>Some scripts auto-install <code>Install-Module ZeroNetworks</code> if not present. Others use <code>Invoke-RestMethod</code> directly.</td></tr>
+      <tr><td>PowerShell version</td><td>PowerShell 5.1+ for most scripts; PowerShell 7.0+ required for <a href="#pin-assets-to-clusters">Pin-AssetsToClusters</a> and <a href="#new-ot-asset">New-OtAsset</a>.</td></tr>
+      <tr><td>ImportExcel module</td><td>Required for <a href="#import-asset-labels">Import-AssetLabels</a>. Install with <code>Install-Module ImportExcel</code>.</td></tr>
+    </tbody>
+  </table>
+
+  <!-- ═══════════════════════ ASSET LIFECYCLE ═══════════════════════ -->
+  <div class="script-separator" id="add-assets-to-learning">
+    <div class="page-header" style="margin-bottom:1rem; border-bottom:none; padding-bottom:0.5rem;">
+      <h1>Add-AssetsToLearning.ps1</h1>
+      <div class="tags"><span class="tag">PowerShell</span><span class="tag purple">Asset Lifecycle</span></div>
+    </div>
+  </div>
+
+  <a class="github-link" href="https://github.com/zeronetworks/Community/blob/master/Segment/Segment/Asset%20Management/Add-AssetsToLearning.ps1" target="_blank">&#128279; View on GitHub</a>
+
+  <h2>Synopsis</h2>
+  <p>Reads a list of asset hostnames from a text file, resolves them to Zero Networks asset IDs, and queues them for network learning.</p>
+
+  <h2>Configuration (edit at top of script)</h2>
+  <table>
+    <thead><tr><th>Variable</th><th>Description</th></tr></thead>
+    <tbody>
+      <tr><td><code>$apiToken</code></td><td>Zero Networks API key</td></tr>
+      <tr><td><code>$file</code></td><td>Path to a plain-text file with one hostname per line (e.g. <code>C:\temp\hosts.txt</code>)</td></tr>
+      <tr><td><code>$adDomain</code></td><td>AD domain to append to each hostname to form an FQDN</td></tr>
+      <tr><td><code>$daysToLearn</code></td><td>Number of learning days (default: 30)</td></tr>
+      <tr><td><code>$maintenanceWindowId</code></td><td>Optional maintenance window ID (format: <code>e:m:xxxxxxx</code>)</td></tr>
+    </tbody>
+  </table>
+
+  <div class="example">
+    <div class="example-header"><span class="ex-label">Example 1</span><span class="ex-title">Run the script after configuring variables</span></div>
+    <pre><span class="ps-prompt">PS&gt; </span><span class="ps-cmd">.\Add-AssetsToLearning.ps1</span></pre>
+    <div class="example-desc">Reads hostnames from the configured file, resolves each to a ZN asset ID using <code>Search-ZNAsset</code>, then POSTs to <code>/assets/actions/queue</code> with the configured learning duration and optional maintenance window.</div>
+  </div>
+
+  <!-- ─── Move-ProtectToLearning ─── -->
+  <div class="script-separator" id="move-protect-to-learning">
+    <div class="page-header" style="margin-bottom:1rem; border-bottom:none; padding-bottom:0.5rem;">
+      <h1>Move-ProtectToLearning.ps1</h1>
+      <div class="tags"><span class="tag">PowerShell</span><span class="tag purple">Asset Lifecycle</span></div>
+    </div>
+  </div>
+
+  <a class="github-link" href="https://github.com/zeronetworks/Community/blob/master/Segment/Segment/Asset%20Management/Move-ProtectToLearning.ps1" target="_blank">&#128279; View on GitHub</a>
+
+  <h2>Synopsis</h2>
+  <p>Fetches all currently <em>protected</em> assets, unprotects them, then immediately re-queues them for a 30-day learning cycle.</p>
+
+  <div class="callout">
+    <strong>Warning</strong>
+    This removes protection from <em>all</em> segmented assets. Use only when intentionally rolling back to learning across the board.
+  </div>
+
+  <div class="example">
+    <div class="example-header"><span class="ex-label">Example 1</span><span class="ex-title">Unprotect all and re-queue for learning</span></div>
+    <pre><span class="ps-prompt">PS&gt; </span>$APIKey = <span class="ps-value">'eyJ...'</span>
+<span class="ps-cmd">.\Move-ProtectToLearning.ps1</span></pre>
+    <div class="example-desc">Pages through all protected assets (400 at a time), collects their IDs, calls <code>POST /assets/actions/unprotect</code>, then <code>POST /assets/actions/queue</code> with <code>queueDays=30</code>.</div>
+  </div>
+
+  <!-- ─── set-extendLearning ─── -->
+  <div class="script-separator" id="set-extend-learning">
+    <div class="page-header" style="margin-bottom:1rem; border-bottom:none; padding-bottom:0.5rem;">
+      <h1>set-extendLearning.ps1</h1>
+      <div class="tags"><span class="tag">PowerShell</span><span class="tag purple">Asset Lifecycle</span></div>
+    </div>
+  </div>
+
+  <a class="github-link" href="https://github.com/zeronetworks/Community/blob/master/Segment/Segment/Asset%20Management/set-extendLearning.ps1" target="_blank">&#128279; View on GitHub</a>
+
+  <h2>Synopsis</h2>
+  <p>Extends the learning period for all currently-queued (learning) assets by 30 days via a <code>PUT</code> to <code>/assets/actions/queue</code>.</p>
+
+  <h2>Configuration (edit at top of script)</h2>
+  <table>
+    <thead><tr><th>Variable</th><th>Description</th></tr></thead>
+    <tbody>
+      <tr><td><code>$APIKey</code></td><td>Zero Networks API key</td></tr>
+      <tr><td><code>$uri</code></td><td>Base API URL — update if using a private cloud instance</td></tr>
+    </tbody>
+  </table>
+
+  <!-- ─── Unprotect-ZNLearningButNotConnected ─── -->
+  <div class="script-separator" id="unprotect-learning-not-connected">
+    <div class="page-header" style="margin-bottom:1rem; border-bottom:none; padding-bottom:0.5rem;">
+      <h1>Unprotect-ZNLearningButNotConnected.ps1</h1>
+      <div class="tags"><span class="tag">PowerShell</span><span class="tag purple">Asset Lifecycle</span></div>
+    </div>
+  </div>
+
+  <a class="github-link" href="https://github.com/zeronetworks/Community/blob/master/Segment/Segment/Asset%20Management/Unprotect-ZNLearningButNotConnected.ps1" target="_blank">&#128279; View on GitHub</a>
+
+  <h2>Synopsis</h2>
+  <p>Finds queued (learning) assets with <code>assetStatus = 1</code> (not connected to the ZN agent) and unprotects them in batches of 100.</p>
+
+  <!-- ─── Create-LearnWithBlocks ─── -->
+  <div class="script-separator" id="create-learn-with-blocks">
+    <div class="page-header" style="margin-bottom:1rem; border-bottom:none; padding-bottom:0.5rem;">
+      <h1>Create-LearnWithBlocks.ps1</h1>
+      <div class="tags"><span class="tag">PowerShell</span><span class="tag purple">Groups</span><span class="tag">Asset Lifecycle</span></div>
+    </div>
+  </div>
+
+  <a class="github-link" href="https://github.com/zeronetworks/Community/blob/master/Segment/Segment/Asset%20Management/Create-LearnWithBlocks.ps1" target="_blank">&#128279; View on GitHub</a>
+
+  <h2>Synopsis</h2>
+  <p>Creates (or updates) a custom group named <strong>AllLearningWithBlocks</strong> and populates it with every asset currently in Learning-with-Blocks mode (protection states 15–18).</p>
+
+  <div class="callout info">
+    <strong>Idempotent</strong> — safe to run repeatedly. The script checks for the group before creating it, and only adds members that are currently in a blocks-mode learning state.
+  </div>
+
+  <!-- ═══════════════════════ QUERIES & AUDITING ═══════════════════════ -->
+  <div class="script-separator" id="audit-monitored-assets">
+    <div class="page-header" style="margin-bottom:1rem; border-bottom:none; padding-bottom:0.5rem;">
+      <h1>auditMonitoredAssets.ps1</h1>
+      <div class="tags"><span class="tag">PowerShell</span><span class="tag green">Audit</span></div>
+    </div>
+  </div>
+
+  <a class="github-link" href="https://github.com/zeronetworks/Community/blob/master/Segment/Segment/Asset%20Management/audit-monitored-assets/auditMonitoredAssets.ps1" target="_blank">&#128279; View on GitHub</a>
+
+  <h2>Synopsis</h2>
+  <p>Compares a CSV of expected-monitored assets against what is actually showing as monitored in the ZN API, and outputs a dated audit report CSV.</p>
+
+  <h2>Inputs</h2>
+  <table>
+    <thead><tr><th>File</th><th>Description</th></tr></thead>
+    <tbody>
+      <tr><td><code>targeted-assets.csv</code></td><td>Single-column CSV of asset hostnames (with or without domain). Must be in the same directory as the script.</td></tr>
+      <tr><td><code>token.txt</code></td><td>Plain-text file containing the API token. Must be in the same directory as the script.</td></tr>
+    </tbody>
+  </table>
+
+  <h2>Outputs</h2>
+  <table>
+    <thead><tr><th>File</th><th>Contents</th></tr></thead>
+    <tbody>
+      <tr><td><code>YYYY-MM-DD-mon-assets-audit-report.csv</code></td><td>Two columns: <code>hostName</code> and <code>monitorStatus</code> (True/False)</td></tr>
+      <tr><td><code>YYYY-MM-DD-audit-mon-assets-script.log</code></td><td>Detailed execution log</td></tr>
+    </tbody>
+  </table>
+
+  <!-- ─── get-assetAuditDates ─── -->
+  <div class="script-separator" id="get-asset-audit-dates">
+    <div class="page-header" style="margin-bottom:1rem; border-bottom:none; padding-bottom:0.5rem;">
+      <h1>get-assetAuditDates.ps1</h1>
+      <div class="tags"><span class="tag">PowerShell</span><span class="tag green">Audit</span></div>
+    </div>
+  </div>
+
+  <a class="github-link" href="https://github.com/zeronetworks/Community/blob/master/Segment/Segment/Asset%20Management/get-assetAuditDates.ps1" target="_blank">&#128279; View on GitHub</a>
+
+  <h2>Synopsis</h2>
+  <p>For each asset in a given status (monitored, queued, or protected), retrieves the most recent audit event and prints the asset name alongside its last audit timestamp.</p>
+
+  <div class="example">
+    <div class="example-header"><span class="ex-label">Example 1</span><span class="ex-title">Show audit dates for all three asset states</span></div>
+    <pre><span class="ps-prompt">PS&gt; </span><span class="ps-value">$APIKey</span> = <span class="ps-value">'eyJ...'</span>
+<span class="ps-cmd">.\get-assetAuditDates.ps1</span></pre>
+    <div class="example-desc">Runs <code>Show-AssetsDates</code> for monitored, queued, and protected states sequentially. Output is printed to the console as each asset is processed.</div>
+  </div>
+
+  <!-- ─── get-AssetsStaleConnection ─── -->
+  <div class="script-separator" id="get-assets-stale-connection">
+    <div class="page-header" style="margin-bottom:1rem; border-bottom:none; padding-bottom:0.5rem;">
+      <h1>get-AssetsStaleConnection.ps1</h1>
+      <div class="tags"><span class="tag">PowerShell</span><span class="tag green">Audit</span></div>
+    </div>
+  </div>
+
+  <a class="github-link" href="https://github.com/zeronetworks/Community/blob/master/Segment/Segment/Asset%20Management/get-AssetsStaleConnection.ps1" target="_blank">&#128279; View on GitHub</a>
+
+  <h2>Synopsis</h2>
+  <p>Finds all assets that are disconnected (<code>isAssetConnected = false</code>) and whose <code>lastLogonTimestamp</code> is older than <code>$n</code> days. Results are stored in <code>$disconnectedAssets</code>.</p>
+
+  <h2>Configuration</h2>
+  <table>
+    <thead><tr><th>Variable</th><th>Description</th></tr></thead>
+    <tbody>
+      <tr><td><code>$n</code></td><td>Number of days to look back (default: 180)</td></tr>
+      <tr><td><code>$APIKey</code></td><td>Zero Networks API key</td></tr>
+    </tbody>
+  </table>
+
+  <!-- ─── Get-NoIPAssets ─── -->
+  <div class="script-separator" id="get-no-ip-assets">
+    <div class="page-header" style="margin-bottom:1rem; border-bottom:none; padding-bottom:0.5rem;">
+      <h1>Get-NoIPAssets.ps1</h1>
+      <div class="tags"><span class="tag">PowerShell</span><span class="tag green">Audit</span></div>
+    </div>
+  </div>
+
+  <a class="github-link" href="https://github.com/zeronetworks/Community/blob/master/Segment/Segment/Asset%20Management/Get-NoIPAssets.ps1" target="_blank">&#128279; View on GitHub</a>
+
+  <h2>Synopsis</h2>
+  <p>Pages through all assets and collects those with no IPv4 or IPv6 addresses registered in Zero Networks. Results are stored in <code>$inactiveAssets</code>.</p>
+
+  <!-- ─── Get-SegmentSimulationBlocks ─── -->
+  <div class="script-separator" id="get-segment-simulation-blocks">
+    <div class="page-header" style="margin-bottom:1rem; border-bottom:none; padding-bottom:0.5rem;">
+      <h1>Get-SegmentSimulationBlocks.ps1</h1>
+      <div class="tags"><span class="tag">PowerShell</span><span class="tag green">Audit</span><span class="tag purple">Simulation</span></div>
+    </div>
+  </div>
+
+  <a class="github-link" href="https://github.com/zeronetworks/Community/blob/master/Segment/Segment/Asset%20Management/Get-SegmentSimulationBlocks/Get-SegmentSimulationBlocks.ps1" target="_blank">&#128279; View on GitHub</a>
+
+  <h2>Synopsis</h2>
+  <p>A comprehensive query tool that identifies which network activities would be <em>blocked</em> if assets were moved to protection, enabling simulation-mode analysis before committing to segment.</p>
+
+  <div class="callout info">
+    This is the largest script in the Asset Management collection (~945 lines). It provides detailed simulation data useful for pre-protection reviews and runbook validation.
+  </div>
+
+  <!-- ═══════════════════════ GROUPS ═══════════════════════ -->
+  <div class="script-separator" id="add-assets-to-tag-group">
+    <div class="page-header" style="margin-bottom:1rem; border-bottom:none; padding-bottom:0.5rem;">
+      <h1>Add-AssetsToTagGroup.ps1</h1>
+      <div class="tags"><span class="tag">PowerShell</span><span class="tag purple">Groups</span></div>
+    </div>
+  </div>
+
+  <a class="github-link" href="https://github.com/zeronetworks/Community/blob/master/Segment/Segment/Asset%20Management/Add-AssetsToTagGroup.ps1" target="_blank">&#128279; View on GitHub</a>
+
+  <h2>Synopsis</h2>
+  <p>Reads a CSV of assets, resolves them by FQDN to Zero Networks asset IDs, then batches them (100 at a time) into a specified tag group.</p>
+
+  <h2>Configuration</h2>
+  <table>
+    <thead><tr><th>Variable</th><th>Description</th></tr></thead>
+    <tbody>
+      <tr><td><code>$apiKey</code></td><td>Zero Networks API key</td></tr>
+      <tr><td><code>$assets</code></td><td>Path to CSV file. The CSV must have a <code>Name</code> column containing FQDNs.</td></tr>
+      <tr><td><code>$groupId</code></td><td>Tag group ID in format <code>g:t:xxxxxxxx</code></td></tr>
+    </tbody>
+  </table>
+
+  <!-- ─── add-ipToCustomGroup ─── -->
+  <div class="script-separator" id="add-ip-to-custom-group">
+    <div class="page-header" style="margin-bottom:1rem; border-bottom:none; padding-bottom:0.5rem;">
+      <h1>add-ipToCustomGroup.ps1</h1>
+      <div class="tags"><span class="tag">PowerShell</span><span class="tag purple">Groups</span></div>
+    </div>
+  </div>
+
+  <a class="github-link" href="https://github.com/zeronetworks/Community/blob/master/Segment/Segment/Asset%20Management/add-ipToCustomGroup.ps1" target="_blank">&#128279; View on GitHub</a>
+
+  <h2>Synopsis</h2>
+  <p>Looks up a remote candidate by IP address and adds it as a member of a specified custom group.</p>
+
+  <h2>Parameters</h2>
+  <div class="param-entry">
+    <div class="param-name">-IPaddress</div>
+    <div class="param-body">
+      <p class="param-desc">One or more IP addresses (comma-separated) to look up via the remote-candidates API.</p>
+      <div class="param-meta">
+        <div class="param-meta-item"><span class="meta-label">Type:</span><span class="meta-value">String</span></div>
+        <div class="param-meta-item"><span class="meta-label">Required:</span><span class="meta-value required">True</span></div>
+      </div>
+    </div>
+  </div>
+  <div class="param-entry">
+    <div class="param-name">-GroupID</div>
+    <div class="param-body">
+      <p class="param-desc">Custom group ID to add the IP to (format: <code>g:c:xxxxxxxx</code>).</p>
+      <div class="param-meta">
+        <div class="param-meta-item"><span class="meta-label">Type:</span><span class="meta-value">String</span></div>
+        <div class="param-meta-item"><span class="meta-label">Required:</span><span class="meta-value required">True</span></div>
+      </div>
+    </div>
+  </div>
+  <div class="param-entry">
+    <div class="param-name">-APIKey</div>
+    <div class="param-body">
+      <p class="param-desc">Zero Networks API key.</p>
+      <div class="param-meta">
+        <div class="param-meta-item"><span class="meta-label">Type:</span><span class="meta-value">String</span></div>
+        <div class="param-meta-item"><span class="meta-label">Required:</span><span class="meta-value required">True</span></div>
+      </div>
+    </div>
+  </div>
+  <div class="param-entry">
+    <div class="param-name">-baseUri</div>
+    <div class="param-body">
+      <p class="param-desc">Base API URL. Defaults to <code>https://portal.zeronetworks.com/api/v1/</code>.</p>
+      <div class="param-meta">
+        <div class="param-meta-item"><span class="meta-label">Type:</span><span class="meta-value">String</span></div>
+        <div class="param-meta-item"><span class="meta-label">Required:</span><span class="meta-value optional">Optional</span></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="example">
+    <div class="example-header"><span class="ex-label">Example 1</span><span class="ex-title">Add a single IP to a custom group</span></div>
+    <pre><span class="ps-prompt">PS&gt; </span><span class="ps-cmd">.\add-ipToCustomGroup.ps1</span> <span class="ps-param">-IPaddress</span> <span class="ps-value">10.0.0.5</span> <span class="ps-param">-GroupID</span> <span class="ps-value">g:c:abc12345</span> <span class="ps-param">-APIKey</span> <span class="ps-value">eyJ...</span></pre>
+  </div>
+
+  <!-- ─── create-GroupEnv ─── -->
+  <div class="script-separator" id="create-group-env">
+    <div class="page-header" style="margin-bottom:1rem; border-bottom:none; padding-bottom:0.5rem;">
+      <h1>create-GroupEnv.ps1</h1>
+      <div class="tags"><span class="tag">PowerShell</span><span class="tag purple">Groups</span></div>
+    </div>
+  </div>
+
+  <a class="github-link" href="https://github.com/zeronetworks/Community/blob/master/Segment/Segment/Asset%20Management/create-GroupEnv.ps1" target="_blank">&#128279; View on GitHub</a>
+
+  <h2>Synopsis</h2>
+  <p>Reads a CSV of devices with <code>Name</code>, <code>Fully qualified domain name</code>, and <code>Environment</code> columns. For each unique environment value, creates a custom group (if it doesn't exist), then adds the matching assets as members.</p>
+
+  <h2>Parameters</h2>
+  <div class="param-entry">
+    <div class="param-name">-CsvFilePath</div>
+    <div class="param-body">
+      <p class="param-desc">Full path to the input CSV. Required columns: <code>Name</code>, <code>Fully qualified domain name</code>, <code>Environment</code>. Environment may be blank or comma-separated for multi-environment devices.</p>
+      <div class="param-meta">
+        <div class="param-meta-item"><span class="meta-label">Required:</span><span class="meta-value required">True</span></div>
+      </div>
+    </div>
+  </div>
+  <div class="param-entry">
+    <div class="param-name">-BaseApiUrl</div>
+    <div class="param-body">
+      <p class="param-desc">Zero Networks API base URL, e.g. <code>https://portal.zeronetworks.com/api/v1</code>.</p>
+      <div class="param-meta">
+        <div class="param-meta-item"><span class="meta-label">Required:</span><span class="meta-value required">True</span></div>
+      </div>
+    </div>
+  </div>
+  <div class="param-entry">
+    <div class="param-name">-ApiKey</div>
+    <div class="param-body">
+      <p class="param-desc">Zero Networks API key.</p>
+      <div class="param-meta">
+        <div class="param-meta-item"><span class="meta-label">Required:</span><span class="meta-value required">True</span></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="example">
+    <div class="example-header"><span class="ex-label">Example 1</span><span class="ex-title">Create environment groups from a device CSV</span></div>
+    <pre><span class="ps-prompt">PS&gt; </span><span class="ps-cmd">.\create-GroupEnv.ps1</span> <span class="ps-param">-CsvFilePath</span> <span class="ps-value">"C:\devices.csv"</span> <span class="ps-param">-BaseApiUrl</span> <span class="ps-value">"https://portal.zeronetworks.com/api/v1"</span> <span class="ps-param">-ApiKey</span> <span class="ps-value">eyJ...</span> <span class="ps-param">-Verbose</span></pre>
+  </div>
+
+  <!-- ─── Update-ZNGroupMembers ─── -->
+  <div class="script-separator" id="update-zn-group-members">
+    <div class="page-header" style="margin-bottom:1rem; border-bottom:none; padding-bottom:0.5rem;">
+      <h1>Update-ZNGroupMembers.ps1</h1>
+      <div class="tags"><span class="tag">PowerShell</span><span class="tag purple">Groups</span></div>
+    </div>
+  </div>
+
+  <a class="github-link" href="https://github.com/zeronetworks/Community/blob/master/Segment/Segment/Asset%20Management/Update-ZNGroupMembers.ps1" target="_blank">&#128279; View on GitHub</a>
+
+  <h2>Synopsis</h2>
+  <p>Converts CIDR IP ranges from a text file to Zero Networks item IDs and sets them as the members of a custom group (replacing existing membership).</p>
+
+  <h2>Parameters</h2>
+  <div class="param-entry">
+    <div class="param-name">-APIKey</div>
+    <div class="param-body"><p class="param-desc">Zero Networks API key.</p><div class="param-meta"><div class="param-meta-item"><span class="meta-label">Required:</span><span class="meta-value required">True</span></div></div></div>
+  </div>
+  <div class="param-entry">
+    <div class="param-name">-RangesFilePath</div>
+    <div class="param-body"><p class="param-desc">Path to a file containing CIDR ranges, one per line (e.g. <code>192.168.1.0/24</code>).</p><div class="param-meta"><div class="param-meta-item"><span class="meta-label">Required:</span><span class="meta-value required">True</span></div></div></div>
+  </div>
+  <div class="param-entry">
+    <div class="param-name">-GroupID</div>
+    <div class="param-body"><p class="param-desc">Custom group ID. Must match format <code>g:c:xxxxx</code>.</p><div class="param-meta"><div class="param-meta-item"><span class="meta-label">Required:</span><span class="meta-value required">True</span></div></div></div>
+  </div>
+  <div class="param-entry">
+    <div class="param-name">-BaseURL</div>
+    <div class="param-body"><p class="param-desc">Base API URL. Defaults to <code>https://portal.zeronetworks.com/api/v1</code>.</p><div class="param-meta"><div class="param-meta-item"><span class="meta-label">Required:</span><span class="meta-value optional">Optional</span></div></div></div>
+  </div>
+
+  <div class="example">
+    <div class="example-header"><span class="ex-label">Example 1</span><span class="ex-title">Update group membership from a CIDR file</span></div>
+    <pre><span class="ps-prompt">PS&gt; </span><span class="ps-cmd">.\Update-ZNGroupMembers.ps1</span> <span class="ps-param">-APIKey</span> <span class="ps-value">eyJ...</span> <span class="ps-param">-RangesFilePath</span> <span class="ps-value">ipRanges.txt</span> <span class="ps-param">-GroupID</span> <span class="ps-value">g:c:nexZMPPY</span></pre>
+  </div>
+
+  <!-- ═══════════════════════ LABELS & IMPORT ═══════════════════════ -->
+  <div class="script-separator" id="import-asset-labels">
+    <div class="page-header" style="margin-bottom:1rem; border-bottom:none; padding-bottom:0.5rem;">
+      <h1>Import-AssetLabels.ps1</h1>
+      <div class="tags"><span class="tag">PowerShell</span><span class="tag green">Labels</span></div>
+    </div>
+  </div>
+
+  <a class="github-link" href="https://github.com/zeronetworks/Community/blob/master/Segment/Segment/Asset%20Management/Import-AssetLabels.ps1" target="_blank">&#128279; View on GitHub</a>
+
+  <h2>Synopsis</h2>
+  <p>Reads an Excel spreadsheet mapping asset hostnames to Application and Environment label values, then calls the ZN API to add those labels to each asset.</p>
+
+  <h2>Requirements</h2>
+  <table>
+    <thead><tr><th>Requirement</th><th>Details</th></tr></thead>
+    <tbody>
+      <tr><td>ImportExcel module</td><td><code>Install-Module ImportExcel</code></td></tr>
+      <tr><td>Excel file</td><td><code>ZNHosttoApplicationmapping.xlsx</code> in the working directory. Columns: <code>Asset Name</code>, <code>Applications</code> (semicolon-separated), <code>Environment</code>.</td></tr>
+    </tbody>
+  </table>
+
+  <!-- ─── Parse-AsimilyExport ─── -->
+  <div class="script-separator" id="import-asimily">
+    <div class="page-header" style="margin-bottom:1rem; border-bottom:none; padding-bottom:0.5rem;">
+      <h1>Parse-AsimilyExport.ps1</h1>
+      <div class="tags"><span class="tag">PowerShell</span><span class="tag green">Import</span><span class="tag">Asimily</span></div>
+    </div>
+  </div>
+
+  <a class="github-link" href="https://github.com/zeronetworks/Community/blob/master/Segment/Segment/Asset%20Management/Import-Asimily/Parse-AsimilyExport.ps1" target="_blank">&#128279; View on GitHub</a>
+
+  <h2>Synopsis</h2>
+  <p>Parses a CSV export from the Asimily IoT/OT security platform and maps devices to Zero Networks assets, enabling automated labelling or group assignment based on Asimily data.</p>
+
+  <!-- ═══════════════════════ OT / IoT ═══════════════════════ -->
+  <div class="script-separator" id="create-ot-assets">
+    <div class="page-header" style="margin-bottom:1rem; border-bottom:none; padding-bottom:0.5rem;">
+      <h1>CreateOTAssets.ps1</h1>
+      <div class="tags"><span class="tag">PowerShell</span><span class="tag green">OT / IoT</span></div>
+    </div>
+  </div>
+
+  <a class="github-link" href="https://github.com/zeronetworks/Community/blob/master/Segment/Segment/Asset%20Management/CreateOTAssets.ps1" target="_blank">&#128279; View on GitHub</a>
+
+  <h2>Synopsis</h2>
+  <p>Reads a CSV of OT/IoT devices (columns: <code>Name</code>, <code>IP</code>) and creates each as an OT asset entry in Zero Networks using the <code>POST /assets/ot</code> endpoint.</p>
+
+  <h2>OT Asset Type Reference</h2>
+  <table>
+    <thead><tr><th>Type ID</th><th>Device Type</th><th>Type ID</th><th>Device Type</th></tr></thead>
+    <tbody>
+      <tr><td>4</td><td>IP camera</td><td>5</td><td>Smart TV</td></tr>
+      <tr><td>6</td><td>Factory controller</td><td>7</td><td>Medical device</td></tr>
+      <tr><td>8</td><td>Printer</td><td>9</td><td>Scanner</td></tr>
+      <tr><td>11</td><td>Router</td><td>12</td><td>Hypervisor</td></tr>
+      <tr><td>13</td><td>PLC</td><td>14</td><td>HMI</td></tr>
+      <tr><td>15</td><td>Switch</td><td>16</td><td>Terminal station</td></tr>
+      <tr><td>17</td><td>RTU</td><td>18</td><td>Wireless access point</td></tr>
+      <tr><td>19</td><td>Historian</td><td>22</td><td>UPS</td></tr>
+      <tr><td>25</td><td>Firewall appliance</td><td>30</td><td>HVAC</td></tr>
+    </tbody>
+  </table>
+
+  <!-- ─── New-OtAsset ─── -->
+  <div class="script-separator" id="new-ot-asset">
+    <div class="page-header" style="margin-bottom:1rem; border-bottom:none; padding-bottom:0.5rem;">
+      <h1>New-OtAsset.ps1</h1>
+      <div class="tags"><span class="tag">PowerShell 7+</span><span class="tag green">OT / IoT</span></div>
+    </div>
+  </div>
+
+  <a class="github-link" href="https://github.com/zeronetworks/Community/blob/master/Segment/Segment/Asset%20Management/New-OtAsset/New-OtAsset.ps1" target="_blank">&#128279; View on GitHub</a>
+
+  <h2>Synopsis</h2>
+  <p>Creates one or more OT/IoT assets individually (by parameter) or in bulk (from CSV). Reads the API URL from the JWT token. Supports dry-run mode.</p>
+
+  <h2>Parameters</h2>
+  <div class="param-entry">
+    <div class="param-name">-CsvFilePath</div>
+    <div class="param-body"><p class="param-desc">Path to a CSV exported from the companion Excel workbook. When provided, <code>-ip</code> and <code>-name</code> are not needed.</p><div class="param-meta"><div class="param-meta-item"><span class="meta-label">Required:</span><span class="meta-value optional">Optional (required without ip/name)</span></div></div></div>
+  </div>
+  <div class="param-entry">
+    <div class="param-name">-ApiKey</div>
+    <div class="param-body"><p class="param-desc">API key. Falls back to <code>$Env:ZN_API_KEY</code>.</p><div class="param-meta"><div class="param-meta-item"><span class="meta-label">Required:</span><span class="meta-value optional">Optional</span></div></div></div>
+  </div>
+  <div class="param-entry">
+    <div class="param-name">-ip</div>
+    <div class="param-body"><p class="param-desc">IPv4 address of the OT/IoT device.</p><div class="param-meta"><div class="param-meta-item"><span class="meta-label">Required:</span><span class="meta-value optional">Optional (required without CsvFilePath)</span></div></div></div>
+  </div>
+  <div class="param-entry">
+    <div class="param-name">-name</div>
+    <div class="param-body"><p class="param-desc">Display name for the asset in the portal.</p><div class="param-meta"><div class="param-meta-item"><span class="meta-label">Required:</span><span class="meta-value optional">Optional (required without CsvFilePath)</span></div></div></div>
+  </div>
+  <div class="param-entry">
+    <div class="param-name">-DryRun</div>
+    <div class="param-body"><p class="param-desc">Preview what would be sent to the API without making any changes.</p><div class="param-meta"><div class="param-meta-item"><span class="meta-label">Type:</span><span class="meta-value">Switch</span></div></div></div>
+  </div>
+
+  <div class="example">
+    <div class="example-header"><span class="ex-label">Example 1</span><span class="ex-title">Create a single OT asset</span></div>
+    <pre><span class="ps-prompt">PS&gt; </span><span class="ps-cmd">.\New-OtAsset.ps1</span> <span class="ps-param">-ip</span> <span class="ps-value">192.168.10.5</span> <span class="ps-param">-name</span> <span class="ps-value">PLC-01</span></pre>
+  </div>
+  <div class="example">
+    <div class="example-header"><span class="ex-label">Example 2</span><span class="ex-title">Bulk import from CSV (dry run)</span></div>
+    <pre><span class="ps-prompt">PS&gt; </span><span class="ps-cmd">.\New-OtAsset.ps1</span> <span class="ps-param">-CsvFilePath</span> <span class="ps-value">.\devices.csv</span> <span class="ps-switch">-DryRun</span></pre>
+  </div>
+
+  <!-- ═══════════════════════ CLUSTER PINNING ═══════════════════════ -->
+  <div class="script-separator" id="pin-assets-to-clusters">
+    <div class="page-header" style="margin-bottom:1rem; border-bottom:none; padding-bottom:0.5rem;">
+      <h1>Pin-AssetsToClusters.ps1</h1>
+      <div class="tags"><span class="tag">PowerShell 7+</span><span class="tag purple">Deployment Clusters</span></div>
+    </div>
+  </div>
+
+  <a class="github-link" href="https://github.com/zeronetworks/Community/blob/master/Segment/Segment/Asset%20Management/Pin%20Assets%20To%20Clusters/Pin-AssetsToClusters.ps1" target="_blank">&#128279; View on GitHub</a>
+
+  <h2>Synopsis</h2>
+  <p>Pins or unpins assets to deployment clusters. Supports single-asset operations by asset ID or OU path, bulk operations via CSV, dry-run preview, and cluster listing.</p>
+
+  <h2>Parameter Sets</h2>
+  <table>
+    <thead><tr><th>Set</th><th>Required Parameters</th><th>Use Case</th></tr></thead>
+    <tbody>
+      <tr><td><code>ByAssetId</code></td><td><code>-ApiKey</code>, <code>-AssetId</code>, <code>-DeploymentClusterId</code></td><td>Pin/unpin a single asset</td></tr>
+      <tr><td><code>ByOuPath</code></td><td><code>-ApiKey</code>, <code>-OUPath</code>, <code>-DeploymentClusterId</code></td><td>Pin/unpin all assets in an OU</td></tr>
+      <tr><td><code>ByCsvPath</code></td><td><code>-ApiKey</code>, <code>-CsvPath</code></td><td>Bulk pin/unpin from CSV file</td></tr>
+      <tr><td><code>ListDeploymentClusters</code></td><td><code>-ApiKey</code>, <code>-ListDeploymentClusters</code></td><td>List all available clusters</td></tr>
+      <tr><td><code>ExportCsvTemplate</code></td><td><code>-ExportCsvTemplate</code></td><td>Generate a blank CSV template</td></tr>
+    </tbody>
+  </table>
+
+  <div class="example">
+    <div class="example-header"><span class="ex-label">Example 1</span><span class="ex-title">Pin a single asset to a cluster</span></div>
+    <pre><span class="ps-prompt">PS&gt; </span><span class="ps-cmd">.\Pin-AssetsToClusters.ps1</span> <span class="ps-param">-ApiKey</span> <span class="ps-value">eyJ...</span> <span class="ps-param">-AssetId</span> <span class="ps-value">a:a:qvI6tVtn</span> <span class="ps-param">-DeploymentClusterId</span> <span class="ps-value">C:d:00fd409f</span></pre>
+  </div>
+  <div class="example">
+    <div class="example-header"><span class="ex-label">Example 2</span><span class="ex-title">Preview bulk CSV changes (dry run)</span></div>
+    <pre><span class="ps-prompt">PS&gt; </span><span class="ps-cmd">.\Pin-AssetsToClusters.ps1</span> <span class="ps-param">-ApiKey</span> <span class="ps-value">eyJ...</span> <span class="ps-param">-CsvPath</span> <span class="ps-value">.\assets.csv</span> <span class="ps-switch">-DryRun</span></pre>
+  </div>
+  <div class="example">
+    <div class="example-header"><span class="ex-label">Example 3</span><span class="ex-title">Unpin all assets in an OU</span></div>
+    <pre><span class="ps-prompt">PS&gt; </span><span class="ps-cmd">.\Pin-AssetsToClusters.ps1</span> <span class="ps-param">-ApiKey</span> <span class="ps-value">eyJ...</span> <span class="ps-param">-OUPath</span> <span class="ps-value">"OU=Computers,DC=domain,DC=com"</span> <span class="ps-param">-DeploymentClusterId</span> <span class="ps-value">C:d:00fd409f</span> <span class="ps-switch">-Unpin</span></pre>
+  </div>
+
+  <!-- ═══════════════════════ LINUX ENROLLMENT ═══════════════════════ -->
+  <div class="script-separator" id="enroll-linux-asset">
+    <div class="page-header" style="margin-bottom:1rem; border-bottom:none; padding-bottom:0.5rem;">
+      <h1>enrollLinuxAsset.ps1</h1>
+      <div class="tags"><span class="tag">PowerShell</span><span class="tag">Linux</span><span class="tag purple">Enrollment</span></div>
+    </div>
+  </div>
+
+  <a class="github-link" href="https://github.com/zeronetworks/Community/blob/master/Segment/Segment/Asset%20Management/Enroll%20Linux%20in%20Dashboard/enrollLinuxAsset.ps1" target="_blank">&#128279; View on GitHub</a>
+
+  <h2>Synopsis</h2>
+  <p>Automates the enrollment of Linux assets into the Zero Networks dashboard using PowerShell remoting (SSH). Handles the registration token exchange and agent install sequence.</p>
+
+</main>
+
+<script>
+  const sections = document.querySelectorAll('[id]');
+  const navLinks = document.querySelectorAll('nav.sidebar a');
+  const observer = new IntersectionObserver(entries => {
+    entries.forEach(entry => {
+      if (entry.isIntersecting) {
+        navLinks.forEach(a => a.classList.remove('active'));
+        const active = document.querySelector(`nav.sidebar a[href="#${entry.target.id}"]`);
+        if (active) active.classList.add('active');
+      }
+    });
+  }, { rootMargin: '-20% 0px -70% 0px' });
+  sections.forEach(s => observer.observe(s));
+</script>
+
+</body>
+</html>

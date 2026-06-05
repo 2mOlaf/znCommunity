@@ -1,0 +1,217 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Troubleshooting Scripts – Zero Networks Community</title>
+  <link rel="stylesheet" href="styles.css" />
+  <style>
+    .github-link { display:inline-block; font-size:0.82rem; color:var(--accent); text-decoration:none; margin-bottom:0.6rem; }
+    .github-link:hover { text-decoration:underline; }
+  </style>
+</head>
+<body>
+
+<nav class="sidebar">
+  <div class="sidebar-logo">
+    <div class="brand">Zero Networks</div>
+    <div class="title">Troubleshooting Scripts</div>
+  </div>
+
+  <div class="sidebar-section">Overview</div>
+  <a href="#overview">About These Scripts</a>
+
+  <div class="sidebar-section">Connectivity</div>
+  <a href="#zn-connectivity-test">ZNConnectivityTest</a>
+  <a href="#network-port-check">Network Port Connectivity Check</a>
+
+  <div class="sidebar-section">Administration</div>
+  <a href="#check-admin">checkAdmin</a>
+  <a href="#collect-smb-details">CollectSMBDetails</a>
+
+  <div class="sidebar-section">See Also</div>
+  <a href="community-scripts-segmentation-server.html">Segmentation Server Scripts</a>
+  <a href="zntools-user-reference.html">ZNTools User Guide</a>
+  <a href="index.html">&#8592; Docs Home</a>
+</nav>
+
+<main>
+
+  <div class="breadcrumb">
+    <a href="index.html">Docs Home</a><span>/</span>
+    <a href="index.html#community-scripts">Community Scripts</a><span>/</span>
+    <span>Troubleshooting</span>
+  </div>
+
+  <div id="overview" class="page-header">
+    <h1>Troubleshooting Scripts</h1>
+    <div class="tags">
+      <span class="tag">PowerShell</span>
+      <span class="tag purple">Community</span>
+      <span class="tag orange">Diagnostics</span>
+    </div>
+    <p class="lead">
+      Scripts for diagnosing Zero Networks connectivity issues, validating firewall and GPO configuration,
+      and collecting diagnostic data from segmented assets.
+    </p>
+  </div>
+
+  <!-- ═══════════════════════ ZN CONNECTIVITY TEST ═══════════════════════ -->
+  <div class="script-separator" id="zn-connectivity-test">
+    <div class="page-header" style="margin-bottom:1rem; border-bottom:none; padding-bottom:0.5rem;">
+      <h1>ZNConnectivityTest.ps1</h1>
+      <div class="tags"><span class="tag">PowerShell</span><span class="tag orange">Connectivity</span></div>
+    </div>
+  </div>
+
+  <a class="github-link" href="https://github.com/zeronetworks/Community/blob/master/Segment/Segment/Troubleshooting/ZNConnectivityTest.ps1" target="_blank">&#128279; View on GitHub</a>
+
+  <h2>Synopsis</h2>
+  <p>Tests TCP connectivity and DNS resolution to all required Zero Networks cloud endpoints from the machine running the script. Reports any failures.</p>
+
+  <h2>Endpoints Tested</h2>
+  <table>
+    <thead><tr><th>Hostname</th><th>Port</th><th>Purpose</th></tr></thead>
+    <tbody>
+      <tr><td><code>monitor.zeronetworks.com</code></td><td>443</td><td>Telemetry / metrics</td></tr>
+      <tr><td><code>portal.zeronetworks.com</code></td><td>443</td><td>Management portal</td></tr>
+      <tr><td><code>download.zeronetworks.com</code></td><td>443</td><td>Package downloads</td></tr>
+      <tr><td><code>access.zeronetworks.com</code></td><td>443</td><td>Access control</td></tr>
+      <tr><td><code>2fa.zeronetworks.com</code></td><td>443</td><td>MFA push</td></tr>
+      <tr><td><code>cloud-prod-v2.zeronetworks.com</code></td><td>443</td><td>Cloud backend</td></tr>
+      <tr><td><code>register-prod.zeronetworks.com</code></td><td>443</td><td>Registration</td></tr>
+      <tr><td><code>cloud-connector.zeronetworks.com</code></td><td>443</td><td>Cloud Connector</td></tr>
+      <tr><td><code>connect-backend.zeronetworks.com</code></td><td>443</td><td>Connect backend</td></tr>
+      <tr><td><code>connect.zeronetworks.com</code></td><td>443</td><td>Connect service</td></tr>
+      <tr><td><code>jamf-connector.zeronetworks.com</code></td><td>443</td><td>Jamf integration</td></tr>
+      <tr><td><code>register-cloud-connector.zeronetworks.com</code></td><td>443</td><td>CC registration</td></tr>
+    </tbody>
+  </table>
+
+  <div class="example">
+    <div class="example-header"><span class="ex-label">Example 1</span><span class="ex-title">Run connectivity test</span></div>
+    <pre><span class="ps-prompt">PS&gt; </span><span class="ps-cmd">.\ZNConnectivityTest.ps1</span></pre>
+    <div class="example-desc">Tests each endpoint with <code>Test-NetConnection</code> and <code>Resolve-DnsName</code>. Outputs failures immediately; prints "All connections succeeded" if everything passes. Returns a table of failed endpoints at the end.</div>
+  </div>
+
+  <!-- ═══════════════════════ NETWORK PORT CHECK ═══════════════════════ -->
+  <div class="script-separator" id="network-port-check">
+    <div class="page-header" style="margin-bottom:1rem; border-bottom:none; padding-bottom:0.5rem;">
+      <h1>Network Port Connectivity Check.ps1</h1>
+      <div class="tags"><span class="tag">PowerShell</span><span class="tag orange">Connectivity</span></div>
+    </div>
+  </div>
+
+  <a class="github-link" href="https://github.com/zeronetworks/Community/blob/master/Segment/Segment/Troubleshooting/Network%20Port%20Connectivity%20Check.ps1" target="_blank">&#128279; View on GitHub</a>
+
+  <h2>Synopsis</h2>
+  <p>Tests TCP and UDP port connectivity against the required ports listed in the Zero Networks Deployment Guide, scoped to a specific machine profile. Results are color-coded in the console.</p>
+
+  <h2>Parameters</h2>
+  <div class="param-entry">
+    <div class="param-name">-machineProfile</div>
+    <div class="param-body">
+      <p class="param-desc">The type of machine to test connectivity for. Determines which set of ports to validate.</p>
+      <div class="param-meta">
+        <div class="param-meta-item"><span class="meta-label">Accepted values:</span><span class="meta-value">Client, Trust Server</span></div>
+        <div class="param-meta-item"><span class="meta-label">Required:</span><span class="meta-value required">True</span></div>
+      </div>
+    </div>
+  </div>
+
+  <h2>Port Reference</h2>
+  <table>
+    <thead><tr><th>Port</th><th>Protocol</th><th>Purpose</th></tr></thead>
+    <tbody>
+      <tr><td>443</td><td>TCP</td><td>Secured SSL / HTTPS</td></tr>
+      <tr><td>80</td><td>TCP</td><td>HTTP</td></tr>
+      <tr><td>30022</td><td>TCP</td><td>Health monitoring — metrics to ZN Cloud</td></tr>
+      <tr><td>389</td><td>TCP/UDP</td><td>LDAP</td></tr>
+      <tr><td>3268</td><td>TCP</td><td>Global Catalog LDAP</td></tr>
+      <tr><td>88</td><td>TCP/UDP</td><td>Kerberos authentication</td></tr>
+      <tr><td>135</td><td>TCP</td><td>NTLM / RPC</td></tr>
+      <tr><td>445</td><td>TCP</td><td>SMB / NTLM</td></tr>
+      <tr><td>53</td><td>TCP/UDP</td><td>DNS</td></tr>
+      <tr><td>5985</td><td>TCP</td><td>WinRM</td></tr>
+      <tr><td>22</td><td>TCP</td><td>SSH (Linux)</td></tr>
+    </tbody>
+  </table>
+
+  <div class="example">
+    <div class="example-header"><span class="ex-label">Example 1</span><span class="ex-title">Test connectivity for a client machine</span></div>
+    <pre><span class="ps-prompt">PS&gt; </span><span class="ps-cmd">.\</span><span class="ps-value">"Network Port Connectivity Check.ps1"</span> <span class="ps-param">-machineProfile</span> <span class="ps-value">Client</span></pre>
+  </div>
+  <div class="example">
+    <div class="example-header"><span class="ex-label">Example 2</span><span class="ex-title">Test connectivity from a Trust Server</span></div>
+    <pre><span class="ps-prompt">PS&gt; </span><span class="ps-cmd">.\</span><span class="ps-value">"Network Port Connectivity Check.ps1"</span> <span class="ps-param">-machineProfile</span> <span class="ps-value">"Trust Server"</span></pre>
+  </div>
+
+  <!-- ═══════════════════════ CHECK ADMIN ═══════════════════════ -->
+  <div class="script-separator" id="check-admin">
+    <div class="page-header" style="margin-bottom:1rem; border-bottom:none; padding-bottom:0.5rem;">
+      <h1>checkAdmin.ps1</h1>
+      <div class="tags"><span class="tag">PowerShell</span><span class="tag orange">GPO Validation</span></div>
+    </div>
+  </div>
+
+  <a class="github-link" href="https://github.com/zeronetworks/Community/blob/master/Segment/Segment/Troubleshooting/checkAdmin.ps1" target="_blank">&#128279; View on GitHub</a>
+
+  <h2>Synopsis</h2>
+  <p>Checks whether <code>ZNRemoteManagementGroup</code> is a member of the local Administrators group. If not, identifies any GPOs with Restricted Groups settings that may be removing it, and checks their content.</p>
+
+  <div class="callout info">
+    Run this script on an asset that is unexpectedly losing its <code>ZNRemoteManagementGroup</code> admin membership to identify conflicting GPOs.
+  </div>
+
+  <div class="example">
+    <div class="example-header"><span class="ex-label">Example 1</span><span class="ex-title">Check admin group membership and GPO conflicts</span></div>
+    <pre><span class="ps-prompt">PS&gt; </span><span class="ps-cmd">.\checkAdmin.ps1</span></pre>
+    <div class="example-desc">If <code>ZNRemoteManagementGroup</code> is present, reports success. If missing, runs <code>gpresult /r</code>, identifies Restricted Groups GPOs, reads their SYSVOL templates, and reports whether each GPO configures the Administrators group.</div>
+  </div>
+
+  <!-- ═══════════════════════ COLLECT SMB DETAILS ═══════════════════════ -->
+  <div class="script-separator" id="collect-smb-details">
+    <div class="page-header" style="margin-bottom:1rem; border-bottom:none; padding-bottom:0.5rem;">
+      <h1>CollectSMBDetails.ps1</h1>
+      <div class="tags"><span class="tag">PowerShell</span><span class="tag orange">ETW Tracing</span></div>
+    </div>
+  </div>
+
+  <a class="github-link" href="https://github.com/zeronetworks/Community/blob/master/Segment/Segment/Troubleshooting/CollectSMBDetails.ps1" target="_blank">&#128279; View on GitHub</a>
+
+  <h2>Synopsis</h2>
+  <p>Starts an ETW (Event Tracing for Windows) session to capture Zero Networks WPP trace events and SMB client events, writing them to a rotating <code>.etl</code> file for diagnostic analysis.</p>
+
+  <h2>Configuration</h2>
+  <table>
+    <thead><tr><th>Variable</th><th>Default</th><th>Description</th></tr></thead>
+    <tbody>
+      <tr><td><code>$etwSessionName</code></td><td><code>ETWWppTestSession</code></td><td>ETW session name</td></tr>
+      <tr><td><code>$logPath</code></td><td><code>C:\WPPLogs_&lt;hostname&gt;</code></td><td>Output directory for trace files</td></tr>
+      <tr><td><code>$rolloverInterval</code></td><td>24 (hours)</td><td>Log rotation interval</td></tr>
+    </tbody>
+  </table>
+
+  <div class="callout info">
+    The output <code>.etl</code> file can be opened with <strong>Windows Performance Analyzer</strong> (WPA) or converted with <code>tracerpt</code>. Share with Zero Networks support when troubleshooting SMB-related connectivity issues.
+  </div>
+
+</main>
+
+<script>
+  const sections = document.querySelectorAll('[id]');
+  const navLinks = document.querySelectorAll('nav.sidebar a');
+  const observer = new IntersectionObserver(entries => {
+    entries.forEach(entry => {
+      if (entry.isIntersecting) {
+        navLinks.forEach(a => a.classList.remove('active'));
+        const active = document.querySelector(`nav.sidebar a[href="#${entry.target.id}"]`);
+        if (active) active.classList.add('active');
+      }
+    });
+  }, { rootMargin: '-20% 0px -70% 0px' });
+  sections.forEach(s => observer.observe(s));
+</script>
+
+</body>
+</html>

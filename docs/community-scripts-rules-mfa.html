@@ -1,0 +1,293 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Rules &amp; MFA Scripts – Zero Networks Community</title>
+  <link rel="stylesheet" href="styles.css" />
+  <style>
+    .github-link { display:inline-block; font-size:0.82rem; color:var(--accent); text-decoration:none; margin-bottom:0.6rem; }
+    .github-link:hover { text-decoration:underline; }
+  </style>
+</head>
+<body>
+
+<nav class="sidebar">
+  <div class="sidebar-logo">
+    <div class="brand">Zero Networks</div>
+    <div class="title">Rules &amp; MFA Scripts</div>
+  </div>
+
+  <div class="sidebar-section">Overview</div>
+  <a href="#overview">About These Scripts</a>
+
+  <div class="sidebar-section">Rule Management</div>
+  <a href="#approve-proposed-deletes">Approve-ZNProposedDeletes</a>
+  <a href="#update-block-risky-ips">Update-ZNBlockRulewithRiskyIps</a>
+  <a href="#update-outbound-block-url">Update-ZNOutboundBlockfromURLFile</a>
+  <a href="zn-approve-reference.html">zn-approve.py &#8599;</a>
+
+  <div class="sidebar-section">MFA Policies</div>
+  <a href="#update-mfa-policies">Update-mfaPolicies</a>
+  <a href="#get-secret-microsoft-auth">getSecretMicrosoftAuth</a>
+
+  <div class="sidebar-section">See Also</div>
+  <a href="community-scripts-asset-management.html">Asset Management Scripts</a>
+  <a href="zeronetworks-module-reference.html">ZeroNetworks Module (PSGallery)</a>
+  <a href="index.html">&#8592; Docs Home</a>
+</nav>
+
+<main>
+
+  <div class="breadcrumb">
+    <a href="index.html">Docs Home</a><span>/</span>
+    <a href="index.html#community-scripts">Community Scripts</a><span>/</span>
+    <span>Rules &amp; MFA</span>
+  </div>
+
+  <div id="overview" class="page-header">
+    <h1>Rules &amp; MFA Scripts</h1>
+    <div class="tags">
+      <span class="tag">PowerShell</span>
+      <span class="tag">Python</span>
+      <span class="tag purple">Community</span>
+      <span class="tag green">ZN API</span>
+    </div>
+    <p class="lead">
+      Community scripts for managing Zero Networks inbound and outbound rules, approving proposed
+      rule deletions, updating block rules from external data sources, and managing MFA reactive policies.
+    </p>
+  </div>
+
+  <div class="callout info">
+    <strong>API key scope</strong>
+    All scripts in this section require a read/write Zero Networks API key. The approve-delete
+    scripts perform destructive operations — test with <code>-WhatIf</code> or <code>--dry-run</code> first.
+  </div>
+
+  <!-- ═══════════════════════ APPROVE PROPOSED DELETES ═══════════════════════ -->
+  <div class="script-separator" id="approve-proposed-deletes">
+    <div class="page-header" style="margin-bottom:1rem; border-bottom:none; padding-bottom:0.5rem;">
+      <h1>Approve-ZNProposedDeletes.ps1</h1>
+      <div class="tags"><span class="tag">PowerShell</span><span class="tag orange">Destructive</span></div>
+    </div>
+  </div>
+
+  <a class="github-link" href="https://github.com/zeronetworks/Community/blob/master/Segment/Segment/Rules/Approve-ZNProposedDeletes.ps1" target="_blank">&#128279; View on GitHub</a>
+
+  <h2>Synopsis</h2>
+  <p>Fetches all inbound rules in <em>proposed delete</em> state and approves their deletion. Can be scoped to inactive-asset rules only or zero-hit rules only.</p>
+
+  <div class="callout">
+    <strong>Warning</strong>
+    Approving rule deletions is irreversible. Always run with <code>-WhatIf</code> first to preview which rules would be affected.
+  </div>
+
+  <h2>Parameters</h2>
+  <div class="param-entry">
+    <div class="param-name">-ApiKey</div>
+    <div class="param-body"><p class="param-desc">Zero Networks read/write API key. The key is JWT-decoded to determine the account's portal hostname automatically.</p><div class="param-meta"><div class="param-meta-item"><span class="meta-label">Required:</span><span class="meta-value required">True</span></div></div></div>
+  </div>
+  <div class="param-entry">
+    <div class="param-name">-WhatIf</div>
+    <div class="param-body"><p class="param-desc">Simulates deletions without calling the approve-delete endpoint. Prints which rules would be approved.</p><div class="param-meta"><div class="param-meta-item"><span class="meta-label">Type:</span><span class="meta-value">Switch</span></div></div></div>
+  </div>
+  <div class="param-entry">
+    <div class="param-name">-InactiveAssetsOnly</div>
+    <div class="param-body"><p class="param-desc">Limits approval to rules whose suggestion reason is "references an inactive asset(s)".</p><div class="param-meta"><div class="param-meta-item"><span class="meta-label">Type:</span><span class="meta-value">Switch</span></div></div></div>
+  </div>
+  <div class="param-entry">
+    <div class="param-name">-NoHitsOnly</div>
+    <div class="param-body"><p class="param-desc">Limits approval to rules whose suggestion reason is "has not been used in the last 6 months".</p><div class="param-meta"><div class="param-meta-item"><span class="meta-label">Type:</span><span class="meta-value">Switch</span></div></div></div>
+  </div>
+
+  <div class="example">
+    <div class="example-header"><span class="ex-label">Example 1</span><span class="ex-title">Preview all proposed deletions (dry run)</span></div>
+    <pre><span class="ps-prompt">PS&gt; </span><span class="ps-cmd">.\Approve-ZNProposedDeletes.ps1</span> <span class="ps-param">-ApiKey</span> <span class="ps-value">eyJ...</span> <span class="ps-switch">-WhatIf</span></pre>
+    <div class="example-desc">Prints all rules that would be approved for deletion without making any API calls to the approve-delete endpoint.</div>
+  </div>
+  <div class="example">
+    <div class="example-header"><span class="ex-label">Example 2</span><span class="ex-title">Approve only zero-hit rules</span></div>
+    <pre><span class="ps-prompt">PS&gt; </span><span class="ps-cmd">.\Approve-ZNProposedDeletes.ps1</span> <span class="ps-param">-ApiKey</span> <span class="ps-value">eyJ...</span> <span class="ps-switch">-NoHitsOnly</span></pre>
+    <div class="example-desc">Approves deletion only for rules flagged as unused in the last 6 months. Rules referencing inactive assets are not affected.</div>
+  </div>
+  <div class="example">
+    <div class="example-header"><span class="ex-label">Example 3</span><span class="ex-title">Approve rules for inactive assets only</span></div>
+    <pre><span class="ps-prompt">PS&gt; </span><span class="ps-cmd">.\Approve-ZNProposedDeletes.ps1</span> <span class="ps-param">-ApiKey</span> <span class="ps-value">eyJ...</span> <span class="ps-switch">-InactiveAssetsOnly</span></pre>
+  </div>
+
+  <!-- ═══════════════════════ UPDATE BLOCK RISKY IPS ═══════════════════════ -->
+  <div class="script-separator" id="update-block-risky-ips">
+    <div class="page-header" style="margin-bottom:1rem; border-bottom:none; padding-bottom:0.5rem;">
+      <h1>Update-ZNBlockRulewithRiskyIps.ps1</h1>
+      <div class="tags"><span class="tag">PowerShell</span><span class="tag orange">Block Rules</span></div>
+    </div>
+  </div>
+
+  <a class="github-link" href="https://github.com/zeronetworks/Community/blob/master/Segment/Segment/Rules/Update-ZNBlockRulewithRiskyIps.ps1" target="_blank">&#128279; View on GitHub</a>
+
+  <h2>Synopsis</h2>
+  <p>Queries network activities from the previous 24 hours filtered by high-risk source IP and blocked state, then appends any new source IPs to an existing inbound block rule.</p>
+
+  <h2>Configuration (edit at top of script)</h2>
+  <table>
+    <thead><tr><th>Variable</th><th>Description</th></tr></thead>
+    <tbody>
+      <tr><td><code>$APIKey</code></td><td>Zero Networks API key</td></tr>
+      <tr><td><code>$blockRuleId</code></td><td>ID of the inbound block rule to update. Find in the portal URL when viewing the rule.</td></tr>
+    </tbody>
+  </table>
+
+  <div class="callout info">
+    The script fetches activities with <code>srcRiskLevel=2</code> (high) and <code>state=3</code> (blocked), collects unique source asset IDs, and adds any not already in the block rule. It does <em>not</em> remove existing entries.
+  </div>
+
+  <!-- ═══════════════════════ UPDATE OUTBOUND BLOCK URL ═══════════════════════ -->
+  <div class="script-separator" id="update-outbound-block-url">
+    <div class="page-header" style="margin-bottom:1rem; border-bottom:none; padding-bottom:0.5rem;">
+      <h1>Update-ZNOutboundBlockfromURLFile.ps1</h1>
+      <div class="tags"><span class="tag">PowerShell</span><span class="tag orange">Block Rules</span></div>
+    </div>
+  </div>
+
+  <a class="github-link" href="https://github.com/zeronetworks/Community/blob/master/Segment/Segment/Rules/Update-ZNOutboundBlockfromURLFile.ps1" target="_blank">&#128279; View on GitHub</a>
+
+  <h2>Synopsis</h2>
+  <p>Reads a list of domain names or wildcard patterns from a text file and replaces the remote entity list of an outbound block rule with those URLs.</p>
+
+  <h2>Configuration</h2>
+  <table>
+    <thead><tr><th>Variable</th><th>Description</th></tr></thead>
+    <tbody>
+      <tr><td><code>$APIKey</code></td><td>Zero Networks API key</td></tr>
+      <tr><td><code>$blockRuleName</code></td><td>Description of the outbound block rule to find (default: <code>"Block Bad Domain URLs"</code>)</td></tr>
+      <tr><td><code>$badURLFilePath</code></td><td>Path to text file with one URL/pattern per line</td></tr>
+    </tbody>
+  </table>
+
+  <div class="callout info">
+    URLs beginning with <code>*</code> are encoded as wildcard entries (<code>b:18*url</code>). Exact domain matches use <code>b:17url</code>. The outbound block rule must already exist in the portal before running this script.
+  </div>
+
+  <!-- ═══════════════════════ ZN-APPROVE.PY ═══════════════════════ -->
+  <div class="script-separator" id="zn-approve-py">
+    <div class="page-header" style="margin-bottom:1rem; border-bottom:none; padding-bottom:0.5rem;">
+      <h1>zn-approve.py</h1>
+      <div class="tags"><span class="tag" style="background:rgba(55,118,171,0.18);color:#5ba4cf;">Python 3</span><span class="tag purple">CLI Tool</span></div>
+    </div>
+  </div>
+
+  <a class="github-link" href="https://github.com/zeronetworks/Community/blob/master/Segment/Segment/Rules/zn-approve.py" target="_blank">&#128279; View on GitHub</a>
+
+  <div class="callout info">
+    <strong>Full reference available</strong>
+    <code>zn-approve.py</code> is a Python CLI tool with three subcommands, interactive paginated
+    selection, dry-run support, and JWT introspection. It has its own dedicated reference page.
+    <br><br>
+    <a href="zn-approve-reference.html" style="font-weight:600;">&#8594; Read the zn-approve.py reference</a>
+  </div>
+
+  <h2>Quick start</h2>
+  <div class="example">
+    <div class="example-header"><span class="ex-label">Install</span><span class="ex-title">Install the only dependency</span></div>
+    <pre><span class="ps-prompt">$ </span>pip install requests</pre>
+  </div>
+  <div class="example">
+    <div class="example-header"><span class="ex-label">Typical workflow</span><span class="ex-title">Review rules, select, then apply</span></div>
+    <pre><span class="ps-prompt">$ </span>python zn-approve.py list --select           <span style="color:var(--text-muted)"># browse and save rule IDs</span>
+<span class="ps-prompt">$ </span>python zn-approve.py apply --ids-file zn-approved-rules-2026-06-05.txt</pre>
+  </div>
+
+  <!-- ═══════════════════════ UPDATE MFA POLICIES ═══════════════════════ -->
+  <div class="script-separator" id="update-mfa-policies">
+    <div class="page-header" style="margin-bottom:1rem; border-bottom:none; padding-bottom:0.5rem;">
+      <h1>Update-mfaPolicies.ps1</h1>
+      <div class="tags"><span class="tag">PowerShell</span><span class="tag purple">MFA</span></div>
+    </div>
+  </div>
+
+  <a class="github-link" href="https://github.com/zeronetworks/Community/blob/master/Segment/Segment/MFA_Policies/Update-mfaPolicies.ps1" target="_blank">&#128279; View on GitHub</a>
+
+  <h2>Synopsis</h2>
+  <p>Audits all inbound reactive (MFA) policies and optionally updates any that have <code>useDefaultIdp = false</code> to use the default IdP. Prompts for confirmation before applying changes.</p>
+
+  <h2>Parameters</h2>
+  <div class="param-entry">
+    <div class="param-name">-baseURI</div>
+    <div class="param-body"><p class="param-desc">API base URL including the environment subdomain, e.g. <code>https://zncustlabs-admin.zeronetworks.com/api/v1/</code>.</p><div class="param-meta"><div class="param-meta-item"><span class="meta-label">Required:</span><span class="meta-value required">True</span></div></div></div>
+  </div>
+  <div class="param-entry">
+    <div class="param-name">-APIKey</div>
+    <div class="param-body"><p class="param-desc">Zero Networks API key.</p><div class="param-meta"><div class="param-meta-item"><span class="meta-label">Required:</span><span class="meta-value required">True</span></div></div></div>
+  </div>
+  <div class="param-entry">
+    <div class="param-name">-envID</div>
+    <div class="param-body"><p class="param-desc">Environment ID, sent as the <code>zn-env-id</code> request header.</p><div class="param-meta"><div class="param-meta-item"><span class="meta-label">Required:</span><span class="meta-value required">True</span></div></div></div>
+  </div>
+  <div class="param-entry">
+    <div class="param-name">-DryRun</div>
+    <div class="param-body"><p class="param-desc">Reports what would be changed without modifying any policies.</p><div class="param-meta"><div class="param-meta-item"><span class="meta-label">Type:</span><span class="meta-value">Switch</span></div></div></div>
+  </div>
+
+  <div class="example">
+    <div class="example-header"><span class="ex-label">Example 1</span><span class="ex-title">Dry-run — show policies that would be updated</span></div>
+    <pre><span class="ps-prompt">PS&gt; </span><span class="ps-cmd">.\Update-mfaPolicies.ps1</span> <span class="ps-param">-baseURI</span> <span class="ps-value">"https://zncustlabs-admin.zeronetworks.com/api/v1/"</span> <span class="ps-param">-APIKey</span> <span class="ps-value">eyJ...</span> <span class="ps-param">-envID</span> <span class="ps-value">env123</span> <span class="ps-switch">-DryRun</span></pre>
+  </div>
+  <div class="example">
+    <div class="example-header"><span class="ex-label">Example 2</span><span class="ex-title">Apply updates interactively</span></div>
+    <pre><span class="ps-prompt">PS&gt; </span><span class="ps-cmd">.\Update-mfaPolicies.ps1</span> <span class="ps-param">-baseURI</span> <span class="ps-value">"https://zncustlabs-admin.zeronetworks.com/api/v1/"</span> <span class="ps-param">-APIKey</span> <span class="ps-value">eyJ...</span> <span class="ps-param">-envID</span> <span class="ps-value">env123</span></pre>
+    <div class="example-desc">Fetches all policies, shows the percentage with <code>useDefaultIdp=false</code>, then prompts <code>Y/N</code> before updating.</div>
+  </div>
+
+  <!-- ═══════════════════════ GET SECRET MICROSOFT AUTH ═══════════════════════ -->
+  <div class="script-separator" id="get-secret-microsoft-auth">
+    <div class="page-header" style="margin-bottom:1rem; border-bottom:none; padding-bottom:0.5rem;">
+      <h1>getSecretMicrosoftAuth.ps1</h1>
+      <div class="tags"><span class="tag">PowerShell</span><span class="tag purple">MFA</span><span class="tag">Microsoft Graph</span></div>
+    </div>
+  </div>
+
+  <a class="github-link" href="https://github.com/zeronetworks/Community/blob/master/Segment/Segment/MFA%20Push/getSecretMicrosoftAuth.ps1" target="_blank">&#128279; View on GitHub</a>
+
+  <h2>Synopsis</h2>
+  <p>Generates a new client secret for the Azure Multi-Factor Authentication service principal using Microsoft Graph, and outputs the secret value. Useful for rotating the MFA Push credential used by Zero Networks.</p>
+
+  <h2>Requirements</h2>
+  <table>
+    <thead><tr><th>Requirement</th><th>Details</th></tr></thead>
+    <tbody>
+      <tr><td>Microsoft.Graph modules</td><td><code>Microsoft.Graph.Authentication</code> and <code>Microsoft.Graph.Applications</code> — auto-installed if missing</td></tr>
+      <tr><td>Permissions</td><td>App registration with <code>Application.ReadWrite.All</code> permission on Microsoft Graph</td></tr>
+    </tbody>
+  </table>
+
+  <div class="callout">
+    <strong>Secret visibility</strong>
+    The new client secret value is only returned once at creation time. Copy it immediately — it cannot be retrieved again after this script exits.
+  </div>
+
+  <div class="example">
+    <div class="example-header"><span class="ex-label">Example 1</span><span class="ex-title">Generate a new MFA push client secret</span></div>
+    <pre><span class="ps-prompt">PS&gt; </span><span class="ps-cmd">.\getSecretMicrosoftAuth.ps1</span></pre>
+    <div class="example-desc">Connects to Microsoft Graph interactively, creates a new credential on the Azure MFA service principal (<code>appId: 981f26a1-7f43-403b-a875-f8b09b8cd720</code>) with a 2-year expiry, prints the secret, then disconnects.</div>
+  </div>
+
+</main>
+
+<script>
+  const sections = document.querySelectorAll('[id]');
+  const navLinks = document.querySelectorAll('nav.sidebar a');
+  const observer = new IntersectionObserver(entries => {
+    entries.forEach(entry => {
+      if (entry.isIntersecting) {
+        navLinks.forEach(a => a.classList.remove('active'));
+        const active = document.querySelector(`nav.sidebar a[href="#${entry.target.id}"]`);
+        if (active) active.classList.add('active');
+      }
+    });
+  }, { rootMargin: '-20% 0px -70% 0px' });
+  sections.forEach(s => observer.observe(s));
+</script>
+
+</body>
+</html>

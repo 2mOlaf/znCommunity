@@ -1,0 +1,240 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Segmentation Server Scripts – Zero Networks Community</title>
+  <link rel="stylesheet" href="styles.css" />
+  <style>
+    .github-link { display:inline-block; font-size:0.82rem; color:var(--accent); text-decoration:none; margin-bottom:0.6rem; }
+    .github-link:hover { text-decoration:underline; }
+  </style>
+</head>
+<body>
+
+<nav class="sidebar">
+  <div class="sidebar-logo">
+    <div class="brand">Zero Networks</div>
+    <div class="title">Segmentation Server</div>
+  </div>
+
+  <div class="sidebar-section">Overview</div>
+  <a href="#overview">About These Scripts</a>
+
+  <div class="sidebar-section">Audit &amp; Logging</div>
+  <a href="#get-audit-log">Get-AuditLogByTimeRange</a>
+  <a href="#znlog-filter">znlog-filter</a>
+  <a href="#parse-winrm-logs">Logs - Parse WinRM</a>
+
+  <div class="sidebar-section">GPO / Firewall</div>
+  <a href="#add-outbound-rules">Add-ZNOutboundRulesProtectGPO</a>
+
+  <div class="sidebar-section">Emergency Access</div>
+  <a href="#breakglass-single">breakglass-single</a>
+
+  <div class="sidebar-section">See Also</div>
+  <a href="breakglass-reference.html">BreakGlass Reference (full)</a>
+  <a href="community-scripts-troubleshooting.html">Troubleshooting Scripts</a>
+  <a href="index.html">&#8592; Docs Home</a>
+</nav>
+
+<main>
+
+  <div class="breadcrumb">
+    <a href="index.html">Docs Home</a><span>/</span>
+    <a href="index.html#community-scripts">Community Scripts</a><span>/</span>
+    <span>Segmentation Server</span>
+  </div>
+
+  <div id="overview" class="page-header">
+    <h1>Segmentation Server Scripts</h1>
+    <div class="tags">
+      <span class="tag">PowerShell</span>
+      <span class="tag purple">Community</span>
+      <span class="tag">Segment Server</span>
+    </div>
+    <p class="lead">
+      Scripts for Segmentation Server administration — exporting audit logs, filtering trust server
+      WinRM logs, adding outbound firewall rules to GPOs, and a lightweight single-asset break glass.
+    </p>
+  </div>
+
+  <div class="callout info">
+    <strong>Intended run location</strong>
+    Most scripts in this section are designed to run directly on a Segment Server or from a machine with
+    PowerShell remoting access to one. The <a href="#breakglass-single">breakglass-single</a> script must
+    run on a machine that can WinRM to the target asset.
+  </div>
+
+  <!-- ═══════════════════════ GET AUDIT LOG ═══════════════════════ -->
+  <div class="script-separator" id="get-audit-log">
+    <div class="page-header" style="margin-bottom:1rem; border-bottom:none; padding-bottom:0.5rem;">
+      <h1>Get-AuditLogByTimeRange.ps1</h1>
+      <div class="tags"><span class="tag">PowerShell</span><span class="tag green">Audit Export</span></div>
+    </div>
+  </div>
+
+  <a class="github-link" href="https://github.com/zeronetworks/Community/blob/master/Segment/Segmentation%20Server/Get-AuditLogByTimeRange.ps1" target="_blank">&#128279; View on GitHub</a>
+
+  <h2>Synopsis</h2>
+  <p>Prompts for a start and end time, then pages through the Zero Networks audit log API and exports all matching events to a CSV file in the user's profile directory.</p>
+
+  <h2>Prerequisites</h2>
+  <table>
+    <thead><tr><th>Requirement</th><th>Details</th></tr></thead>
+    <tbody>
+      <tr><td>API Key</td><td>Set <code>$APIKey</code> in the script (the variable is commented out — uncomment and populate, or use your preferred secrets method).</td></tr>
+      <tr><td>AuditTypes.json</td><td>Optional — the script includes an inline enum for audit type IDs. The JSON reference file is available in the upstream Community repo at <code>.github/modules/ps/AuditTypes.json</code>.</td></tr>
+    </tbody>
+  </table>
+
+  <div class="example">
+    <div class="example-header"><span class="ex-label">Example 1</span><span class="ex-title">Export May 2024 audit log to CSV</span></div>
+    <pre><span class="ps-prompt">PS&gt; </span>$APIKey = <span class="ps-value">'eyJ...'</span>
+<span class="ps-cmd">.\Get-AuditLogByTimeRange.ps1</span></pre>
+    <div class="example-desc">Prompts for start and end times in ISO 8601 format (e.g. <code>2024-05-01T00:00:00Z</code>). Exports results to <code>%USERPROFILE%\Audit Log-&lt;start&gt;-to-&lt;end&gt;.csv</code> using 400-record pages and cursor-based pagination.</div>
+  </div>
+
+  <h2>Audit Type Reference (selected)</h2>
+  <table>
+    <thead><tr><th>ID</th><th>Event Type</th><th>ID</th><th>Event Type</th></tr></thead>
+    <tbody>
+      <tr><td>1</td><td>Protection Adding</td><td>2</td><td>Protection Added</td></tr>
+      <tr><td>7</td><td>Protection Queued</td><td>9</td><td>Inbound Rule Added</td></tr>
+      <tr><td>10</td><td>Inbound Rule Removed</td><td>17</td><td>Inbound Reactive Policy Added</td></tr>
+      <tr><td>20</td><td>JIT Rule Added</td><td>22</td><td>JIT Rule Expired</td></tr>
+      <tr><td>29</td><td>Outbound Block Rule Added</td><td>33</td><td>Inbound Block Rule Added</td></tr>
+      <tr><td>44</td><td>Protection Queue Removed</td><td colspan="2"><em>(full list is in the script enum)</em></td></tr>
+    </tbody>
+  </table>
+
+  <!-- ═══════════════════════ ZNLOG FILTER ═══════════════════════ -->
+  <div class="script-separator" id="znlog-filter">
+    <div class="page-header" style="margin-bottom:1rem; border-bottom:none; padding-bottom:0.5rem;">
+      <h1>znlog-filter.ps1</h1>
+      <div class="tags"><span class="tag">PowerShell</span><span class="tag orange">Log Analysis</span></div>
+    </div>
+  </div>
+
+  <a class="github-link" href="https://github.com/zeronetworks/Community/blob/master/Segment/Segmentation%20Server/znlog-filter.ps1" target="_blank">&#128279; View on GitHub</a>
+
+  <h2>Synopsis</h2>
+  <p>Filters Zero Networks WinRM trust server logs (including archived zips) by a specific asset ID, extracting all matching log lines to a single output file for analysis.</p>
+
+  <h2>Interactive Prompts (with defaults)</h2>
+  <table>
+    <thead><tr><th>Prompt</th><th>Default</th><th>Description</th></tr></thead>
+    <tbody>
+      <tr><td>AssetID</td><td><code>a:a:XYZabc12</code></td><td>Zero Networks internal asset ID (find in portal URL)</td></tr>
+      <tr><td>Log Folder path</td><td><code>C:\Program Files\Zero Networks\Logs</code></td><td>Folder containing <code>trust-winrm.log</code> and zips</td></tr>
+      <tr><td>Days to look back</td><td><code>2</code></td><td>How many days of zip archives to include</td></tr>
+      <tr><td>Output Path</td><td><code>%USERPROFILE%\zn-tmp</code></td><td>Directory for extracted files and output</td></tr>
+      <tr><td>Output file</td><td><code>&lt;output-path&gt;\trust-winrm_filtered.txt</code></td><td>File to write matching log lines to</td></tr>
+    </tbody>
+  </table>
+
+  <div class="example">
+    <div class="example-header"><span class="ex-label">Example 1</span><span class="ex-title">Filter logs for a specific asset (accept all defaults)</span></div>
+    <pre><span class="ps-prompt">PS&gt; </span><span class="ps-cmd">.\znlog-filter.ps1</span></pre>
+    <div class="example-desc">Prompts interactively for each value. Press Enter to accept the bracketed default. Extracts recent zip archives, copies the current log, then filters all files for lines matching <code>assetId=&lt;your-id&gt;</code>.</div>
+  </div>
+
+  <!-- ═══════════════════════ PARSE WINRM LOGS ═══════════════════════ -->
+  <div class="script-separator" id="parse-winrm-logs">
+    <div class="page-header" style="margin-bottom:1rem; border-bottom:none; padding-bottom:0.5rem;">
+      <h1>Logs - Parse WinRM from Trust Server logs and Summarize.ps1</h1>
+      <div class="tags"><span class="tag">PowerShell</span><span class="tag orange">Log Analysis</span></div>
+    </div>
+  </div>
+
+  <a class="github-link" href="https://github.com/zeronetworks/Community/blob/master/Segment/Segmentation%20Server/Logs%20-%20Parse%20WinRM%20from%20Trust%20Server%20logs%20and%20Summarize.ps1" target="_blank">&#128279; View on GitHub</a>
+
+  <h2>Synopsis</h2>
+  <p>Parses and summarizes WinRM connection events from Zero Networks Trust Server logs, helping identify patterns in WinRM activity including sources, destinations, and failure rates.</p>
+
+  <!-- ═══════════════════════ ADD OUTBOUND RULES ═══════════════════════ -->
+  <div class="script-separator" id="add-outbound-rules">
+    <div class="page-header" style="margin-bottom:1rem; border-bottom:none; padding-bottom:0.5rem;">
+      <h1>Add-ZNOutboundRulesProtectGPO.ps1</h1>
+      <div class="tags"><span class="tag">PowerShell</span><span class="tag purple">GPO</span><span class="tag">Active Directory</span></div>
+    </div>
+  </div>
+
+  <a class="github-link" href="https://github.com/zeronetworks/Community/blob/master/Segment/Segmentation%20Server/Add-ZNOutboundRulesProtectGPO.ps1" target="_blank">&#128279; View on GitHub</a>
+
+  <h2>Synopsis</h2>
+  <p>Adds outbound Windows Firewall allow rules to the Zero Networks Protect GPO (<code>ZeroNetworksProtect-DoNotModify</code>) for Domain Controller and DNS/DHCP traffic.</p>
+
+  <div class="callout">
+    <strong>Warning</strong>
+    This script modifies Group Policy. Run it on a domain controller or from a machine with GPMC access. The target GPO name defaults to <code>ZeroNetworksProtect-DoNotModify</code> and must already exist. If multiple protect GPOs exist the script will prompt for clarification.
+  </div>
+
+  <h2>Rules Added</h2>
+  <table>
+    <thead><tr><th>Rule Name</th><th>Direction</th><th>Ports</th><th>Purpose</th></tr></thead>
+    <tbody>
+      <tr><td><code>ZNAccessOut-ADDC</code> (TCP)</td><td>Outbound</td><td>53, 88, 135, 389, 445, 464, 636, 3268–3269, 49152–65535</td><td>AD domain controller TCP traffic</td></tr>
+      <tr><td><code>ZNAccessOut-ADDC</code> (UDP)</td><td>Outbound</td><td>53, 67, 88, 123, 138, 389, 464</td><td>AD domain controller UDP traffic</td></tr>
+      <tr><td><code>ZNAccessOut-DNS-DHCP</code> (TCP)</td><td>Outbound</td><td>53, 67–68</td><td>DNS and DHCP TCP</td></tr>
+      <tr><td><code>ZNAccessOut-DNS-DHCP</code> (UDP)</td><td>Outbound</td><td>53, 67–68</td><td>DNS and DHCP UDP</td></tr>
+      <tr><td><code>ZNAccessOut-ICMP</code></td><td>Outbound</td><td>ICMP (protocol 1)</td><td>Ping</td></tr>
+    </tbody>
+  </table>
+
+  <div class="example">
+    <div class="example-header"><span class="ex-label">Example 1</span><span class="ex-title">Add outbound rules to the Protect GPO</span></div>
+    <pre><span class="ps-prompt">PS&gt; </span><span class="ps-cmd">.\Add-ZNOutboundRulesProtectGPO.ps1</span></pre>
+    <div class="example-desc">Discovers all DC IP addresses in the forest, locates the Protect GPO, and adds the outbound firewall rules. If the GPO name cannot be resolved automatically, the script prompts for the GPO name.</div>
+  </div>
+
+  <!-- ═══════════════════════ BREAKGLASS SINGLE ═══════════════════════ -->
+  <div class="script-separator" id="breakglass-single">
+    <div class="page-header" style="margin-bottom:1rem; border-bottom:none; padding-bottom:0.5rem;">
+      <h1>breakglass-single.ps1</h1>
+      <div class="tags"><span class="tag">PowerShell</span><span class="tag orange">Emergency</span></div>
+    </div>
+  </div>
+
+  <a class="github-link" href="https://github.com/zeronetworks/Community/blob/master/Segment/Segmentation%20Server/breakglass-single.ps1" target="_blank">&#128279; View on GitHub</a>
+
+  <h2>Synopsis</h2>
+  <p>A minimal single-asset break glass script. Uses PowerShell Remoting (Kerberos) to add Windows Firewall rules allowing all inbound and outbound traffic on a named target asset.</p>
+
+  <div class="callout">
+    <strong>Warning</strong>
+    This script opens <em>all</em> inbound and outbound traffic on the target. It is a quick-recovery tool for scenarios where the main Break Glass scripts are not available. See the <a href="breakglass-reference.html">BreakGlass Reference</a> for the full pre-installed scripts.
+  </div>
+
+  <h2>Configuration (edit at top of script)</h2>
+  <table>
+    <thead><tr><th>Variable</th><th>Description</th></tr></thead>
+    <tbody>
+      <tr><td><code>$AssetFQDN</code></td><td>FQDN of the target asset (default: <code>test.computer.com</code> — must be changed)</td></tr>
+      <tr><td><code>$Credential</code></td><td>Prompts for credentials at runtime via <code>Get-Credential</code></td></tr>
+    </tbody>
+  </table>
+
+  <div class="callout info">
+    Uncomment the <code>-localport 3389</code> variant and comment out the "allow all" rule to restrict break glass to RDP only.
+  </div>
+
+</main>
+
+<script>
+  const sections = document.querySelectorAll('[id]');
+  const navLinks = document.querySelectorAll('nav.sidebar a');
+  const observer = new IntersectionObserver(entries => {
+    entries.forEach(entry => {
+      if (entry.isIntersecting) {
+        navLinks.forEach(a => a.classList.remove('active'));
+        const active = document.querySelector(`nav.sidebar a[href="#${entry.target.id}"]`);
+        if (active) active.classList.add('active');
+      }
+    });
+  }, { rootMargin: '-20% 0px -70% 0px' });
+  sections.forEach(s => observer.observe(s));
+</script>
+
+</body>
+</html>

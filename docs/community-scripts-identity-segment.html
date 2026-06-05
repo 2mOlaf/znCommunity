@@ -1,0 +1,154 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Identity Segment Scripts – Zero Networks Community</title>
+  <link rel="stylesheet" href="styles.css" />
+  <style>
+    .github-link { display:inline-block; font-size:0.82rem; color:var(--accent); text-decoration:none; margin-bottom:0.6rem; }
+    .github-link:hover { text-decoration:underline; }
+  </style>
+</head>
+<body>
+
+<nav class="sidebar">
+  <div class="sidebar-logo">
+    <div class="brand">Zero Networks</div>
+    <div class="title">Identity Segment</div>
+  </div>
+
+  <div class="sidebar-section">Overview</div>
+  <a href="#overview">About These Scripts</a>
+
+  <div class="sidebar-section">Identity Learning</div>
+  <a href="#add-clients-to-identity-learning">Add-ClientsToIdentityLearning</a>
+  <a href="#get-current-svc-accounts">get-currentSVCAccounts</a>
+
+  <div class="sidebar-section">See Also</div>
+  <a href="community-scripts-asset-management.html">Asset Management Scripts</a>
+  <a href="zeronetworks-module-reference.html">ZeroNetworks Module (PSGallery)</a>
+  <a href="index.html">&#8592; Docs Home</a>
+</nav>
+
+<main>
+
+  <div class="breadcrumb">
+    <a href="index.html">Docs Home</a><span>/</span>
+    <a href="index.html#community-scripts">Community Scripts</a><span>/</span>
+    <span>Identity Segment</span>
+  </div>
+
+  <div id="overview" class="page-header">
+    <h1>Identity Segment Scripts</h1>
+    <div class="tags">
+      <span class="tag">PowerShell</span>
+      <span class="tag purple">Community</span>
+      <span class="tag">Identity</span>
+    </div>
+    <p class="lead">
+      Community scripts for managing Zero Networks Identity Segment — queueing client assets
+      and service accounts for identity learning.
+    </p>
+  </div>
+
+  <!-- ═══════════════════════ ADD CLIENTS TO IDENTITY LEARNING ═══════════════════════ -->
+  <div class="script-separator" id="add-clients-to-identity-learning">
+    <div class="page-header" style="margin-bottom:1rem; border-bottom:none; padding-bottom:0.5rem;">
+      <h1>Add-ClientsToIdentityLearning.ps1</h1>
+      <div class="tags"><span class="tag">PowerShell</span><span class="tag purple">Identity Learning</span></div>
+    </div>
+  </div>
+
+  <a class="github-link" href="https://github.com/zeronetworks/Community/blob/master/Segment/Identity%20Segment/Add-ClientsToIdentityLearning.ps1" target="_blank">&#128279; View on GitHub</a>
+
+  <h2>Synopsis</h2>
+  <p>Finds all monitored client assets that are not yet identity-segmented, then queues them for a 30-day identity learning period in batches of 100.</p>
+
+  <h2>Prerequisites</h2>
+  <table>
+    <thead><tr><th>Requirement</th><th>Details</th></tr></thead>
+    <tbody>
+      <tr><td>ZeroNetworks module</td><td>Auto-installed via <code>Install-Module ZeroNetworks</code> if not present</td></tr>
+      <tr><td>API key</td><td>Set <code>$apiKey</code> in the script</td></tr>
+    </tbody>
+  </table>
+
+  <h2>How It Works</h2>
+  <ol style="margin: 0.5rem 0 1rem 1.5rem; line-height: 2.1;">
+    <li>Looks up the built-in <strong>Clients</strong> system group (<code>g:s:*</code>).</li>
+    <li>Builds a filter for monitored assets that are in the Clients group and have identity protection status 1 (not identity-segmented).</li>
+    <li>Pages through all matching assets (400 per request).</li>
+    <li>Batches the asset IDs (100 per call) and POSTs to <code>/assets/identity-actions/queue</code> with a 30-day learning duration.</li>
+  </ol>
+
+  <div class="example">
+    <div class="example-header"><span class="ex-label">Example 1</span><span class="ex-title">Queue all eligible client assets for identity learning</span></div>
+    <pre><span class="ps-prompt">PS&gt; </span>$apiKey = <span class="ps-value">'eyJ...'</span>
+<span class="ps-cmd">.\Add-ClientsToIdentityLearning.ps1</span></pre>
+  </div>
+
+  <!-- ═══════════════════════ GET CURRENT SVC ACCOUNTS ═══════════════════════ -->
+  <div class="script-separator" id="get-current-svc-accounts">
+    <div class="page-header" style="margin-bottom:1rem; border-bottom:none; padding-bottom:0.5rem;">
+      <h1>get-currentSVCAccounts.ps1</h1>
+      <div class="tags"><span class="tag">PowerShell</span><span class="tag purple">Service Accounts</span></div>
+    </div>
+  </div>
+
+  <a class="github-link" href="https://github.com/zeronetworks/Community/blob/master/Segment/Identity%20Segment/get-currentSVCAccounts.ps1" target="_blank">&#128279; View on GitHub</a>
+
+  <h2>Synopsis</h2>
+  <p>Retrieves service accounts that have logged on within the past <code>$n</code> days and are not yet identity-protected, then optionally queues them for a 30-day identity learning period.</p>
+
+  <h2>Parameters</h2>
+  <div class="param-entry">
+    <div class="param-name">-n</div>
+    <div class="param-body">
+      <p class="param-desc">Number of days to look back for account activity. Accounts with a <code>lastLogon</code> timestamp older than this value are excluded.</p>
+      <div class="param-meta">
+        <div class="param-meta-item"><span class="meta-label">Type:</span><span class="meta-value">Int</span></div>
+        <div class="param-meta-item"><span class="meta-label">Default:</span><span class="meta-value">180 days</span></div>
+      </div>
+    </div>
+  </div>
+  <div class="param-entry">
+    <div class="param-name">-APIKey</div>
+    <div class="param-body">
+      <p class="param-desc">Zero Networks API key.</p>
+      <div class="param-meta">
+        <div class="param-meta-item"><span class="meta-label">Default:</span><span class="meta-value"><code>&lt;API_KEY&gt;</code> placeholder — must be set</span></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="example">
+    <div class="example-header"><span class="ex-label">Example 1</span><span class="ex-title">Find and queue service accounts active in the last 180 days</span></div>
+    <pre><span class="ps-prompt">PS&gt; </span><span class="ps-cmd">.\get-currentSVCAccounts.ps1</span> <span class="ps-param">-APIKey</span> <span class="ps-value">eyJ...</span></pre>
+    <div class="example-desc">Fetches all service accounts, filters to those with <code>lastLogon</code> within 180 days and <code>protectionState != 3</code> (not already protected), prints their names, and queues them for identity learning if any are found.</div>
+  </div>
+  <div class="example">
+    <div class="example-header"><span class="ex-label">Example 2</span><span class="ex-title">Adjust lookback period</span></div>
+    <pre><span class="ps-prompt">PS&gt; </span><span class="ps-cmd">.\get-currentSVCAccounts.ps1</span> <span class="ps-param">-n</span> <span class="ps-value">90</span> <span class="ps-param">-APIKey</span> <span class="ps-value">eyJ...</span></pre>
+    <div class="example-desc">Limits results to service accounts that logged on within the past 90 days.</div>
+  </div>
+
+</main>
+
+<script>
+  const sections = document.querySelectorAll('[id]');
+  const navLinks = document.querySelectorAll('nav.sidebar a');
+  const observer = new IntersectionObserver(entries => {
+    entries.forEach(entry => {
+      if (entry.isIntersecting) {
+        navLinks.forEach(a => a.classList.remove('active'));
+        const active = document.querySelector(`nav.sidebar a[href="#${entry.target.id}"]`);
+        if (active) active.classList.add('active');
+      }
+    });
+  }, { rootMargin: '-20% 0px -70% 0px' });
+  sections.forEach(s => observer.observe(s));
+</script>
+
+</body>
+</html>

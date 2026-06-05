@@ -1,0 +1,612 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>zn-approve.py – Zero Networks Python CLI Reference</title>
+  <link rel="stylesheet" href="styles.css" />
+  <style>
+    /* Python shell prompt override */
+    .sh-prompt { color: var(--text-muted); user-select: none; }
+    .sh-flag   { color: #e3bb5a; }
+    .sh-value  { color: #a8d8a8; }
+    .sh-cmd    { color: var(--accent); font-weight: 600; }
+    .sh-sub    { color: #c792ea; }
+
+    /* Python tag variant */
+    .tag.python { background: rgba(55,118,171,0.18); color: #5ba4cf; }
+
+    /* Workflow step numbers */
+    .workflow-steps { counter-reset: workflow; list-style: none; padding: 0; margin: 0.75rem 0 1rem; }
+    .workflow-steps li {
+      counter-increment: workflow;
+      position: relative;
+      padding: 0.7rem 1rem 0.7rem 3rem;
+      margin-bottom: 0.5rem;
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      font-size: 0.88rem;
+      line-height: 1.5;
+    }
+    .workflow-steps li::before {
+      content: counter(workflow);
+      position: absolute;
+      left: 0.9rem;
+      top: 50%;
+      transform: translateY(-50%);
+      width: 1.3rem;
+      height: 1.3rem;
+      background: var(--accent);
+      color: #fff;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 0.72rem;
+      font-weight: 700;
+      line-height: 1.3rem;
+      text-align: center;
+    }
+    .workflow-steps li code { font-size: 0.82rem; }
+
+    /* Interactive mode command table */
+    .interactive-cmd { font-family: "Cascadia Code", Consolas, monospace; font-size: 0.85rem; white-space: nowrap; }
+  </style>
+</head>
+<body>
+
+<nav class="sidebar">
+  <div class="sidebar-logo">
+    <div class="brand">Zero Networks</div>
+    <div class="title">zn-approve.py</div>
+  </div>
+
+  <div class="sidebar-section">Overview</div>
+  <a href="#overview">What is zn-approve.py?</a>
+  <a href="#prerequisites">Prerequisites</a>
+  <a href="#authentication">Authentication</a>
+
+  <div class="sidebar-section">Global Flags</div>
+  <a href="#flag-api-key">--api-key</a>
+  <a href="#flag-token-info">--token-info</a>
+  <a href="#flag-connectivity">--connectivity</a>
+  <a href="#flag-debug">--debug</a>
+
+  <div class="sidebar-section">Commands</div>
+  <a href="#cmd-list">list</a>
+  <a href="#cmd-approve-all">approve-all</a>
+  <a href="#cmd-apply">apply</a>
+
+  <div class="sidebar-section">Workflows</div>
+  <a href="#workflow-select-apply">Select then apply</a>
+  <a href="#workflow-approve-all">Bulk approve all</a>
+  <a href="#interactive-mode">Interactive selection mode</a>
+
+  <div class="sidebar-section">Reference</div>
+  <a href="#rate-limiting">Rate limiting</a>
+  <a href="#exit-codes">Exit codes</a>
+
+  <div class="sidebar-section">See Also</div>
+  <a href="community-scripts-rules-mfa.html">Rules &amp; MFA Scripts</a>
+  <a href="zntools-roadmap.html#approve-znrulecleanup">Roadmap: Approve-ZNRuleCleanup</a>
+  <a href="index.html">&#8592; Docs Home</a>
+</nav>
+
+<main>
+
+  <div class="breadcrumb">
+    <a href="index.html">Docs Home</a><span>/</span>
+    <a href="community-scripts-rules-mfa.html">Rules &amp; MFA Scripts</a><span>/</span>
+    <span>zn-approve.py</span>
+  </div>
+
+  <!-- ═══════════════════════ OVERVIEW ═══════════════════════ -->
+  <div id="overview" class="page-header">
+    <h1>zn-approve.py</h1>
+    <div class="tags">
+      <span class="tag python">Python 3</span>
+      <span class="tag purple">CLI Tool</span>
+      <span class="tag">Rules</span>
+    </div>
+    <p class="lead">
+      A Python 3 command-line tool for reviewing and approving Zero Networks inbound rules.
+      Supports interactive paginated selection, bulk approval, and targeted apply-from-file workflows.
+    </p>
+  </div>
+
+  <div class="callout info">
+    <strong>This is a Python script, not a PowerShell script.</strong>
+    Unlike most tools in this repository, <code>zn-approve.py</code> runs with <code>python</code> (or
+    <code>python3</code> on Linux/macOS) rather than PowerShell. It requires Python 3.8 or higher and the
+    <code>requests</code> library. No PowerShell or Zero Networks PowerShell module is needed.
+  </div>
+
+  <!-- ═══════════════════════ PREREQUISITES ═══════════════════════ -->
+  <h2 id="prerequisites">Prerequisites</h2>
+  <table>
+    <thead><tr><th>Requirement</th><th>Details</th></tr></thead>
+    <tbody>
+      <tr>
+        <td>Python 3.8+</td>
+        <td>Verify with <code>python --version</code> or <code>python3 --version</code>. Download from <a href="https://python.org" target="_blank">python.org</a>.</td>
+      </tr>
+      <tr>
+        <td><code>requests</code> library</td>
+        <td>Only external dependency. Install with <code>pip install requests</code>. All other imports are standard library.</td>
+      </tr>
+      <tr>
+        <td>Zero Networks API key</td>
+        <td>A read/write JWT token from your Zero Networks portal. Set as <code>ZN_API_KEY</code> environment variable or pass via <code>--api-key</code>.</td>
+      </tr>
+      <tr>
+        <td>Network access</td>
+        <td>Outbound HTTPS (port 443) to your Zero Networks portal endpoint.</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <div class="example">
+    <div class="example-header"><span class="ex-label">Setup</span><span class="ex-title">Install the dependency and verify</span></div>
+    <pre><span class="sh-prompt">$ </span>pip install requests
+<span class="sh-prompt">$ </span>python <span class="sh-cmd">zn-approve.py</span> <span class="sh-flag">--help</span></pre>
+  </div>
+
+  <!-- ═══════════════════════ AUTHENTICATION ═══════════════════════ -->
+  <h2 id="authentication">Authentication</h2>
+  <p>
+    The script reads your API key from the <code>ZN_API_KEY</code> environment variable by default.
+    You can also pass it directly with <code>--api-key</code> on any command or globally.
+  </p>
+  <p>
+    The API key is a JWT. The script decodes it locally (no network call) to extract the
+    <code>aud</code> (audience) claim and construct the correct portal base URL automatically.
+    If the key cannot be decoded as a JWT, the script falls back to
+    <code>https://portal.zeronetworks.com/api/v1</code>.
+  </p>
+
+  <table>
+    <thead><tr><th>Method</th><th>Example</th></tr></thead>
+    <tbody>
+      <tr>
+        <td>Environment variable (recommended)</td>
+        <td><code>$Env:ZN_API_KEY = "eyJ..."</code> (PowerShell)<br><code>export ZN_API_KEY="eyJ..."</code> (bash)</td>
+      </tr>
+      <tr>
+        <td>Inline flag</td>
+        <td><code>python zn-approve.py --api-key eyJ... list</code></td>
+      </tr>
+    </tbody>
+  </table>
+
+  <div class="callout info">
+    <strong>Token auto-detection</strong>
+    The script decodes the JWT payload to find your account-specific portal URL. You do not need to
+    configure a base URL — it is derived from the token you already have.
+    Use <a href="#flag-token-info"><code>--token-info</code></a> to inspect what the script sees in your token.
+  </div>
+
+  <!-- ═══════════════════════ GLOBAL FLAGS ═══════════════════════ -->
+  <h2 style="margin-top:2rem;">Global Flags</h2>
+  <p style="font-size:0.88rem; color:var(--text-muted);">These flags can be passed before or without a subcommand.</p>
+
+  <div class="param-entry" id="flag-api-key">
+    <div class="param-name">--api-key</div>
+    <div class="param-body">
+      <p class="param-desc">
+        Your Zero Networks JWT token. Overrides the <code>ZN_API_KEY</code> environment variable.
+        Accepted on the top-level parser and also on each subcommand independently.
+      </p>
+      <div class="param-meta">
+        <div class="param-meta-item"><span class="meta-label">Type:</span><span class="meta-value">String</span></div>
+        <div class="param-meta-item"><span class="meta-label">Required:</span><span class="meta-value optional">Optional (if ZN_API_KEY is set)</span></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="param-entry" id="flag-token-info">
+    <div class="param-name">--token-info</div>
+    <div class="param-body">
+      <p class="param-desc">
+        Decodes the active JWT token and prints its claims: audience, subject, name, scope,
+        issued-at, expiry, and issuer. Timestamps are shown in ISO 8601 UTC format.
+        Useful for verifying you have the right key and that it has not expired.
+        Cannot be combined with a subcommand.
+      </p>
+      <div class="param-meta">
+        <div class="param-meta-item"><span class="meta-label">Type:</span><span class="meta-value">Flag (no value)</span></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="param-entry" id="flag-connectivity">
+    <div class="param-name">--connectivity</div>
+    <div class="param-body">
+      <p class="param-desc">
+        Makes a test API call (<code>GET /protection/rules/inbound?_limit=1</code>) and prints the
+        HTTP response code. Use this to confirm network access and token validity before running
+        bulk operations. Cannot be combined with a subcommand.
+      </p>
+      <div class="param-meta">
+        <div class="param-meta-item"><span class="meta-label">Type:</span><span class="meta-value">Flag (no value)</span></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="param-entry" id="flag-debug">
+    <div class="param-name">--debug</div>
+    <div class="param-body">
+      <p class="param-desc">
+        Prints the HTTP method, URL, and response status for every API call. On failures, also
+        prints response headers and the first 500 characters of the response body. Accepted on
+        the top-level parser and on each subcommand.
+      </p>
+      <div class="param-meta">
+        <div class="param-meta-item"><span class="meta-label">Type:</span><span class="meta-value">Flag (no value)</span></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══════════════════════ COMMAND: LIST ═══════════════════════ -->
+  <div class="script-separator" id="cmd-list">
+    <div class="page-header" style="margin-bottom:1rem; border-bottom:none; padding-bottom:0.5rem;">
+      <h1>list</h1>
+      <div class="tags">
+        <span class="tag python">Python 3</span>
+        <span class="tag">Read-only</span>
+      </div>
+    </div>
+  </div>
+
+  <h2>Synopsis</h2>
+  <p>Lists inbound rules with <code>suggestionType=1</code> (rules suggested for approval). Without <code>--select</code>, prints each rule to the console. With <code>--select</code>, opens an interactive paginated browser where you can mark rules and save their IDs to a file for later use with <a href="#cmd-apply"><code>apply</code></a>.</p>
+
+  <h2>Arguments</h2>
+
+  <div class="param-entry">
+    <div class="param-name">--select</div>
+    <div class="param-body">
+      <p class="param-desc">
+        Opens the interactive selection mode. Rules are displayed page by page; you mark rules
+        using number ranges and save the selected IDs to a file.
+        See <a href="#interactive-mode">Interactive selection mode</a> for the full command reference.
+      </p>
+      <div class="param-meta">
+        <div class="param-meta-item"><span class="meta-label">Type:</span><span class="meta-value">Flag (no value)</span></div>
+        <div class="param-meta-item"><span class="meta-label">Default:</span><span class="meta-value">Off — non-interactive list to console</span></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="param-entry">
+    <div class="param-name">--output</div>
+    <div class="param-body">
+      <p class="param-desc">
+        Path for the rule ID file written when you run <code>save</code> in interactive mode.
+        One rule ID per line.
+      </p>
+      <div class="param-meta">
+        <div class="param-meta-item"><span class="meta-label">Type:</span><span class="meta-value">String (file path)</span></div>
+        <div class="param-meta-item"><span class="meta-label">Default:</span><span class="meta-value"><code>zn-approved-rules-YYYY-MM-DD.txt</code> in the working directory</span></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="param-entry">
+    <div class="param-name">--page-size</div>
+    <div class="param-body">
+      <p class="param-desc">Number of rules to display per page in interactive selection mode.</p>
+      <div class="param-meta">
+        <div class="param-meta-item"><span class="meta-label">Type:</span><span class="meta-value">Integer</span></div>
+        <div class="param-meta-item"><span class="meta-label">Default:</span><span class="meta-value">5</span></div>
+      </div>
+    </div>
+  </div>
+
+  <h2>Examples</h2>
+
+  <div class="example">
+    <div class="example-header"><span class="ex-label">Example 1</span><span class="ex-title">Print all pending rules to console</span></div>
+    <pre><span class="sh-prompt">$ </span>python <span class="sh-cmd">zn-approve.py</span> <span class="sh-sub">list</span></pre>
+    <div class="example-desc">Fetches up to 100 inbound rules with <code>suggestionType=1</code> and prints source, destination, protocol, and port for each.</div>
+  </div>
+
+  <div class="example">
+    <div class="example-header"><span class="ex-label">Example 2</span><span class="ex-title">Open interactive selection (default output file)</span></div>
+    <pre><span class="sh-prompt">$ </span>python <span class="sh-cmd">zn-approve.py</span> <span class="sh-sub">list</span> <span class="sh-flag">--select</span></pre>
+    <div class="example-desc">Opens paginated interactive mode. When you <code>save</code>, IDs are written to <code>zn-approved-rules-YYYY-MM-DD.txt</code>.</div>
+  </div>
+
+  <div class="example">
+    <div class="example-header"><span class="ex-label">Example 3</span><span class="ex-title">Interactive selection with custom output and page size</span></div>
+    <pre><span class="sh-prompt">$ </span>python <span class="sh-cmd">zn-approve.py</span> <span class="sh-sub">list</span> <span class="sh-flag">--select</span> <span class="sh-flag">--output</span> <span class="sh-value">my-selection.txt</span> <span class="sh-flag">--page-size</span> <span class="sh-value">10</span></pre>
+  </div>
+
+  <!-- ═══════════════════════ COMMAND: APPROVE-ALL ═══════════════════════ -->
+  <div class="script-separator" id="cmd-approve-all">
+    <div class="page-header" style="margin-bottom:1rem; border-bottom:none; padding-bottom:0.5rem;">
+      <h1>approve-all</h1>
+      <div class="tags">
+        <span class="tag python">Python 3</span>
+        <span class="tag orange">Writes to API</span>
+      </div>
+    </div>
+  </div>
+
+  <h2>Synopsis</h2>
+  <p>Fetches all inbound rules in a pending state, prompts for confirmation, then approves them all in sequence. Use <code>--dry-run</code> to preview which API endpoints would be called without making any changes.</p>
+
+  <div class="callout">
+    <strong>Confirmation required</strong>
+    This command always prompts <code>Approve ALL N pending rules? (yes/no)</code> before making
+    any changes. Type <code>yes</code> exactly to proceed; anything else cancels.
+  </div>
+
+  <h2>Arguments</h2>
+
+  <div class="param-entry">
+    <div class="param-name">--dry-run</div>
+    <div class="param-body">
+      <p class="param-desc">
+        Prints the HTTP method and endpoint URL that would be called for each rule, without
+        making any API calls. Use this to audit scope before committing.
+      </p>
+      <div class="param-meta">
+        <div class="param-meta-item"><span class="meta-label">Type:</span><span class="meta-value">Flag (no value)</span></div>
+      </div>
+    </div>
+  </div>
+
+  <h2>Examples</h2>
+
+  <div class="example">
+    <div class="example-header"><span class="ex-label">Example 1</span><span class="ex-title">Preview what would be approved</span></div>
+    <pre><span class="sh-prompt">$ </span>python <span class="sh-cmd">zn-approve.py</span> <span class="sh-sub">approve-all</span> <span class="sh-flag">--dry-run</span></pre>
+    <div class="example-desc">Prints each <code>PUT /protection/rules/inbound/review/approve/{id}</code> that would be called. No changes are made.</div>
+  </div>
+
+  <div class="example">
+    <div class="example-header"><span class="ex-label">Example 2</span><span class="ex-title">Approve all pending rules</span></div>
+    <pre><span class="sh-prompt">$ </span>python <span class="sh-cmd">zn-approve.py</span> <span class="sh-sub">approve-all</span>
+Approve ALL 23 pending rules? (yes/no): <span class="sh-value">yes</span>
+Approving 23 rules...
+[1/23] Approved rule a1b2c3...
+...</pre>
+    <div class="example-desc">Confirms scope, then approves each rule in sequence with a 300ms pause between calls to avoid rate limiting.</div>
+  </div>
+
+  <!-- ═══════════════════════ COMMAND: APPLY ═══════════════════════ -->
+  <div class="script-separator" id="cmd-apply">
+    <div class="page-header" style="margin-bottom:1rem; border-bottom:none; padding-bottom:0.5rem;">
+      <h1>apply</h1>
+      <div class="tags">
+        <span class="tag python">Python 3</span>
+        <span class="tag orange">Writes to API</span>
+      </div>
+    </div>
+  </div>
+
+  <h2>Synopsis</h2>
+  <p>Approves a specific list of rule IDs, supplied either as a comma-separated string or as a file (one ID per line). This is the second step of the <a href="#workflow-select-apply">select-then-apply workflow</a> — you review rules with <code>list --select</code>, save your selection, then apply it here.</p>
+
+  <div class="callout">
+    <strong>Confirmation required</strong>
+    Always prompts <code>Approve N selected rules? (yes/no)</code> before calling the API.
+  </div>
+
+  <h2>Arguments</h2>
+
+  <div class="param-entry">
+    <div class="param-name">--ids-file</div>
+    <div class="param-body">
+      <p class="param-desc">
+        Path to a plain-text file containing one rule ID per line. Empty lines are ignored.
+        Duplicate IDs are deduplicated automatically.
+        This is the output file produced by <code>list --select</code>.
+      </p>
+      <div class="param-meta">
+        <div class="param-meta-item"><span class="meta-label">Type:</span><span class="meta-value">String (file path)</span></div>
+        <div class="param-meta-item"><span class="meta-label">Required:</span><span class="meta-value optional">Required if --ids is not provided</span></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="param-entry">
+    <div class="param-name">--ids</div>
+    <div class="param-body">
+      <p class="param-desc">Comma-separated list of rule IDs to approve directly. Can be combined with <code>--ids-file</code>; duplicates across both sources are removed.</p>
+      <div class="param-meta">
+        <div class="param-meta-item"><span class="meta-label">Type:</span><span class="meta-value">String (comma-separated)</span></div>
+        <div class="param-meta-item"><span class="meta-label">Required:</span><span class="meta-value optional">Required if --ids-file is not provided</span></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="param-entry">
+    <div class="param-name">--dry-run</div>
+    <div class="param-body">
+      <p class="param-desc">Prints the API method and endpoint for each rule without making any changes.</p>
+      <div class="param-meta">
+        <div class="param-meta-item"><span class="meta-label">Type:</span><span class="meta-value">Flag (no value)</span></div>
+      </div>
+    </div>
+  </div>
+
+  <h2>Examples</h2>
+
+  <div class="example">
+    <div class="example-header"><span class="ex-label">Example 1</span><span class="ex-title">Apply a saved selection file</span></div>
+    <pre><span class="sh-prompt">$ </span>python <span class="sh-cmd">zn-approve.py</span> <span class="sh-sub">apply</span> <span class="sh-flag">--ids-file</span> <span class="sh-value">zn-approved-rules-2026-06-05.txt</span></pre>
+  </div>
+
+  <div class="example">
+    <div class="example-header"><span class="ex-label">Example 2</span><span class="ex-title">Dry-run a file before applying</span></div>
+    <pre><span class="sh-prompt">$ </span>python <span class="sh-cmd">zn-approve.py</span> <span class="sh-sub">apply</span> <span class="sh-flag">--ids-file</span> <span class="sh-value">zn-approved-rules-2026-06-05.txt</span> <span class="sh-flag">--dry-run</span></pre>
+    <div class="example-desc">Prints each <code>PUT</code> endpoint that would be called. No API changes are made.</div>
+  </div>
+
+  <div class="example">
+    <div class="example-header"><span class="ex-label">Example 3</span><span class="ex-title">Approve two specific rule IDs inline</span></div>
+    <pre><span class="sh-prompt">$ </span>python <span class="sh-cmd">zn-approve.py</span> <span class="sh-sub">apply</span> <span class="sh-flag">--ids</span> <span class="sh-value">"a1b2c3d4,e5f6g7h8"</span></pre>
+  </div>
+
+  <!-- ═══════════════════════ WORKFLOWS ═══════════════════════ -->
+  <h2 id="workflow-select-apply" style="margin-top:2.5rem;">Recommended Workflow: Select then Apply</h2>
+  <p>The intended use for most situations. Review rules interactively, save only those you want to approve, then apply them in a separate step with confirmation.</p>
+
+  <ol class="workflow-steps">
+    <li>
+      <strong>Verify your token</strong><br>
+      <code>python zn-approve.py --token-info</code> — confirm the key is valid and shows the right portal audience.
+    </li>
+    <li>
+      <strong>Check connectivity</strong><br>
+      <code>python zn-approve.py --connectivity</code> — confirms the API is reachable and the token is accepted.
+    </li>
+    <li>
+      <strong>Browse and select rules</strong><br>
+      <code>python zn-approve.py list --select</code> — opens the interactive browser. Page through rules, mark the ones you want, then <code>save</code> to write IDs to a file.
+    </li>
+    <li>
+      <strong>Review the saved file</strong><br>
+      Open <code>zn-approved-rules-YYYY-MM-DD.txt</code> in any text editor. Remove any IDs you changed your mind about.
+    </li>
+    <li>
+      <strong>Dry-run first</strong><br>
+      <code>python zn-approve.py apply --ids-file zn-approved-rules-YYYY-MM-DD.txt --dry-run</code> — confirm the endpoint list looks right.
+    </li>
+    <li>
+      <strong>Apply</strong><br>
+      <code>python zn-approve.py apply --ids-file zn-approved-rules-YYYY-MM-DD.txt</code> — type <code>yes</code> at the prompt to approve.
+    </li>
+  </ol>
+
+  <h2 id="workflow-approve-all">Bulk Workflow: Approve All Pending</h2>
+  <p>For environments where all pending rules are expected to be approved without manual review.</p>
+
+  <ol class="workflow-steps">
+    <li>
+      <strong>Preview scope</strong><br>
+      <code>python zn-approve.py approve-all --dry-run</code> — see every rule ID and endpoint that would be called.
+    </li>
+    <li>
+      <strong>Approve</strong><br>
+      <code>python zn-approve.py approve-all</code> — type <code>yes</code> at the prompt.
+    </li>
+  </ol>
+
+  <!-- ═══════════════════════ INTERACTIVE MODE ═══════════════════════ -->
+  <h2 id="interactive-mode">Interactive Selection Mode Reference</h2>
+  <p>Entered when you run <code>list --select</code>. Rules are shown in pages; each rule is numbered starting at 1. A <code>[*]</code> marker indicates the rule is currently selected.</p>
+
+  <table>
+    <thead><tr><th>Command</th><th>Alias</th><th>Effect</th></tr></thead>
+    <tbody>
+      <tr><td class="interactive-cmd">n</td><td><code>next</code></td><td>Go to the next page</td></tr>
+      <tr><td class="interactive-cmd">p</td><td><code>prev</code></td><td>Go to the previous page</td></tr>
+      <tr><td class="interactive-cmd">s &lt;ranges&gt;</td><td>—</td><td>Select rules by number. Accepts comma-separated numbers and ranges (e.g. <code>s 1,3,5-8</code>)</td></tr>
+      <tr><td class="interactive-cmd">u &lt;ranges&gt;</td><td>—</td><td>Unselect rules by number using the same range syntax</td></tr>
+      <tr><td class="interactive-cmd">a</td><td><code>all</code></td><td>Select all rules on the current page</td></tr>
+      <tr><td class="interactive-cmd">c</td><td><code>clear</code></td><td>Clear all selections across all pages</td></tr>
+      <tr><td class="interactive-cmd">save</td><td>—</td><td>Write the selected rule IDs to the output file (can be done mid-session; selections are preserved)</td></tr>
+      <tr><td class="interactive-cmd">quit</td><td>—</td><td>Exit without saving</td></tr>
+    </tbody>
+  </table>
+
+  <div class="callout info">
+    <strong>Range syntax</strong>
+    Ranges are inclusive on both ends. <code>s 1-3,7,10-12</code> selects rules 1, 2, 3, 7, 10, 11, 12.
+    You can <code>save</code> multiple times during a session — each save overwrites the previous file with the current selection.
+    Your selections persist across page navigation until you <code>clear</code> or <code>quit</code>.
+  </div>
+
+  <div class="example">
+    <div class="example-header"><span class="ex-label">Session example</span><span class="ex-title">Browse, select, and save</span></div>
+    <pre>============================================================
+Page 1/4 (rules 1-5 of 18)
+------------------------------------------------------------
+[ ] Rule #1 (a1b2c3...)
+Source: server-01.corp.local
+Destination: dc01.corp.local
+Protocol: TCP
+Port: 445
+------------------------------------------------------------
+[ ] Rule #2 (d4e5f6...)
+...
+============================================================
+Commands: n(ext), p(rev), s(elect) &lt;ranges&gt;, u(nselect) &lt;ranges&gt;, a(ll page), c(lear),
+          save, quit
+<span class="sh-prompt">&gt; </span>s 1,3
+Selected 2 rules
+<span class="sh-prompt">&gt; </span>n
+<span class="sh-prompt">&gt; </span>a
+Selected page rules 6-10
+<span class="sh-prompt">&gt; </span>u 8
+Unselected 1 rules
+<span class="sh-prompt">&gt; </span>save
+Saved 7 rule IDs to zn-approved-rules-2026-06-05.txt
+<span class="sh-prompt">&gt; </span>quit</pre>
+  </div>
+
+  <!-- ═══════════════════════ RATE LIMITING ═══════════════════════ -->
+  <h2 id="rate-limiting">Rate Limiting</h2>
+  <p>
+    The script automatically handles HTTP <code>429 Too Many Requests</code> responses by waiting
+    5 seconds and retrying the same request once. Additionally, bulk approval operations
+    (<code>approve-all</code> and <code>apply</code>) insert a 300ms pause between each approval
+    call to reduce the chance of hitting rate limits at scale.
+  </p>
+
+  <!-- ═══════════════════════ EXIT CODES ═══════════════════════ -->
+  <h2 id="exit-codes">Exit Codes</h2>
+  <table>
+    <thead><tr><th>Code</th><th>Condition</th></tr></thead>
+    <tbody>
+      <tr><td><code>0</code></td><td>Successful completion (including "no rules found" and user-cancelled confirmations)</td></tr>
+      <tr><td><code>1</code></td><td><code>ZN_API_KEY</code> not set and <code>--api-key</code> not provided</td></tr>
+      <tr><td><code>2</code></td><td>Argument parsing error (missing required subcommand, invalid flag)</td></tr>
+    </tbody>
+  </table>
+
+</main>
+
+<script>
+  const sections = document.querySelectorAll('[id]');
+  const navLinks = document.querySelectorAll('nav.sidebar a');
+  const observer = new IntersectionObserver(entries => {
+    entries.forEach(entry => {
+      if (entry.isIntersecting) {
+        navLinks.forEach(a => a.classList.remove('active'));
+        const active = document.querySelector(`nav.sidebar a[href="#${entry.target.id}"]`);
+        if (active) active.classList.add('active');
+      }
+    });
+  }, { rootMargin: '-20% 0px -70% 0px' });
+  sections.forEach(s => observer.observe(s));
+
+  // Copy buttons on code examples
+  document.querySelectorAll('.example').forEach(ex => {
+    const pre = ex.querySelector('pre');
+    const header = ex.querySelector('.example-header');
+    if (!pre || !header) return;
+    const btn = document.createElement('button');
+    btn.className = 'copy-btn';
+    btn.textContent = 'Copy';
+    btn.addEventListener('click', () => {
+      const text = pre.innerText.replace(/^\$ /gm, '');
+      navigator.clipboard.writeText(text).then(() => {
+        btn.textContent = 'Copied!';
+        btn.classList.add('copied');
+        setTimeout(() => { btn.textContent = 'Copy'; btn.classList.remove('copied'); }, 2000);
+      }).catch(() => {
+        const sel = window.getSelection(), range = document.createRange();
+        range.selectNodeContents(pre);
+        sel.removeAllRanges(); sel.addRange(range);
+      });
+    });
+    header.appendChild(btn);
+  });
+</script>
+
+</body>
+</html>

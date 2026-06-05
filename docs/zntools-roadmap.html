@@ -1,0 +1,705 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>ZNTools Module Roadmap – Zero Networks</title>
+  <link rel="stylesheet" href="styles.css" />
+  <style>
+    /* ── Roadmap-specific styles ── */
+    .status-badge {
+      display: inline-block;
+      font-size: 0.72rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      padding: 0.18em 0.65em;
+      border-radius: 999px;
+      vertical-align: middle;
+      margin-left: 0.5rem;
+    }
+    .status-planned      { background: rgba(120,120,140,0.18); color: var(--text-muted); }
+    .status-in-design    { background: rgba(180,140,60,0.18);  color: #c8a63a; }
+    .status-in-progress  { background: rgba(77,166,255,0.18);  color: var(--accent); }
+    .status-shipped      { background: rgba(60,200,100,0.18);  color: #3ec866; }
+
+    .tier-header {
+      display: flex;
+      align-items: center;
+      gap: 0.8rem;
+      margin: 2.5rem 0 0.3rem;
+      padding-bottom: 0.6rem;
+      border-bottom: 2px solid var(--border);
+    }
+    .tier-header h2 { margin: 0; border: none; padding: 0; }
+    .tier-label {
+      font-size: 0.72rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+      color: var(--text-muted);
+    }
+
+    .roadmap-card {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      margin: 1.25rem 0;
+      overflow: hidden;
+    }
+    .roadmap-card-header {
+      display: flex;
+      align-items: baseline;
+      gap: 0.5rem;
+      padding: 0.9rem 1.2rem 0.7rem;
+      border-bottom: 1px solid var(--border);
+      background: rgba(0,0,0,0.06);
+    }
+    .roadmap-card-header code {
+      font-size: 1rem;
+      font-weight: 700;
+      color: var(--text-head);
+      font-family: "Cascadia Code", Consolas, monospace;
+      background: none;
+      padding: 0;
+    }
+    .roadmap-card-body { padding: 1rem 1.2rem 1.1rem; }
+    .roadmap-card-body h4 {
+      font-size: 0.78rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.07em;
+      color: var(--text-muted);
+      margin: 0.9rem 0 0.3rem;
+    }
+    .roadmap-card-body h4:first-child { margin-top: 0; }
+    .source-list { list-style: none; padding: 0; margin: 0.25rem 0 0; }
+    .source-list li { font-size: 0.85rem; margin: 0.2rem 0; }
+    .source-list a { color: var(--accent); text-decoration: none; }
+    .source-list a:hover { text-decoration: underline; }
+    .evolution-note {
+      font-size: 0.88rem;
+      color: var(--text);
+      line-height: 1.6;
+      margin: 0.3rem 0 0.5rem;
+    }
+    .delta-list { list-style: disc; padding-left: 1.4rem; margin: 0.25rem 0; font-size: 0.86rem; line-height: 1.7; }
+    .sig-block {
+      background: var(--bg-pre, #161b22);
+      border-radius: 6px;
+      padding: 0.7rem 1rem;
+      margin-top: 0.5rem;
+      font-family: "Cascadia Code", Consolas, monospace;
+      font-size: 0.8rem;
+      line-height: 1.7;
+      overflow-x: auto;
+      color: var(--text);
+    }
+    .sig-cmd  { color: var(--accent); }
+    .sig-param { color: #e3bb5a; }
+    .sig-type  { color: #a8d8a8; }
+    .sig-opt   { color: var(--text-muted); }
+
+    .excluded-table td:first-child { font-family: "Cascadia Code", Consolas, monospace; font-size: 0.82rem; white-space: nowrap; }
+    .excluded-table td:last-child  { font-size: 0.85rem; color: var(--text-muted); }
+
+    .summary-table td:nth-child(1) { font-family: "Cascadia Code", Consolas, monospace; font-size: 0.82rem; white-space: nowrap; }
+    .summary-table td:nth-child(3) { white-space: nowrap; }
+
+    .principle-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 0.75rem;
+      margin: 1rem 0 1.5rem;
+    }
+    @media (max-width: 700px) { .principle-grid { grid-template-columns: 1fr; } }
+    .principle-card {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 0.8rem 1rem;
+    }
+    .principle-card .p-title {
+      font-weight: 700;
+      font-size: 0.88rem;
+      color: var(--text-head);
+      margin-bottom: 0.3rem;
+    }
+    .principle-card .p-desc { font-size: 0.82rem; color: var(--text-muted); line-height: 1.5; }
+  </style>
+</head>
+<body>
+
+<nav class="sidebar">
+  <div class="sidebar-logo">
+    <div class="brand">Zero Networks</div>
+    <div class="title">ZNTools Roadmap</div>
+  </div>
+
+  <div class="sidebar-section">Overview</div>
+  <a href="#overview">Philosophy</a>
+  <a href="#principles">Guiding Principles</a>
+  <a href="#current-state">Current Module State</a>
+
+  <div class="sidebar-section">Tier 1 — Direct</div>
+  <a href="#test-znconnectivity">Test-ZNConnectivity</a>
+  <a href="#add-zntrustedaddress">Add-ZNTrustedAddress</a>
+  <a href="#export-znauditlog">Export-ZNAuditLog</a>
+  <a href="#approve-znrulecleanup">Approve-ZNRuleCleanup</a>
+  <a href="#find-znconflictinggpo">Find-ZNConflictingGPO</a>
+
+  <div class="sidebar-section">Tier 2 — Consolidate</div>
+  <a href="#get-znstaleadset">Get-ZNStaleAsset</a>
+  <a href="#invoke-znlearning">Invoke-ZNLearning</a>
+  <a href="#new-znotasset">New-ZNOTAsset</a>
+  <a href="#set-zngroupmembership">Set-ZNGroupMembership</a>
+  <a href="#set-znassetcluster">Set-ZNAssetCluster</a>
+
+  <div class="sidebar-section">Tier 3 — Expand</div>
+  <a href="#invoke-znidentitylearning">Invoke-ZNIdentityLearning</a>
+  <a href="#update-znblockrule">Update-ZNBlockRule</a>
+  <a href="#import-znassetlabel">Import-ZNAssetLabel</a>
+
+  <div class="sidebar-section">Reference</div>
+  <a href="#not-in-scope">Not In Scope</a>
+  <a href="#summary-table">Command Summary</a>
+
+  <div class="sidebar-section">See Also</div>
+  <a href="zntools-user-reference.html">ZNTools User Guide</a>
+  <a href="zntools-author-reference.html">ZNTools Author Guide</a>
+  <a href="index.html">&#8592; Docs Home</a>
+</nav>
+
+<main>
+
+  <div class="breadcrumb">
+    <a href="index.html">Docs Home</a><span>/</span>
+    <span>ZNTools Roadmap</span>
+  </div>
+
+  <!-- ═══════════════════════ OVERVIEW ═══════════════════════ -->
+  <div id="overview" class="page-header">
+    <h1>ZNTools Module Roadmap</h1>
+    <div class="tags">
+      <span class="tag purple">Module Development</span>
+      <span class="tag">Community → ZNTools</span>
+      <span class="tag orange">Roadmap</span>
+    </div>
+    <p class="lead">
+      Community scripts that have proven operational value are being formalized into the ZNTools
+      PowerShell module — generalized, hardened, and given the standard module contract.
+      This page tracks what's coming, where it comes from, and what it will look like when it ships.
+    </p>
+  </div>
+
+  <div class="callout info">
+    <strong>Living document</strong>
+    This roadmap is updated as commands move through design and implementation. The source markdown lives at
+    <a href="zntools-roadmap.md"><code>docs/zntools-roadmap.md</code></a>.
+    Community scripts referenced here remain available as standalone scripts in the
+    <a href="https://github.com/zeronetworks/Community/tree/master/Segment" target="_blank">Community repository</a>
+    until the module command ships.
+  </div>
+
+  <!-- ═══════════════════════ PRINCIPLES ═══════════════════════ -->
+  <h2 id="principles">Guiding Principles</h2>
+  <p>A community script graduates to a module command when it meets most of these criteria:</p>
+
+  <div class="principle-grid">
+    <div class="principle-card">
+      <div class="p-title">Broad applicability</div>
+      <div class="p-desc">Useful to any Zero Networks operator, not just one customer topology or third-party product.</div>
+    </div>
+    <div class="principle-card">
+      <div class="p-title">Generalizable parameters</div>
+      <div class="p-desc">The current script solves 80% of the need. The module command solves 100% with proper parameter sets.</div>
+    </div>
+    <div class="principle-card">
+      <div class="p-title">Pattern consolidation</div>
+      <div class="p-desc">Two or more scripts solve the same problem at different levels of polish. The module command replaces them both.</div>
+    </div>
+    <div class="principle-card">
+      <div class="p-title">API surface ownership</div>
+      <div class="p-desc">The operation wraps a ZN REST API endpoint that ZNTools should "own," removing the need for every operator to re-invent the HTTP calls.</div>
+    </div>
+    <div class="principle-card">
+      <div class="p-title">Production hardening</div>
+      <div class="p-desc">The script logic is solid but needs <code>-WhatIf</code>, structured error output, batch retry, and consistent result objects to be production-safe.</div>
+    </div>
+    <div class="principle-card">
+      <div class="p-title">Module contract</div>
+      <div class="p-desc">Private helpers (<code>Get-ZNApiHeaders</code>, <code>Get-ZNApiBaseUrl</code>, <code>Parse-JWT</code>) replace inline HTTP setup. The ZNTools banner is shown.</div>
+    </div>
+  </div>
+
+  <!-- ═══════════════════════ CURRENT STATE ═══════════════════════ -->
+  <h2 id="current-state">Current Module State — ZNTools v1.1</h2>
+  <table>
+    <thead><tr><th>Command (after prefix)</th><th>Category</th><th>Status</th></tr></thead>
+    <tbody>
+      <tr><td><code>Test-ZNPort</code></td><td>Network diagnostics</td><td><span class="status-badge status-shipped">Shipped</span></td></tr>
+      <tr><td><code>Get-ZNLinuxProfile</code></td><td>Configuration</td><td><span class="status-badge status-shipped">Shipped</span></td></tr>
+      <tr><td><code>Get-ZNSegmentCluster</code></td><td>Infrastructure query</td><td><span class="status-badge status-shipped">Shipped</span></td></tr>
+      <tr><td><code>Show-ZNHealthDashboard</code></td><td>Environment health</td><td><span class="status-badge status-shipped">Shipped</span></td></tr>
+      <tr><td><code>Invoke-ZNServices</code></td><td>Service lifecycle</td><td><span class="status-badge status-shipped">Shipped</span></td></tr>
+      <tr><td><code>Import-ZNBG-AssetData</code> + 15 <code>*-ZNBG-*</code> commands</td><td>BreakGlass asset browser</td><td><span class="status-badge status-shipped">Shipped</span></td></tr>
+    </tbody>
+  </table>
+  <p style="font-size:0.88rem; color:var(--text-muted);">The roadmap adds <strong>16 new commands</strong> across three delivery tiers below.</p>
+
+  <!-- ═══════════════════════════════════════════════
+       TIER 1
+  ═══════════════════════════════════════════════ -->
+  <div class="tier-header">
+    <h2>Tier 1 — Direct Formalization</h2>
+    <span class="tier-label">Scripts that map cleanly to one new command</span>
+  </div>
+  <p style="font-size:0.88rem; color:var(--text-muted); margin-bottom:1.25rem;">
+    Source code is already solid. The work is adopting the module contract: swap inline HTTP headers for private helpers, add <code>SupportsShouldProcess</code>, and surface structured output objects.
+  </p>
+
+  <!-- Test-ZNConnectivity -->
+  <div class="roadmap-card" id="test-znconnectivity">
+    <div class="roadmap-card-header">
+      <code>Test-ZNConnectivity</code>
+      <span class="status-badge status-planned">Planned</span>
+      <div style="margin-left:auto;" class="tags" style="margin:0">
+        <span class="tag">Diagnostics</span>
+      </div>
+    </div>
+    <div class="roadmap-card-body">
+      <h4>Source</h4>
+      <ul class="source-list">
+        <li><a href="https://github.com/zeronetworks/Community/blob/master/Segment/Segment/Troubleshooting/ZNConnectivityTest.ps1" target="_blank">ZNConnectivityTest.ps1</a></li>
+      </ul>
+      <h4>Evolution</h4>
+      <p class="evolution-note">The script is console-only today — pass/fail printed per endpoint. The module command returns structured objects so results can be piped, exported, or acted on programmatically. The endpoint list itself is maintained by the module and versioned with module releases.</p>
+      <h4>What changes</h4>
+      <ul class="delta-list">
+        <li>Returns <code>[PSCustomObject[]]</code> (endpoint, port, tcpSuccess, dnsSuccess, latencyMs)</li>
+        <li>Adds <code>-Endpoint</code> to target a subset; <code>-Quiet</code> to suppress console output</li>
+        <li>No API key required — connectivity test runs without authentication</li>
+      </ul>
+      <h4>Signature</h4>
+      <div class="sig-block"><span class="sig-cmd">Test-ZNConnectivity</span> [<span class="sig-param">-Endpoint</span> <span class="sig-type">&lt;string[]&gt;</span>] [<span class="sig-param">-PassThru</span>] [<span class="sig-param">-Quiet</span>]</div>
+    </div>
+  </div>
+
+  <!-- Add-ZNTrustedAddress -->
+  <div class="roadmap-card" id="add-zntrustedaddress">
+    <div class="roadmap-card-header">
+      <code>Add-ZNTrustedAddress</code> / <code>Remove-ZNTrustedAddress</code>
+      <span class="status-badge status-planned">Planned</span>
+      <div style="margin-left:auto;" class="tags"><span class="tag">Settings</span></div>
+    </div>
+    <div class="roadmap-card-body">
+      <h4>Source</h4>
+      <ul class="source-list">
+        <li><a href="https://github.com/zeronetworks/Community/blob/master/Segment/Settings/Add-ZNTrustedInternetAddresses.ps1" target="_blank">Add-ZNTrustedInternetAddresses.ps1</a></li>
+      </ul>
+      <h4>Evolution</h4>
+      <p class="evolution-note">The script is additive-only and file-input-only. The module commands support pipeline input, individual IPs as arguments, and a paired Remove command — making them composable with the rest of the pipeline.</p>
+      <h4>What changes</h4>
+      <ul class="delta-list">
+        <li><code>-IPAddress</code> accepts <code>[string[]]</code> (pipeline-bindable) as well as file path</li>
+        <li>Paired <code>Remove-ZNTrustedAddress</code> for removal</li>
+        <li>Uses module private API helpers; returns the updated address list</li>
+      </ul>
+      <h4>Signature</h4>
+      <div class="sig-block"><span class="sig-cmd">Add-ZNTrustedAddress</span> [<span class="sig-param">-IPAddress</span>] <span class="sig-type">&lt;string[]&gt;</span> [<span class="sig-param">-ApiKey</span> <span class="sig-type">&lt;string&gt;</span>] [<span class="sig-param">-WhatIf</span>]
+<span class="sig-cmd">Remove-ZNTrustedAddress</span> [<span class="sig-param">-IPAddress</span>] <span class="sig-type">&lt;string[]&gt;</span> [<span class="sig-param">-ApiKey</span> <span class="sig-type">&lt;string&gt;</span>] [<span class="sig-param">-WhatIf</span>]</div>
+    </div>
+  </div>
+
+  <!-- Export-ZNAuditLog -->
+  <div class="roadmap-card" id="export-znauditlog">
+    <div class="roadmap-card-header">
+      <code>Export-ZNAuditLog</code>
+      <span class="status-badge status-planned">Planned</span>
+      <div style="margin-left:auto;" class="tags"><span class="tag">Audit</span></div>
+    </div>
+    <div class="roadmap-card-body">
+      <h4>Source</h4>
+      <ul class="source-list">
+        <li><a href="https://github.com/zeronetworks/Community/blob/master/Segment/Segmentation%20Server/Get-AuditLogByTimeRange.ps1" target="_blank">Get-AuditLogByTimeRange.ps1</a></li>
+      </ul>
+      <h4>Evolution</h4>
+      <p class="evolution-note">Interactive prompts and manual ISO date string entry are replaced with typed <code>[DateTime]</code> parameters. A <code>-Last</code> shorthand removes the need to calculate timestamps. When no output path is given, objects flow to the pipeline for further filtering or formatting.</p>
+      <h4>What changes</h4>
+      <ul class="delta-list">
+        <li><code>-Start</code> / <code>-End</code> accept <code>[DateTime]</code>; <code>-Last</code> accepts <code>[TimeSpan]</code></li>
+        <li><code>-AuditType</code> filter using the enum the script already defines internally</li>
+        <li>Pipeline-first: objects returned when no <code>-OutputPath</code> is given; CSV written when path provided</li>
+      </ul>
+      <h4>Signature</h4>
+      <div class="sig-block"><span class="sig-cmd">Export-ZNAuditLog</span> <span class="sig-param">-Start</span> <span class="sig-type">&lt;DateTime&gt;</span> <span class="sig-param">-End</span> <span class="sig-type">&lt;DateTime&gt;</span> [<span class="sig-param">-AuditType</span> <span class="sig-type">&lt;AuditType[]&gt;</span>] [<span class="sig-param">-OutputPath</span> <span class="sig-type">&lt;string&gt;</span>] [<span class="sig-param">-ApiKey</span> <span class="sig-type">&lt;string&gt;</span>]
+<span class="sig-cmd">Export-ZNAuditLog</span> <span class="sig-param">-Last</span> <span class="sig-type">&lt;TimeSpan&gt;</span> [<span class="sig-param">-AuditType</span> <span class="sig-type">&lt;AuditType[]&gt;</span>] [<span class="sig-param">-OutputPath</span> <span class="sig-type">&lt;string&gt;</span>] [<span class="sig-param">-ApiKey</span> <span class="sig-type">&lt;string&gt;</span>]</div>
+    </div>
+  </div>
+
+  <!-- Approve-ZNRuleCleanup -->
+  <div class="roadmap-card" id="approve-znrulecleanup">
+    <div class="roadmap-card-header">
+      <code>Approve-ZNRuleCleanup</code>
+      <span class="status-badge status-planned">Planned</span>
+      <div style="margin-left:auto;" class="tags"><span class="tag orange">Destructive</span></div>
+    </div>
+    <div class="roadmap-card-body">
+      <h4>Source</h4>
+      <ul class="source-list">
+        <li><a href="https://github.com/zeronetworks/Community/blob/master/Segment/Segment/Rules/Approve-ZNProposedDeletes.ps1" target="_blank">Approve-ZNProposedDeletes.ps1</a></li>
+      </ul>
+      <h4>Evolution</h4>
+      <p class="evolution-note">The script already has <code>-WhatIf</code> and the two scope filters. The module command extends scope to outbound rules and returns a per-rule result object for audit logging.</p>
+      <h4>What changes</h4>
+      <ul class="delta-list">
+        <li><code>-Direction Inbound|Outbound|Both</code> (script is inbound-only today)</li>
+        <li>Returns <code>[ZNRuleCleanupResult]</code> per rule (ruleId, approved, reason, whatIfOnly)</li>
+        <li>Standard <code>SupportsShouldProcess</code> pattern for <code>-WhatIf</code></li>
+      </ul>
+      <h4>Signature</h4>
+      <div class="sig-block"><span class="sig-cmd">Approve-ZNRuleCleanup</span> [<span class="sig-param">-Direction</span> <span class="sig-type">&lt;string&gt;</span>] [<span class="sig-param">-InactiveAssetsOnly</span>] [<span class="sig-param">-NoHitsOnly</span>] [<span class="sig-param">-ReasonFilter</span> <span class="sig-type">&lt;string&gt;</span>] [<span class="sig-param">-ApiKey</span> <span class="sig-type">&lt;string&gt;</span>] [<span class="sig-param">-WhatIf</span>]</div>
+    </div>
+  </div>
+
+  <!-- Find-ZNConflictingGPO -->
+  <div class="roadmap-card" id="find-znconflictinggpo">
+    <div class="roadmap-card-header">
+      <code>Find-ZNConflictingGPO</code>
+      <span class="status-badge status-planned">Planned</span>
+      <div style="margin-left:auto;" class="tags"><span class="tag">Active Directory</span></div>
+    </div>
+    <div class="roadmap-card-body">
+      <h4>Source</h4>
+      <ul class="source-list">
+        <li><a href="https://github.com/zeronetworks/Community/blob/master/Segment/Settings/Active%20Directory/Get-ADGPOsWithFWRules.ps1" target="_blank">Get-ADGPOsWithFWRules.ps1</a></li>
+      </ul>
+      <h4>Evolution</h4>
+      <p class="evolution-note">Replaces console-only output with structured objects and adds parallel GPO inspection for large environments.</p>
+      <h4>What changes</h4>
+      <ul class="delta-list">
+        <li>Returns <code>[ZNConflictingGPO]</code> objects (GPO name, GUID, conflicting paths)</li>
+        <li>Parallel GPO inspection with <code>ForEach-Object -Parallel</code></li>
+        <li><code>-ExcludeGPO &lt;string[]&gt;</code> to suppress known-safe exceptions</li>
+      </ul>
+      <h4>Signature</h4>
+      <div class="sig-block"><span class="sig-cmd">Find-ZNConflictingGPO</span> [<span class="sig-param">-Domain</span> <span class="sig-type">&lt;string&gt;</span>] [<span class="sig-param">-ExcludeGPO</span> <span class="sig-type">&lt;string[]&gt;</span>]</div>
+    </div>
+  </div>
+
+  <!-- ═══════════════════════════════════════════════
+       TIER 2
+  ═══════════════════════════════════════════════ -->
+  <div class="tier-header">
+    <h2>Tier 2 — Pattern Consolidation</h2>
+    <span class="tier-label">Multiple scripts → one generalized command</span>
+  </div>
+  <p style="font-size:0.88rem; color:var(--text-muted); margin-bottom:1.25rem;">
+    Each entry here replaces 2–4 community scripts that solve the same problem at different levels of polish.
+    The module command is the "one function to rule them all" — hardened, fully parameterized, and pipeline-composable.
+  </p>
+
+  <!-- Get-ZNStaleAsset -->
+  <div class="roadmap-card" id="get-znstaleadset">
+    <div class="roadmap-card-header">
+      <code>Get-ZNStaleAsset</code>
+      <span class="status-badge status-in-design">In Design</span>
+      <div style="margin-left:auto;" class="tags"><span class="tag green">4 scripts consolidated</span></div>
+    </div>
+    <div class="roadmap-card-body">
+      <h4>Sources</h4>
+      <ul class="source-list">
+        <li><a href="https://github.com/zeronetworks/Community/blob/master/Segment/Segment/Asset%20Management/get-AssetsStaleConnection.ps1" target="_blank">get-AssetsStaleConnection.ps1</a> — disconnected + old lastLogon</li>
+        <li><a href="https://github.com/zeronetworks/Community/blob/master/Segment/Segment/Asset%20Management/Get-NoIPAssets.ps1" target="_blank">Get-NoIPAssets.ps1</a> — no IP addresses registered</li>
+        <li><a href="https://github.com/zeronetworks/Community/blob/master/Segment/Segment/Asset%20Management/audit-monitored-assets/auditMonitoredAssets.ps1" target="_blank">auditMonitoredAssets.ps1</a> — expected vs. actual monitored</li>
+        <li><a href="https://github.com/zeronetworks/Community/blob/master/Segment/Segment/Asset%20Management/get-assetAuditDates.ps1" target="_blank">get-assetAuditDates.ps1</a> — last audit event per asset</li>
+      </ul>
+      <h4>Evolution</h4>
+      <p class="evolution-note">Four scripts probe different "staleness" dimensions. Three store results in a variable with no further processing; one requires two side-input files. The module command unifies all stale-detection strategies under one interface with composable <code>-Condition</code> filters and a consistent output object.</p>
+      <h4>What changes</h4>
+      <ul class="delta-list">
+        <li><code>-Condition NoIP|Disconnected|NotMonitored|All</code> (combinable)</li>
+        <li><code>-DisconnectedDays</code> replaces hardcoded 180-day variable</li>
+        <li><code>-CompareFrom</code> accepts pipeline or array, replacing the CSV file requirement</li>
+        <li>Returns consistent <code>[ZNStaleAsset]</code> objects (AssetId, Name, Condition, LastSeen, Recommendation)</li>
+      </ul>
+      <h4>Signature</h4>
+      <div class="sig-block"><span class="sig-cmd">Get-ZNStaleAsset</span> [<span class="sig-param">-Condition</span> <span class="sig-type">&lt;StaleCondition[]&gt;</span>] [<span class="sig-param">-DisconnectedDays</span> <span class="sig-type">&lt;int&gt;</span>] [<span class="sig-param">-CompareFrom</span> <span class="sig-type">&lt;string[]&gt;</span>] [<span class="sig-param">-ApiKey</span> <span class="sig-type">&lt;string&gt;</span>]</div>
+    </div>
+  </div>
+
+  <!-- Invoke-ZNLearning -->
+  <div class="roadmap-card" id="invoke-znlearning">
+    <div class="roadmap-card-header">
+      <code>Invoke-ZNLearning</code>
+      <span class="status-badge status-in-design">In Design</span>
+      <div style="margin-left:auto;" class="tags"><span class="tag green">4 scripts consolidated</span></div>
+    </div>
+    <div class="roadmap-card-body">
+      <h4>Sources</h4>
+      <ul class="source-list">
+        <li><a href="https://github.com/zeronetworks/Community/blob/master/Segment/Segment/Asset%20Management/Add-AssetsToLearning.ps1" target="_blank">Add-AssetsToLearning.ps1</a> — file-based input, resolves FQDNs</li>
+        <li><a href="https://github.com/zeronetworks/Community/blob/master/Segment/Segment/Asset%20Management/Move-ProtectToLearning.ps1" target="_blank">Move-ProtectToLearning.ps1</a> — all protected → unprotect → queue</li>
+        <li><a href="https://github.com/zeronetworks/Community/blob/master/Segment/Segment/Asset%20Management/set-extendLearning.ps1" target="_blank">set-extendLearning.ps1</a> — extend queued assets by N days</li>
+        <li><a href="https://github.com/zeronetworks/Community/blob/master/Segment/Segment/Asset%20Management/Unprotect-ZNLearningButNotConnected.ps1" target="_blank">Unprotect-ZNLearningButNotConnected.ps1</a> — unprotect disconnected learning assets</li>
+      </ul>
+      <h4>Evolution</h4>
+      <p class="evolution-note">These four scripts represent the full asset learning lifecycle — each requires manual editing to configure its inputs. The PSGallery module has <code>Invoke-ZNAssetNetworkQueue</code> but without maintenance window support, file-based input, or the extend/cleanup patterns. The module command makes all of it composable and non-interactive.</p>
+      <h4>What changes</h4>
+      <ul class="delta-list">
+        <li><code>-AssetId</code> (pipeline-bindable), <code>-FromFile</code>, and <code>-FromProtected</code> parameter sets</li>
+        <li><code>-MaintenanceWindowId</code> — maintenance window support the PSGallery module omits</li>
+        <li><code>-ExtendOnly</code> — only extends in-learning assets, does not requeue</li>
+        <li><code>-CleanupDisconnected</code> — finds and unprotects disconnected learning assets</li>
+        <li>Batching (100/call) and progress bar managed internally</li>
+      </ul>
+      <h4>Signature</h4>
+      <div class="sig-block"><span class="sig-cmd">Invoke-ZNLearning</span> [<span class="sig-param">-AssetId</span> <span class="sig-type">&lt;string[]&gt;</span>] [<span class="sig-param">-FromFile</span> <span class="sig-type">&lt;string&gt;</span>] [<span class="sig-param">-Days</span> <span class="sig-type">&lt;int&gt;</span>] [<span class="sig-param">-MaintenanceWindowId</span> <span class="sig-type">&lt;string&gt;</span>] [<span class="sig-param">-ApiKey</span> <span class="sig-type">&lt;string&gt;</span>] [<span class="sig-param">-WhatIf</span>]
+<span class="sig-cmd">Invoke-ZNLearning</span> <span class="sig-param">-FromProtected</span> [<span class="sig-param">-Days</span> <span class="sig-type">&lt;int&gt;</span>] [<span class="sig-param">-ApiKey</span> <span class="sig-type">&lt;string&gt;</span>] [<span class="sig-param">-WhatIf</span>]
+<span class="sig-cmd">Invoke-ZNLearning</span> <span class="sig-param">-ExtendOnly</span> [<span class="sig-param">-Days</span> <span class="sig-type">&lt;int&gt;</span>] [<span class="sig-param">-ApiKey</span> <span class="sig-type">&lt;string&gt;</span>] [<span class="sig-param">-WhatIf</span>]
+<span class="sig-cmd">Invoke-ZNLearning</span> <span class="sig-param">-CleanupDisconnected</span> [<span class="sig-param">-ApiKey</span> <span class="sig-type">&lt;string&gt;</span>] [<span class="sig-param">-WhatIf</span>]</div>
+    </div>
+  </div>
+
+  <!-- New-ZNOTAsset -->
+  <div class="roadmap-card" id="new-znotasset">
+    <div class="roadmap-card-header">
+      <code>New-ZNOTAsset</code>
+      <span class="status-badge status-in-progress">In Progress</span>
+      <div style="margin-left:auto;" class="tags"><span class="tag green">2 scripts consolidated</span><span class="tag">OT / IoT</span></div>
+    </div>
+    <div class="roadmap-card-body">
+      <h4>Sources</h4>
+      <ul class="source-list">
+        <li><a href="https://github.com/zeronetworks/Community/blob/master/Segment/Segment/Asset%20Management/CreateOTAssets.ps1" target="_blank">CreateOTAssets.ps1</a> — generation 1: CSV import, type hardcoded to 12 (Hypervisor)</li>
+        <li><a href="https://github.com/zeronetworks/Community/blob/master/Segment/Segment/Asset%20Management/New-OtAsset/New-OtAsset.ps1" target="_blank">New-OtAsset.ps1</a> — generation 2: full type support, JWT URL detection, dry-run, single or CSV</li>
+      </ul>
+      <h4>Evolution</h4>
+      <p class="evolution-note"><code>New-OtAsset.ps1</code> is already PS7+, reads the API URL from the JWT, supports all 28 OT device types, and has dry-run mode. It is functionally the generation 2 of this command. The module command is generation 3: swap ad-hoc JWT decoding for <code>Get-ZNApiBaseUrl</code>, adopt the ZNTools banner, promote <code>-DryRun</code> to standard <code>-WhatIf</code>.</p>
+      <h4>What changes</h4>
+      <ul class="delta-list">
+        <li>Uses <code>Get-ZNApiBaseUrl</code> / <code>Get-ZNApiHeaders</code> from module private helpers</li>
+        <li><code>-Type</code> becomes a <code>[ValidateSet]</code> covering all 28 OT device types by name</li>
+        <li><code>-DryRun</code> → standard <code>-WhatIf</code> pattern</li>
+        <li>Returns <code>[ZNAssetResult]</code> object (assetId, displayName, ip) for pipeline use</li>
+      </ul>
+      <h4>Signature</h4>
+      <div class="sig-block"><span class="sig-cmd">New-ZNOTAsset</span> <span class="sig-param">-IPAddress</span> <span class="sig-type">&lt;string&gt;</span> <span class="sig-param">-Name</span> <span class="sig-type">&lt;string&gt;</span> [<span class="sig-param">-Type</span> <span class="sig-type">&lt;OTAssetType&gt;</span>] [<span class="sig-param">-Fqdn</span> <span class="sig-type">&lt;string&gt;</span>] [<span class="sig-param">-ApiKey</span> <span class="sig-type">&lt;string&gt;</span>] [<span class="sig-param">-WhatIf</span>]
+<span class="sig-cmd">New-ZNOTAsset</span> <span class="sig-param">-CsvFilePath</span> <span class="sig-type">&lt;string&gt;</span> [<span class="sig-param">-ApiKey</span> <span class="sig-type">&lt;string&gt;</span>] [<span class="sig-param">-WhatIf</span>]</div>
+    </div>
+  </div>
+
+  <!-- Set-ZNGroupMembership -->
+  <div class="roadmap-card" id="set-zngroupmembership">
+    <div class="roadmap-card-header">
+      <code>Set-ZNGroupMembership</code> / <code>New-ZNEnvironmentGroup</code>
+      <span class="status-badge status-planned">Planned</span>
+      <div style="margin-left:auto;" class="tags"><span class="tag green">3 scripts consolidated</span></div>
+    </div>
+    <div class="roadmap-card-body">
+      <h4>Sources</h4>
+      <ul class="source-list">
+        <li><a href="https://github.com/zeronetworks/Community/blob/master/Segment/Segment/Asset%20Management/Update-ZNGroupMembers.ps1" target="_blank">Update-ZNGroupMembers.ps1</a> — CIDR → ZN item ID encoding → PUT members</li>
+        <li><a href="https://github.com/zeronetworks/Community/blob/master/Segment/Segment/Asset%20Management/Add-AssetsToTagGroup.ps1" target="_blank">Add-AssetsToTagGroup.ps1</a> — CSV assets → batch add to tag group</li>
+        <li><a href="https://github.com/zeronetworks/Community/blob/master/Segment/Segment/Asset%20Management/create-GroupEnv.ps1" target="_blank">create-GroupEnv.ps1</a> — CSV with environment column → create groups + members</li>
+      </ul>
+      <h4>Evolution</h4>
+      <p class="evolution-note">The CIDR → ZN item ID encoding in <code>Update-ZNGroupMembers.ps1</code> is a non-obvious bit of platform knowledge (<code>b:12{hexIP}{hexMask}</code>) that belongs in the module, not every operator's clipboard. These three scripts reveal a core gap: the PSGallery module handles tag groups but has nothing for custom groups, CIDR input, or table-driven group creation.</p>
+      <h4>What changes</h4>
+      <ul class="delta-list">
+        <li>CIDR → <code>b:12{hex}</code> encoding lives in a private module helper, reusable by any command</li>
+        <li><code>-GroupId</code> accepts any group type (custom <code>g:c:*</code>, tag <code>g:t:*</code>)</li>
+        <li><code>-MembersFromCidr</code>, <code>-MembersFromCsv</code>, and <code>-MembersFromAssetId</code> parameter sets</li>
+        <li><code>-Replace</code> flag for full membership replacement vs. additive (default)</li>
+        <li><code>New-ZNEnvironmentGroup</code> handles the auto-create-and-verify pattern from <code>create-GroupEnv.ps1</code></li>
+      </ul>
+      <h4>Signature</h4>
+      <div class="sig-block"><span class="sig-cmd">Set-ZNGroupMembership</span> <span class="sig-param">-GroupId</span> <span class="sig-type">&lt;string&gt;</span> [<span class="sig-param">-MembersFromCidr</span> <span class="sig-type">&lt;string[]&gt;</span>] [<span class="sig-param">-MembersFromCsv</span> <span class="sig-type">&lt;string&gt;</span>] [<span class="sig-param">-Replace</span>] [<span class="sig-param">-WhatIf</span>] [<span class="sig-param">-ApiKey</span> <span class="sig-type">&lt;string&gt;</span>]
+<span class="sig-cmd">New-ZNEnvironmentGroup</span> <span class="sig-param">-CsvFilePath</span> <span class="sig-type">&lt;string&gt;</span> [<span class="sig-param">-CreateIfMissing</span>] [<span class="sig-param">-WhatIf</span>] [<span class="sig-param">-ApiKey</span> <span class="sig-type">&lt;string&gt;</span>]</div>
+    </div>
+  </div>
+
+  <!-- Set-ZNAssetCluster -->
+  <div class="roadmap-card" id="set-znassetcluster">
+    <div class="roadmap-card-header">
+      <code>Set-ZNAssetCluster</code> / <code>Get-ZNDeploymentCluster</code>
+      <span class="status-badge status-in-progress">In Progress</span>
+      <div style="margin-left:auto;" class="tags"><span class="tag">Deployment Clusters</span></div>
+    </div>
+    <div class="roadmap-card-body">
+      <h4>Source</h4>
+      <ul class="source-list">
+        <li><a href="https://github.com/zeronetworks/Community/blob/master/Segment/Segment/Asset%20Management/Pin%20Assets%20To%20Clusters/Pin-AssetsToClusters.ps1" target="_blank">Pin-AssetsToClusters.ps1</a> — the most mature community script (PS7+, dry-run, OU, CSV, cluster listing)</li>
+      </ul>
+      <h4>Evolution</h4>
+      <p class="evolution-note">This script is functionally module-ready. The primary work is adopting the module contract: swap inline headers for <code>Get-ZNApiHeaders</code>, adopt the ZNTools banner, promote <code>-DryRun</code> to <code>-WhatIf</code>, split cluster-listing into its own <code>Get-ZNDeploymentCluster</code> command, and surface output objects through the pipeline.</p>
+      <h4>What changes</h4>
+      <ul class="delta-list">
+        <li>Inline JWT decode and header construction → module private helpers</li>
+        <li><code>-DryRun</code> → standard <code>[CmdletBinding(SupportsShouldProcess)]</code> <code>-WhatIf</code></li>
+        <li><code>-ListDeploymentClusters</code> split into <code>Get-ZNDeploymentCluster</code> (single-responsibility)</li>
+        <li>Output objects surface through the pipeline</li>
+      </ul>
+      <h4>Signature</h4>
+      <div class="sig-block"><span class="sig-cmd">Set-ZNAssetCluster</span> <span class="sig-param">-AssetId</span> <span class="sig-type">&lt;string&gt;</span> <span class="sig-param">-DeploymentClusterId</span> <span class="sig-type">&lt;string&gt;</span> [<span class="sig-param">-Unpin</span>] [<span class="sig-param">-WhatIf</span>] [<span class="sig-param">-ApiKey</span> <span class="sig-type">&lt;string&gt;</span>]
+<span class="sig-cmd">Set-ZNAssetCluster</span> <span class="sig-param">-OUPath</span> <span class="sig-type">&lt;string&gt;</span> <span class="sig-param">-DeploymentClusterId</span> <span class="sig-type">&lt;string&gt;</span> [<span class="sig-param">-Unpin</span>] [<span class="sig-param">-WhatIf</span>] [<span class="sig-param">-ApiKey</span> <span class="sig-type">&lt;string&gt;</span>]
+<span class="sig-cmd">Set-ZNAssetCluster</span> <span class="sig-param">-CsvPath</span> <span class="sig-type">&lt;string&gt;</span> [<span class="sig-param">-Unpin</span>] [<span class="sig-param">-WhatIf</span>] [<span class="sig-param">-ApiKey</span> <span class="sig-type">&lt;string&gt;</span>]
+<span class="sig-cmd">Get-ZNDeploymentCluster</span> [<span class="sig-param">-ApiKey</span> <span class="sig-type">&lt;string&gt;</span>]</div>
+    </div>
+  </div>
+
+  <!-- ═══════════════════════════════════════════════
+       TIER 3
+  ═══════════════════════════════════════════════ -->
+  <div class="tier-header">
+    <h2>Tier 3 — Expanded Capabilities</h2>
+    <span class="tier-label">Significant redesign — scope expanded beyond the source scripts</span>
+  </div>
+  <p style="font-size:0.88rem; color:var(--text-muted); margin-bottom:1.25rem;">
+    These scripts have good ideas and useful patterns, but the module command needs to be substantially
+    broader than what the source script does today.
+  </p>
+
+  <!-- Invoke-ZNIdentityLearning -->
+  <div class="roadmap-card" id="invoke-znidentitylearning">
+    <div class="roadmap-card-header">
+      <code>Invoke-ZNIdentityLearning</code>
+      <span class="status-badge status-planned">Planned</span>
+      <div style="margin-left:auto;" class="tags"><span class="tag">Identity</span></div>
+    </div>
+    <div class="roadmap-card-body">
+      <h4>Sources</h4>
+      <ul class="source-list">
+        <li><a href="https://github.com/zeronetworks/Community/blob/master/Segment/Identity%20Segment/Add-ClientsToIdentityLearning.ps1" target="_blank">Add-ClientsToIdentityLearning.ps1</a> — clients only</li>
+        <li><a href="https://github.com/zeronetworks/Community/blob/master/Segment/Identity%20Segment/get-currentSVCAccounts.ps1" target="_blank">get-currentSVCAccounts.ps1</a> — service accounts only</li>
+      </ul>
+      <h4>Evolution</h4>
+      <p class="evolution-note">Two separate scripts, each hard-scoped to a single asset or user type. Together they represent the full identity learning onboarding workflow. The module command generalizes both under one interface with asset-type and user-type targeting.</p>
+      <h4>What changes</h4>
+      <ul class="delta-list">
+        <li><code>-AssetType Clients|Servers|OT</code> for asset-side queuing</li>
+        <li><code>-UserType ServiceAccount|User</code> for user-side queuing</li>
+        <li><code>-ActiveWithin &lt;int&gt;</code> replaces hardcoded 180-day filter</li>
+      </ul>
+      <h4>Signature</h4>
+      <div class="sig-block"><span class="sig-cmd">Invoke-ZNIdentityLearning</span> <span class="sig-param">-AssetType</span> <span class="sig-type">&lt;string&gt;</span> [<span class="sig-param">-Days</span> <span class="sig-type">&lt;int&gt;</span>] [<span class="sig-param">-ApiKey</span> <span class="sig-type">&lt;string&gt;</span>] [<span class="sig-param">-WhatIf</span>]
+<span class="sig-cmd">Invoke-ZNIdentityLearning</span> <span class="sig-param">-UserType</span> <span class="sig-type">&lt;string&gt;</span> [<span class="sig-param">-ActiveWithin</span> <span class="sig-type">&lt;int&gt;</span>] [<span class="sig-param">-Days</span> <span class="sig-type">&lt;int&gt;</span>] [<span class="sig-param">-ApiKey</span> <span class="sig-type">&lt;string&gt;</span>] [<span class="sig-param">-WhatIf</span>]</div>
+    </div>
+  </div>
+
+  <!-- Update-ZNBlockRule -->
+  <div class="roadmap-card" id="update-znblockrule">
+    <div class="roadmap-card-header">
+      <code>Update-ZNBlockRule</code>
+      <span class="status-badge status-planned">Planned</span>
+      <div style="margin-left:auto;" class="tags"><span class="tag orange">Block Rules</span><span class="tag green">2 scripts consolidated</span></div>
+    </div>
+    <div class="roadmap-card-body">
+      <h4>Sources</h4>
+      <ul class="source-list">
+        <li><a href="https://github.com/zeronetworks/Community/blob/master/Segment/Segment/Rules/Update-ZNBlockRulewithRiskyIps.ps1" target="_blank">Update-ZNBlockRulewithRiskyIps.ps1</a> — add risky IPs from last 24h activity</li>
+        <li><a href="https://github.com/zeronetworks/Community/blob/master/Segment/Segment/Rules/Update-ZNOutboundBlockfromURLFile.ps1" target="_blank">Update-ZNOutboundBlockfromURLFile.ps1</a> — replace outbound block with URL file</li>
+      </ul>
+      <h4>Evolution</h4>
+      <p class="evolution-note">Two scripts, two sources, two different behaviors (additive vs. replace). The module command expresses this cleanly through parameter sets.</p>
+      <h4>What changes</h4>
+      <ul class="delta-list">
+        <li><code>-Direction Inbound|Outbound</code> is explicit; inbound-only limitation removed</li>
+        <li><code>-AddFromActivity</code> with <code>-ActivityHours</code> and <code>-RiskLevel</code></li>
+        <li><code>-FromUrlFile &lt;path&gt;</code> with <code>-Replace</code> flag</li>
+      </ul>
+      <h4>Signature</h4>
+      <div class="sig-block"><span class="sig-cmd">Update-ZNBlockRule</span> <span class="sig-param">-RuleId</span> <span class="sig-type">&lt;string&gt;</span> <span class="sig-param">-AddFromActivity</span> [<span class="sig-param">-ActivityHours</span> <span class="sig-type">&lt;int&gt;</span>] [<span class="sig-param">-RiskLevel</span> <span class="sig-type">&lt;string&gt;</span>] [<span class="sig-param">-WhatIf</span>] [<span class="sig-param">-ApiKey</span> <span class="sig-type">&lt;string&gt;</span>]
+<span class="sig-cmd">Update-ZNBlockRule</span> <span class="sig-param">-RuleId</span> <span class="sig-type">&lt;string&gt;</span> <span class="sig-param">-FromUrlFile</span> <span class="sig-type">&lt;string&gt;</span> [<span class="sig-param">-Replace</span>] [<span class="sig-param">-WhatIf</span>] [<span class="sig-param">-ApiKey</span> <span class="sig-type">&lt;string&gt;</span>]</div>
+    </div>
+  </div>
+
+  <!-- Import-ZNAssetLabel -->
+  <div class="roadmap-card" id="import-znassetlabel">
+    <div class="roadmap-card-header">
+      <code>Import-ZNAssetLabel</code>
+      <span class="status-badge status-planned">Planned</span>
+      <div style="margin-left:auto;" class="tags"><span class="tag">Labels</span></div>
+    </div>
+    <div class="roadmap-card-body">
+      <h4>Source</h4>
+      <ul class="source-list">
+        <li><a href="https://github.com/zeronetworks/Community/blob/master/Segment/Segment/Asset%20Management/Import-AssetLabels.ps1" target="_blank">Import-AssetLabels.ps1</a></li>
+      </ul>
+      <h4>Evolution</h4>
+      <p class="evolution-note">The script requires <code>ImportExcel</code> — a heavyweight dependency just to read an <code>.xlsx</code> file. The core operation (resolve asset, POST labels) is broadly useful. The module command switches to CSV input and adds a single-label interactive mode.</p>
+      <h4>What changes</h4>
+      <ul class="delta-list">
+        <li>Accepts CSV (not Excel); no <code>ImportExcel</code> dependency</li>
+        <li>Pipeline input for full automation (<code>[PSCustomObject]@{AssetId; Labels}</code>)</li>
+        <li><code>-LabelKey</code> / <code>-LabelValue</code> for single-label interactive use</li>
+        <li>Asset lookups cached per run to avoid redundant API calls</li>
+      </ul>
+      <h4>Signature</h4>
+      <div class="sig-block"><span class="sig-cmd">Import-ZNAssetLabel</span> <span class="sig-param">-CsvFilePath</span> <span class="sig-type">&lt;string&gt;</span> [<span class="sig-param">-AssetColumn</span> <span class="sig-type">&lt;string&gt;</span>] [<span class="sig-param">-DomainSuffix</span> <span class="sig-type">&lt;string&gt;</span>] [<span class="sig-param">-WhatIf</span>] [<span class="sig-param">-ApiKey</span> <span class="sig-type">&lt;string&gt;</span>]
+<span class="sig-cmd">Import-ZNAssetLabel</span> <span class="sig-param">-AssetId</span> <span class="sig-type">&lt;string&gt;</span> <span class="sig-param">-LabelKey</span> <span class="sig-type">&lt;string&gt;</span> <span class="sig-param">-LabelValue</span> <span class="sig-type">&lt;string&gt;</span> [<span class="sig-param">-WhatIf</span>] [<span class="sig-param">-ApiKey</span> <span class="sig-type">&lt;string&gt;</span>]</div>
+    </div>
+  </div>
+
+  <!-- ═══════════════════════ NOT IN SCOPE ═══════════════════════ -->
+  <h2 id="not-in-scope" style="margin-top:2.5rem;">Not In Scope</h2>
+  <p style="font-size:0.88rem; margin-bottom:0.75rem;">Scripts explicitly excluded from the module roadmap. They remain valuable as standalone community scripts.</p>
+  <table class="excluded-table">
+    <thead><tr><th>Script</th><th>Reason for exclusion</th></tr></thead>
+    <tbody>
+      <tr><td>Parse-AsimilyExport.ps1</td><td>Vendor-specific integration. Good patterns to reference, but the Asimily data model does not generalize to the module audience.</td></tr>
+      <tr><td>Threat Hunting tools (Python)</td><td>Separate Python ecosystem. Not PowerShell module territory.</td></tr>
+      <tr><td>ZN_Troubleshooter_v01.ps1</td><td>Retired.</td></tr>
+      <tr><td>getSecretMicrosoftAuth.ps1</td><td>Microsoft Graph operations outside ZN API scope.</td></tr>
+      <tr><td>Login-ZNAADSAML.ps1</td><td>Authentication plumbing that would conflict with future module-level auth.</td></tr>
+      <tr><td>breakglass-single.ps1</td><td>Break glass belongs in the pre-installed scripts, not ZNTools.</td></tr>
+      <tr><td>CollectSMBDetails.ps1</td><td>ETW tracing — specialist diagnostics, not broadly operational.</td></tr>
+      <tr><td>znlog-filter.ps1</td><td>Segment Server log analysis; too narrow to generalize.</td></tr>
+      <tr><td>purgeKerberosOnHosts.ps1</td><td>IT ops task not specific enough to ZN to belong in ZNTools.</td></tr>
+      <tr><td>install-CloudConnectorAPI.ps1</td><td>Installer wrapper — belongs as a standalone install-time script.</td></tr>
+      <tr><td>Linux connector shell scripts</td><td>Not PowerShell module territory.</td></tr>
+      <tr><td>Sync-BreakGlassDirectory</td><td>Useful but specific to a replication topology; too narrow.</td></tr>
+      <tr><td>sample.ps1</td><td>Reference only.</td></tr>
+    </tbody>
+  </table>
+
+  <!-- ═══════════════════════ SUMMARY TABLE ═══════════════════════ -->
+  <h2 id="summary-table" style="margin-top:2.5rem;">Command Summary</h2>
+  <table class="summary-table">
+    <thead><tr><th>Command (after prefix)</th><th>Tier</th><th>Status</th><th>Source count</th></tr></thead>
+    <tbody>
+      <tr><td><code>Test-ZNConnectivity</code></td><td>1</td><td><span class="status-badge status-planned">Planned</span></td><td>1</td></tr>
+      <tr><td><code>Add-ZNTrustedAddress</code> / <code>Remove-ZNTrustedAddress</code></td><td>1</td><td><span class="status-badge status-planned">Planned</span></td><td>1 + new inverse</td></tr>
+      <tr><td><code>Export-ZNAuditLog</code></td><td>1</td><td><span class="status-badge status-planned">Planned</span></td><td>1</td></tr>
+      <tr><td><code>Approve-ZNRuleCleanup</code></td><td>1</td><td><span class="status-badge status-planned">Planned</span></td><td>1</td></tr>
+      <tr><td><code>Find-ZNConflictingGPO</code></td><td>1</td><td><span class="status-badge status-planned">Planned</span></td><td>1</td></tr>
+      <tr><td><code>Get-ZNStaleAsset</code></td><td>2</td><td><span class="status-badge status-in-design">In Design</span></td><td>4</td></tr>
+      <tr><td><code>Invoke-ZNLearning</code></td><td>2</td><td><span class="status-badge status-in-design">In Design</span></td><td>4</td></tr>
+      <tr><td><code>New-ZNOTAsset</code></td><td>2</td><td><span class="status-badge status-in-progress">In Progress</span></td><td>2</td></tr>
+      <tr><td><code>Set-ZNGroupMembership</code> / <code>New-ZNEnvironmentGroup</code></td><td>2</td><td><span class="status-badge status-planned">Planned</span></td><td>3</td></tr>
+      <tr><td><code>Set-ZNAssetCluster</code> / <code>Get-ZNDeploymentCluster</code></td><td>2</td><td><span class="status-badge status-in-progress">In Progress</span></td><td>1 (split)</td></tr>
+      <tr><td><code>Invoke-ZNIdentityLearning</code></td><td>3</td><td><span class="status-badge status-planned">Planned</span></td><td>2</td></tr>
+      <tr><td><code>Update-ZNBlockRule</code></td><td>3</td><td><span class="status-badge status-planned">Planned</span></td><td>2</td></tr>
+      <tr><td><code>Import-ZNAssetLabel</code></td><td>3</td><td><span class="status-badge status-planned">Planned</span></td><td>1</td></tr>
+    </tbody>
+  </table>
+
+</main>
+
+<script>
+  const sections = document.querySelectorAll('[id]');
+  const navLinks = document.querySelectorAll('nav.sidebar a');
+  const observer = new IntersectionObserver(entries => {
+    entries.forEach(entry => {
+      if (entry.isIntersecting) {
+        navLinks.forEach(a => a.classList.remove('active'));
+        const active = document.querySelector(`nav.sidebar a[href="#${entry.target.id}"]`);
+        if (active) active.classList.add('active');
+      }
+    });
+  }, { rootMargin: '-20% 0px -70% 0px' });
+  sections.forEach(s => observer.observe(s));
+</script>
+
+</body>
+</html>

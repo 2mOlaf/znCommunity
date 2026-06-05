@@ -1,0 +1,198 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Settings &amp; API Scripts – Zero Networks Community</title>
+  <link rel="stylesheet" href="styles.css" />
+  <style>
+    .github-link { display:inline-block; font-size:0.82rem; color:var(--accent); text-decoration:none; margin-bottom:0.6rem; }
+    .github-link:hover { text-decoration:underline; }
+  </style>
+</head>
+<body>
+
+<nav class="sidebar">
+  <div class="sidebar-logo">
+    <div class="brand">Zero Networks</div>
+    <div class="title">Settings &amp; API Scripts</div>
+  </div>
+
+  <div class="sidebar-section">Overview</div>
+  <a href="#overview">About These Scripts</a>
+
+  <div class="sidebar-section">System Settings</div>
+  <a href="#add-trusted-internet">Add-ZNTrustedInternetAddresses</a>
+
+  <div class="sidebar-section">Active Directory</div>
+  <a href="#get-ad-gpos-fw">Get-ADGPOsWithFWRules</a>
+  <a href="#purge-kerberos">purgeKerberosOnHosts</a>
+
+  <div class="sidebar-section">API Authentication</div>
+  <a href="#login-saml">Login-ZNAADSAML</a>
+  <a href="#api-sample">sample.ps1</a>
+
+  <div class="sidebar-section">See Also</div>
+  <a href="community-scripts-segmentation-server.html">Segmentation Server Scripts</a>
+  <a href="zeronetworks-module-reference.html">ZeroNetworks Module (PSGallery)</a>
+  <a href="index.html">&#8592; Docs Home</a>
+</nav>
+
+<main>
+
+  <div class="breadcrumb">
+    <a href="index.html">Docs Home</a><span>/</span>
+    <a href="index.html#community-scripts">Community Scripts</a><span>/</span>
+    <span>Settings &amp; API</span>
+  </div>
+
+  <div id="overview" class="page-header">
+    <h1>Settings &amp; API Scripts</h1>
+    <div class="tags">
+      <span class="tag">PowerShell</span>
+      <span class="tag purple">Community</span>
+      <span class="tag">Configuration</span>
+    </div>
+    <p class="lead">
+      Scripts for configuring Zero Networks system settings, auditing Active Directory Group Policy,
+      managing Kerberos tickets, and authenticating to the Zero Networks API.
+    </p>
+  </div>
+
+  <!-- ═══════════════════════ ADD TRUSTED INTERNET ═══════════════════════ -->
+  <div class="script-separator" id="add-trusted-internet">
+    <div class="page-header" style="margin-bottom:1rem; border-bottom:none; padding-bottom:0.5rem;">
+      <h1>Add-ZNTrustedInternetAddresses.ps1</h1>
+      <div class="tags"><span class="tag">PowerShell</span><span class="tag purple">System Settings</span></div>
+    </div>
+  </div>
+
+  <a class="github-link" href="https://github.com/zeronetworks/Community/blob/master/Segment/Settings/Add-ZNTrustedInternetAddresses.ps1" target="_blank">&#128279; View on GitHub</a>
+
+  <h2>Synopsis</h2>
+  <p>Reads a list of IP addresses from a file and adds any that are not already present to the Zero Networks <em>Trusted External IPs</em> list in system settings.</p>
+
+  <div class="callout info">
+    <strong>Additive only</strong> — this script only adds IPs; it does not remove existing entries. The current Trusted External IP list is fetched first and the new IPs are merged before the PUT call.
+  </div>
+
+  <div class="example">
+    <div class="example-header"><span class="ex-label">Example 1</span><span class="ex-title">Add IPs from a file (interactive prompts)</span></div>
+    <pre><span class="ps-prompt">PS&gt; </span>$apikey = <span class="ps-value">'eyJ...'</span>
+<span class="ps-cmd">.\Add-ZNTrustedInternetAddresses.ps1</span></pre>
+    <div class="example-desc">If the API key placeholder is unchanged, the script prompts for it. Then prompts for the path to a text file with one IP address per line. Fetches the current list, merges new entries, and PUTs the updated list back.</div>
+  </div>
+
+  <!-- ═══════════════════════ GET AD GPOS WITH FW RULES ═══════════════════════ -->
+  <div class="script-separator" id="get-ad-gpos-fw">
+    <div class="page-header" style="margin-bottom:1rem; border-bottom:none; padding-bottom:0.5rem;">
+      <h1>Get-ADGPOsWithFWRules.ps1</h1>
+      <div class="tags"><span class="tag">PowerShell</span><span class="tag">Active Directory</span><span class="tag green">Audit</span></div>
+    </div>
+  </div>
+
+  <a class="github-link" href="https://github.com/zeronetworks/Community/blob/master/Segment/Settings/Active%20Directory/Get-ADGPOsWithFWRules.ps1" target="_blank">&#128279; View on GitHub</a>
+
+  <h2>Synopsis</h2>
+  <p>Enumerates all GPOs in the domain and identifies any that contain Windows Firewall settings (rules, domain profile, private profile, or public profile), excluding the Zero Networks GPOs themselves.</p>
+
+  <h2>Requirements</h2>
+  <table>
+    <thead><tr><th>Requirement</th><th>Details</th></tr></thead>
+    <tbody>
+      <tr><td>ActiveDirectory module</td><td>Part of RSAT. <code>Import-Module ActiveDirectory</code></td></tr>
+      <tr><td>GroupPolicy module</td><td>Part of RSAT. <code>Import-Module GroupPolicy</code></td></tr>
+      <tr><td>Domain connectivity</td><td>Must run on a domain-joined machine with access to SYSVOL</td></tr>
+    </tbody>
+  </table>
+
+  <div class="example">
+    <div class="example-header"><span class="ex-label">Example 1</span><span class="ex-title">Find non-ZN GPOs with firewall settings</span></div>
+    <pre><span class="ps-prompt">PS&gt; </span><span class="ps-cmd">.\Get-ADGPOsWithFWRules.ps1</span></pre>
+    <div class="example-desc">Checks all GPOs against the four Windows Firewall registry paths. Outputs GPO names that have conflicting firewall settings in red. These GPOs may interfere with Zero Networks enforcement.</div>
+  </div>
+
+  <!-- ═══════════════════════ PURGE KERBEROS ═══════════════════════ -->
+  <div class="script-separator" id="purge-kerberos">
+    <div class="page-header" style="margin-bottom:1rem; border-bottom:none; padding-bottom:0.5rem;">
+      <h1>purgeKerberosOnHosts.ps1</h1>
+      <div class="tags"><span class="tag">PowerShell</span><span class="tag">Active Directory</span><span class="tag orange">GPO Refresh</span></div>
+    </div>
+  </div>
+
+  <a class="github-link" href="https://github.com/zeronetworks/Community/blob/master/Segment/Settings/Active%20Directory/purge-klist-gpupdate/purgeKerberosOnHosts.ps1" target="_blank">&#128279; View on GitHub</a>
+
+  <h2>Synopsis</h2>
+  <p>Remotely purges Kerberos tickets and forces a Group Policy update on a list of Windows servers. Useful for accelerating ZN agent deployment — the Kerberos ticket contains group membership data that must be refreshed before a GPO change takes effect.</p>
+
+  <h2>Inputs</h2>
+  <table>
+    <thead><tr><th>File</th><th>Description</th></tr></thead>
+    <tbody>
+      <tr><td><code>hosts.csv</code></td><td>Single-column CSV of server hostnames (one per line, with or without FQDN). Must be in the same directory as the script.</td></tr>
+    </tbody>
+  </table>
+
+  <h2>Remote Commands Executed</h2>
+  <table>
+    <thead><tr><th>Command</th><th>Effect</th></tr></thead>
+    <tbody>
+      <tr><td><code>klist -li 0x3e4 purge</code></td><td>Purges the Network Service Kerberos ticket cache</td></tr>
+      <tr><td><code>klist -li 0x3e7 purge</code></td><td>Purges the Computer Account Kerberos ticket cache</td></tr>
+      <tr><td><code>gpupdate /force</code></td><td>Forces immediate Group Policy refresh</td></tr>
+    </tbody>
+  </table>
+
+  <div class="callout info">
+    Commands run asynchronously in parallel across all hosts using <code>Invoke-Command</code> jobs, improving performance at scale. A log file named <code>YYYY-MM-DD-zn-klist-purge.log</code> is written to the working directory.
+  </div>
+
+  <!-- ═══════════════════════ LOGIN SAML ═══════════════════════ -->
+  <div class="script-separator" id="login-saml">
+    <div class="page-header" style="margin-bottom:1rem; border-bottom:none; padding-bottom:0.5rem;">
+      <h1>Login-ZNAADSAML.ps1</h1>
+      <div class="tags"><span class="tag">PowerShell</span><span class="tag purple">API Auth</span><span class="tag">Azure AD</span></div>
+    </div>
+  </div>
+
+  <a class="github-link" href="https://github.com/zeronetworks/Community/blob/master/Segment/Settings/API/Login-ZNAADSAML.ps1" target="_blank">&#128279; View on GitHub</a>
+
+  <h2>Synopsis</h2>
+  <p>Authenticates to the Zero Networks API using Azure Active Directory SAML/OAuth, obtaining a session token that can be used for subsequent API calls.</p>
+
+  <!-- ═══════════════════════ API SAMPLE ═══════════════════════ -->
+  <div class="script-separator" id="api-sample">
+    <div class="page-header" style="margin-bottom:1rem; border-bottom:none; padding-bottom:0.5rem;">
+      <h1>sample.ps1</h1>
+      <div class="tags"><span class="tag">PowerShell</span><span class="tag green">API Sample</span></div>
+    </div>
+  </div>
+
+  <a class="github-link" href="https://github.com/zeronetworks/Community/blob/master/Segment/Settings/API/sample.ps1" target="_blank">&#128279; View on GitHub</a>
+
+  <h2>Synopsis</h2>
+  <p>A minimal reference script demonstrating how to construct the authentication headers and make a basic API call to the Zero Networks REST API using PowerShell.</p>
+
+  <div class="callout info">
+    Use this as a starting point when building custom integrations. The pattern shown — setting <code>Authorization</code> and <code>content-type</code> headers and calling <code>Invoke-RestMethod</code> — is used consistently across all community scripts.
+  </div>
+
+</main>
+
+<script>
+  const sections = document.querySelectorAll('[id]');
+  const navLinks = document.querySelectorAll('nav.sidebar a');
+  const observer = new IntersectionObserver(entries => {
+    entries.forEach(entry => {
+      if (entry.isIntersecting) {
+        navLinks.forEach(a => a.classList.remove('active'));
+        const active = document.querySelector(`nav.sidebar a[href="#${entry.target.id}"]`);
+        if (active) active.classList.add('active');
+      }
+    });
+  }, { rootMargin: '-20% 0px -70% 0px' });
+  sections.forEach(s => observer.observe(s));
+</script>
+
+</body>
+</html>

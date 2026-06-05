@@ -1,0 +1,205 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Threat Hunting Tools – Zero Networks Community</title>
+  <link rel="stylesheet" href="styles.css" />
+  <style>
+    .github-link { display:inline-block; font-size:0.82rem; color:var(--accent); text-decoration:none; margin-bottom:0.6rem; }
+    .github-link:hover { text-decoration:underline; }
+  </style>
+</head>
+<body>
+
+<nav class="sidebar">
+  <div class="sidebar-logo">
+    <div class="brand">Zero Networks</div>
+    <div class="title">Threat Hunting</div>
+  </div>
+
+  <div class="sidebar-section">Overview</div>
+  <a href="#overview">About These Tools</a>
+  <a href="#prerequisites">Prerequisites</a>
+
+  <div class="sidebar-section">Hunt Any Threat</div>
+  <a href="#hunt-any-threat">Hunt Any Threat toolkit</a>
+  <a href="#hunt-any-threat-api">ZeroNetworks API wrapper</a>
+  <a href="#hunt-any-threat-tools">ZeroThreatHuntTools class</a>
+
+  <div class="sidebar-section">Hunt For RMMLs</div>
+  <a href="#hunt-for-rmmls">Hunt For RMMLs</a>
+
+  <div class="sidebar-section">See Also</div>
+  <a href="community-scripts-rules-mfa.html">Rules &amp; MFA Scripts</a>
+  <a href="index.html">&#8592; Docs Home</a>
+</nav>
+
+<main>
+
+  <div class="breadcrumb">
+    <a href="index.html">Docs Home</a><span>/</span>
+    <a href="index.html#community-scripts">Community Scripts</a><span>/</span>
+    <span>Threat Hunting</span>
+  </div>
+
+  <div id="overview" class="page-header">
+    <h1>Threat Hunting Tools</h1>
+    <div class="tags">
+      <span class="tag">Python 3</span>
+      <span class="tag purple">Community</span>
+      <span class="tag orange">Security Research</span>
+    </div>
+    <p class="lead">
+      Python-based threat hunting toolkits that use the Zero Networks activity API to detect
+      suspicious network behaviors — from arbitrary IOC searches to Remote Monitoring and
+      Management (RMM) software identification.
+    </p>
+  </div>
+
+  <div class="callout info">
+    <strong>Python toolkits — not standalone scripts</strong>
+    Both tools are structured Python packages, not single-file scripts. Each requires a
+    <code>pip install -r requirements.txt</code> before use and reads the API key from the
+    <code>ZN_API_KEY</code> environment variable.
+  </div>
+
+  <h2 id="prerequisites">Prerequisites</h2>
+  <table>
+    <thead><tr><th>Requirement</th><th>Details</th></tr></thead>
+    <tbody>
+      <tr><td>Python 3.9+</td><td>Tested on Python 3.9 and higher</td></tr>
+      <tr><td>ZN_API_KEY</td><td>Set as an environment variable. A read-only key is sufficient for hunting.</td></tr>
+      <tr><td>pip dependencies</td><td>Install with <code>pip install -r requirements.txt</code> in each tool's directory</td></tr>
+      <tr><td>.env file</td><td>Optionally create a <code>.env</code> file in the tool directory with <code>ZN_API_KEY=eyJ...</code> for <code>python-dotenv</code> loading</td></tr>
+    </tbody>
+  </table>
+
+  <!-- ═══════════════════════ HUNT ANY THREAT ═══════════════════════ -->
+  <div class="script-separator" id="hunt-any-threat">
+    <div class="page-header" style="margin-bottom:1rem; border-bottom:none; padding-bottom:0.5rem;">
+      <h1>Hunt Any Threat</h1>
+      <div class="tags"><span class="tag">Python 3</span><span class="tag purple">Toolkit</span></div>
+    </div>
+  </div>
+
+  <a class="github-link" href="https://github.com/zeronetworks/Community/tree/master/Segment/Threat%20Hunting/Hunt%20Any%20Threat" target="_blank">&#128279; View on GitHub</a>
+
+  <h2>Overview</h2>
+  <p>A Python library and example scripts for hunting arbitrary threats in Zero Networks network activity data. Provides a <code>ZeroThreatHuntTools</code> class with high-level search methods covering domains, IP addresses, destination ports, and running processes.</p>
+
+  <h2>Directory Structure</h2>
+  <table>
+    <thead><tr><th>Path</th><th>Description</th></tr></thead>
+    <tbody>
+      <tr><td><code>example.py</code></td><td>Runnable examples demonstrating each search method</td></tr>
+      <tr><td><code>src/zero_networks/api.py</code></td><td>Low-level Zero Networks REST API wrapper</td></tr>
+      <tr><td><code>src/zero_threat_hunt_tools/zero_threat_hunt_tools.py</code></td><td>Main <code>ZeroThreatHuntTools</code> class</td></tr>
+      <tr><td><code>tests/</code></td><td>pytest test suite with conftest fixtures</td></tr>
+    </tbody>
+  </table>
+
+  <div id="hunt-any-threat-tools">
+    <h2>ZeroThreatHuntTools Methods</h2>
+    <table>
+      <thead><tr><th>Method</th><th>Description</th></tr></thead>
+      <tbody>
+        <tr><td><code>get_activities_to_domains(domains)</code></td><td>Find network activities destined for specified domain names</td></tr>
+        <tr><td><code>get_activities_to_destination_ips(ips)</code></td><td>Find activities destined for specified IP addresses</td></tr>
+        <tr><td><code>get_activities_to_destination_ports(ports)</code></td><td>Find activities on specified destination ports</td></tr>
+        <tr><td><code>get_activities_to_destination_processes(processes)</code></td><td>Find activities from specified source processes</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div id="hunt-any-threat-api">
+    <h2>Quick Start</h2>
+
+    <div class="example">
+      <div class="example-header"><span class="ex-label">Step 1</span><span class="ex-title">Install dependencies</span></div>
+      <pre><span class="ps-prompt">$ </span>cd <span class="ps-value">"Segment/Threat Hunting/Hunt Any Threat"</span>
+pip install -r requirements.txt</pre>
+    </div>
+
+    <div class="example">
+      <div class="example-header"><span class="ex-label">Step 2</span><span class="ex-title">Set API key and run examples</span></div>
+      <pre><span class="ps-prompt">$ </span><span class="ps-cmd">ZN_API_KEY</span>=<span class="ps-value">eyJ...</span> python example.py</pre>
+      <div class="example-desc">Runs all example functions sequentially. Each example demonstrates a different search method with console output showing found activities.</div>
+    </div>
+
+    <div class="example">
+      <div class="example-header"><span class="ex-label">Step 3</span><span class="ex-title">Use the library in your own scripts</span></div>
+      <pre>from src.zero_threat_hunt_tools.zero_threat_hunt_tools import ZeroThreatHuntTools
+
+hunter = ZeroThreatHuntTools(api_key=<span class="ps-value">"eyJ..."</span>)
+activities = hunter.get_activities_to_domains([<span class="ps-value">"malicious-domain.com"</span>])
+print(f"Found {len(activities)} suspicious connections")</pre>
+    </div>
+
+    <div class="example">
+      <div class="example-header"><span class="ex-label">Tests</span><span class="ex-title">Run the test suite</span></div>
+      <pre><span class="ps-prompt">$ </span>pytest tests/</pre>
+    </div>
+  </div>
+
+  <!-- ═══════════════════════ HUNT FOR RMMLS ═══════════════════════ -->
+  <div class="script-separator" id="hunt-for-rmmls">
+    <div class="page-header" style="margin-bottom:1rem; border-bottom:none; padding-bottom:0.5rem;">
+      <h1>Hunt For RMMLs</h1>
+      <div class="tags"><span class="tag">Python 3</span><span class="tag purple">CLI Tool</span><span class="tag orange">RMM Detection</span></div>
+    </div>
+  </div>
+
+  <a class="github-link" href="https://github.com/zeronetworks/Community/tree/master/Segment/Threat%20Hunting/Hunt%20For%20RMMLs" target="_blank">&#128279; View on GitHub</a>
+
+  <h2>Overview</h2>
+  <p>A CLI tool that hunts for Remote Monitoring and Management (RMM) software activity in your Zero Networks environment. Uses a community-maintained YAML database of known RMM tool signatures (cloned from GitHub) to detect unauthorized or shadow IT RMM tools.</p>
+
+  <h2>Directory Structure</h2>
+  <table>
+    <thead><tr><th>Path</th><th>Description</th></tr></thead>
+    <tbody>
+      <tr><td><code>hunt.py</code></td><td>Main CLI entry point with <code>argparse</code></td></tr>
+      <tr><td><code>src/git_ops.py</code></td><td>Clones/validates the RMM signature database from GitHub</td></tr>
+      <tr><td><code>src/rmmdata.py</code></td><td>Loads and parses YAML signature files</td></tr>
+      <tr><td><code>src/zn_hunt_ops.py</code></td><td>Zero Networks activity search logic</td></tr>
+      <tr><td><code>src/zero_networks/api.py</code></td><td>ZN REST API wrapper (shared pattern with Hunt Any Threat)</td></tr>
+    </tbody>
+  </table>
+
+  <div class="example">
+    <div class="example-header"><span class="ex-label">Step 1</span><span class="ex-title">Install and run</span></div>
+    <pre><span class="ps-prompt">$ </span>cd <span class="ps-value">"Segment/Threat Hunting/Hunt For RMMLs"</span>
+pip install -r requirements.txt
+<span class="ps-cmd">ZN_API_KEY</span>=<span class="ps-value">eyJ...</span> python hunt.py <span class="ps-param">--help</span></pre>
+  </div>
+  <div class="example">
+    <div class="example-header"><span class="ex-label">Step 2</span><span class="ex-title">Run a hunt with verbose output</span></div>
+    <pre><span class="ps-prompt">$ </span><span class="ps-cmd">ZN_API_KEY</span>=<span class="ps-value">eyJ...</span> python hunt.py <span class="ps-switch">-v</span></pre>
+    <div class="example-desc">Clones the RMM signature database, loads YAML signatures, queries ZN network activity for matching domains/IPs/ports, and reports any hits. Use <code>-vv</code> for debug output or <code>-vvv</code> for trace.</div>
+  </div>
+
+  <div class="callout info">
+    <strong>Signature source</strong>
+    RMM signatures are automatically cloned from a community-maintained GitHub repository. Ensure the host running the script has outbound HTTPS access to GitHub.
+  </div>
+
+</main>
+
+<script>
+  const sections = document.querySelectorAll('[id]');
+  const navLinks = document.querySelectorAll('nav.sidebar a');
+  const observer = new IntersectionObserver(entries => {
+    entries.forEach(entry => {
+      if (entry.isIntersecting) {
+        navLinks.forEach(a => a.classList.remove('active'));
+        const active = document.querySelector(`nav.sidebar a[href="#${entry.target.id}"]`);
+        if (active) active.classList.add('active');
+      }
+    });
+  }, { rootMargin: '-20% 0px -70% 0px' });
+  sections.forEach(s => observer.observe(s));
+</script>
+
+</body>
+</html>

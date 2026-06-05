@@ -1,0 +1,191 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Connector Scripts – Zero Networks Community</title>
+  <link rel="stylesheet" href="styles.css" />
+  <style>
+    .github-link { display:inline-block; font-size:0.82rem; color:var(--accent); text-decoration:none; margin-bottom:0.6rem; }
+    .github-link:hover { text-decoration:underline; }
+  </style>
+</head>
+<body>
+
+<nav class="sidebar">
+  <div class="sidebar-logo">
+    <div class="brand">Zero Networks</div>
+    <div class="title">Connector Scripts</div>
+  </div>
+
+  <div class="sidebar-section">Overview</div>
+  <a href="#overview">About These Scripts</a>
+
+  <div class="sidebar-section">Cloud Connector</div>
+  <a href="#install-cloud-connector">install-CloudConnectorAPI</a>
+
+  <div class="sidebar-section">Segment Connector (Linux)</div>
+  <a href="#enroll-linux">enroll-linux-install</a>
+  <a href="#uninstall-linux">uninstall-linux</a>
+
+  <div class="sidebar-section">See Also</div>
+  <a href="community-scripts-asset-management.html">Asset Management Scripts</a>
+  <a href="index.html">&#8592; Docs Home</a>
+</nav>
+
+<main>
+
+  <div class="breadcrumb">
+    <a href="index.html">Docs Home</a><span>/</span>
+    <a href="index.html#community-scripts">Community Scripts</a><span>/</span>
+    <span>Connectors</span>
+  </div>
+
+  <div id="overview" class="page-header">
+    <h1>Connector Scripts</h1>
+    <div class="tags">
+      <span class="tag">PowerShell</span>
+      <span class="tag">Bash</span>
+      <span class="tag purple">Community</span>
+    </div>
+    <p class="lead">
+      Installation and management scripts for the Zero Networks Cloud Connector (Windows) and
+      the Segment Connector lightweight agent (Linux).
+    </p>
+  </div>
+
+  <!-- ═══════════════════════ CLOUD CONNECTOR ═══════════════════════ -->
+  <div class="script-separator" id="install-cloud-connector">
+    <div class="page-header" style="margin-bottom:1rem; border-bottom:none; padding-bottom:0.5rem;">
+      <h1>install-CloudConnectorAPI.ps1</h1>
+      <div class="tags"><span class="tag">PowerShell 5.1+</span><span class="tag purple">Cloud Connector</span><span class="tag">Windows</span></div>
+    </div>
+  </div>
+
+  <a class="github-link" href="https://github.com/zeronetworks/Community/blob/master/Segment/Cloud%20Connector%20(Agent)/install-CloudConnectorAPI.ps1" target="_blank">&#128279; View on GitHub</a>
+
+  <h2>Synopsis</h2>
+  <p>Installs or uninstalls the Zero Networks Cloud Connector on Windows. Decodes the provided JWT token to determine the correct installer endpoint, downloads the installer, and executes it with the appropriate arguments.</p>
+
+  <h2>Parameters</h2>
+  <div class="param-entry">
+    <div class="param-name">-CloudConnectorFunction</div>
+    <div class="param-body">
+      <p class="param-desc">Whether to install or uninstall the Cloud Connector.</p>
+      <div class="param-meta">
+        <div class="param-meta-item"><span class="meta-label">Accepted values:</span><span class="meta-value">install, uninstall</span></div>
+        <div class="param-meta-item"><span class="meta-label">Default:</span><span class="meta-value">install</span></div>
+      </div>
+    </div>
+  </div>
+  <div class="param-entry">
+    <div class="param-name">-CloudConnectorToken</div>
+    <div class="param-body">
+      <p class="param-desc">JWT token from the Zero Networks portal used to authorize the install. Decoded locally to determine the API audience URL.</p>
+      <div class="param-meta">
+        <div class="param-meta-item"><span class="meta-label">Required:</span><span class="meta-value required">True (replace placeholder)</span></div>
+      </div>
+    </div>
+  </div>
+  <div class="param-entry">
+    <div class="param-name">-CloudConnectorSource</div>
+    <div class="param-body">
+      <p class="param-desc">Identity source environment for the Cloud Connector.</p>
+      <div class="param-meta">
+        <div class="param-meta-item"><span class="meta-label">Accepted values:</span><span class="meta-value">AD, WORKGROUP, AZURE, AZURE_AD, AWS, GCP, IBM, ORACLE, VMWARE, ALIBABA, OVH, LUMEN, DOMAIN-JOINED-MANUALLY-SYNC</span></div>
+        <div class="param-meta-item"><span class="meta-label">Default:</span><span class="meta-value">AD</span></div>
+      </div>
+    </div>
+  </div>
+  <div class="param-entry">
+    <div class="param-name">-DomainJoinedManuallySync</div>
+    <div class="param-body">
+      <p class="param-desc">When present, passes the <code>-domain-joined-manually-sync</code> flag to the installer. Use when the machine is domain-joined but synchronization is managed manually.</p>
+      <div class="param-meta">
+        <div class="param-meta-item"><span class="meta-label">Type:</span><span class="meta-value">Switch</span></div>
+      </div>
+    </div>
+  </div>
+
+  <h2>Logs</h2>
+  <table>
+    <thead><tr><th>File</th><th>Contents</th></tr></thead>
+    <tbody>
+      <tr><td><code>%TEMP%\CloudConnector.log</code></td><td>Script execution log</td></tr>
+      <tr><td><code>%LOCALAPPDATA%\ZeroNetworks\logs\setup.log</code></td><td>Installer log (if present)</td></tr>
+    </tbody>
+  </table>
+
+  <div class="example">
+    <div class="example-header"><span class="ex-label">Example 1</span><span class="ex-title">Install Cloud Connector for Active Directory</span></div>
+    <pre><span class="ps-prompt">PS&gt; </span><span class="ps-cmd">.\install-CloudConnectorAPI.ps1</span> <span class="ps-param">-CloudConnectorToken</span> <span class="ps-value">eyJ...</span> <span class="ps-param">-CloudConnectorSource</span> <span class="ps-value">AD</span></pre>
+  </div>
+  <div class="example">
+    <div class="example-header"><span class="ex-label">Example 2</span><span class="ex-title">Install for Azure AD</span></div>
+    <pre><span class="ps-prompt">PS&gt; </span><span class="ps-cmd">.\install-CloudConnectorAPI.ps1</span> <span class="ps-param">-CloudConnectorToken</span> <span class="ps-value">eyJ...</span> <span class="ps-param">-CloudConnectorSource</span> <span class="ps-value">AZURE_AD</span></pre>
+  </div>
+  <div class="example">
+    <div class="example-header"><span class="ex-label">Example 3</span><span class="ex-title">Uninstall</span></div>
+    <pre><span class="ps-prompt">PS&gt; </span><span class="ps-cmd">.\install-CloudConnectorAPI.ps1</span> <span class="ps-param">-CloudConnectorFunction</span> <span class="ps-value">uninstall</span> <span class="ps-param">-CloudConnectorToken</span> <span class="ps-value">eyJ...</span></pre>
+  </div>
+
+  <!-- ═══════════════════════ ENROLL LINUX SEGMENT CONNECTOR ═══════════════════════ -->
+  <div class="script-separator" id="enroll-linux">
+    <div class="page-header" style="margin-bottom:1rem; border-bottom:none; padding-bottom:0.5rem;">
+      <h1>enroll-linux-install-segment-connector.sh</h1>
+      <div class="tags"><span class="tag">Bash</span><span class="tag">Linux</span><span class="tag purple">Segment Connector</span></div>
+    </div>
+  </div>
+
+  <a class="github-link" href="https://github.com/zeronetworks/Community/blob/master/Segment/Segment%20Connector%20(Lightweight%20Agent)/Linux/enroll-linux-install-segment-connector.sh" target="_blank">&#128279; View on GitHub</a>
+
+  <h2>Synopsis</h2>
+  <p>Enrolls a Linux host into the Zero Networks management plane and installs the Segment Connector (lightweight agent). Handles prerequisite checks, package download, and registration token exchange.</p>
+
+  <div class="callout info">
+    <strong>Run as root</strong> — this script requires <code>sudo</code> or root access to install the Segment Connector service and configure the system.
+  </div>
+
+  <div class="example">
+    <div class="example-header"><span class="ex-label">Example 1</span><span class="ex-title">Enroll and install</span></div>
+    <pre><span class="ps-prompt">$ </span>sudo bash <span class="ps-cmd">enroll-linux-install-segment-connector.sh</span></pre>
+    <div class="example-desc">Follow the prompts to supply your Zero Networks enrollment token. The script validates prerequisites, downloads the Segment Connector package, installs it, and registers the host.</div>
+  </div>
+
+  <!-- ═══════════════════════ UNINSTALL LINUX SEGMENT CONNECTOR ═══════════════════════ -->
+  <div class="script-separator" id="uninstall-linux">
+    <div class="page-header" style="margin-bottom:1rem; border-bottom:none; padding-bottom:0.5rem;">
+      <h1>uninstall-linux-segment-connector.sh</h1>
+      <div class="tags"><span class="tag">Bash</span><span class="tag">Linux</span><span class="tag orange">Uninstall</span></div>
+    </div>
+  </div>
+
+  <a class="github-link" href="https://github.com/zeronetworks/Community/blob/master/Segment/Segment%20Connector%20(Lightweight%20Agent)/Linux/uninstall-linux-segment-connector.sh" target="_blank">&#128279; View on GitHub</a>
+
+  <h2>Synopsis</h2>
+  <p>Stops and removes the Zero Networks Segment Connector lightweight agent from a Linux system, including cleaning up service definitions, packages, and configuration files.</p>
+
+  <div class="example">
+    <div class="example-header"><span class="ex-label">Example 1</span><span class="ex-title">Uninstall the Segment Connector</span></div>
+    <pre><span class="ps-prompt">$ </span>sudo bash <span class="ps-cmd">uninstall-linux-segment-connector.sh</span></pre>
+  </div>
+
+</main>
+
+<script>
+  const sections = document.querySelectorAll('[id]');
+  const navLinks = document.querySelectorAll('nav.sidebar a');
+  const observer = new IntersectionObserver(entries => {
+    entries.forEach(entry => {
+      if (entry.isIntersecting) {
+        navLinks.forEach(a => a.classList.remove('active'));
+        const active = document.querySelector(`nav.sidebar a[href="#${entry.target.id}"]`);
+        if (active) active.classList.add('active');
+      }
+    });
+  }, { rootMargin: '-20% 0px -70% 0px' });
+  sections.forEach(s => observer.observe(s));
+</script>
+
+</body>
+</html>

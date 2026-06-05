@@ -1,0 +1,173 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Break Glass Sync – Zero Networks Community</title>
+  <link rel="stylesheet" href="styles.css" />
+  <style>
+    .github-link { display:inline-block; font-size:0.82rem; color:var(--accent); text-decoration:none; margin-bottom:0.6rem; }
+    .github-link:hover { text-decoration:underline; }
+  </style>
+</head>
+<body>
+
+<nav class="sidebar">
+  <div class="sidebar-logo">
+    <div class="brand">Zero Networks</div>
+    <div class="title">Break Glass Sync</div>
+  </div>
+
+  <div class="sidebar-section">Overview</div>
+  <a href="#overview">About This Module</a>
+  <a href="#prerequisites">Prerequisites</a>
+
+  <div class="sidebar-section">Module Reference</div>
+  <a href="#sync-breakglass-directory">Sync-BreakGlassDirectory</a>
+  <a href="#parameters">Parameters</a>
+  <a href="#examples">Examples</a>
+
+  <div class="sidebar-section">See Also</div>
+  <a href="breakglass-reference.html">BreakGlass Reference (pre-installed)</a>
+  <a href="community-scripts-segmentation-server.html">Segmentation Server Scripts</a>
+  <a href="index.html">&#8592; Docs Home</a>
+</nav>
+
+<main>
+
+  <div class="breadcrumb">
+    <a href="index.html">Docs Home</a><span>/</span>
+    <a href="index.html#community-scripts">Community Scripts</a><span>/</span>
+    <span>Break Glass Sync</span>
+  </div>
+
+  <div id="overview" class="page-header">
+    <h1>Break Glass Sync Module</h1>
+    <div class="tags">
+      <span class="tag">PowerShell</span>
+      <span class="tag purple">Community Module</span>
+      <span class="tag orange">Emergency Prep</span>
+    </div>
+    <p class="lead">
+      A PowerShell module that copies the Zero Networks <code>BreakGlass\</code> directory from a
+      Segment Server to a secondary destination server — ensuring break glass scripts and the
+      <code>segmentedAssets.json</code> file are available from a backup location.
+    </p>
+  </div>
+
+  <div class="callout info">
+    <strong>Purpose</strong>
+    The pre-installed <a href="breakglass-reference.html">BreakGlass scripts</a> on your Segment Server require
+    <code>segmentedAssets.json</code> to be current. This module enables you to replicate the entire
+    BreakGlass directory to a standby server so it can serve as a fallback run location if the primary
+    Segment Server is unavailable.
+  </div>
+
+  <h2 id="prerequisites">Prerequisites</h2>
+  <table>
+    <thead><tr><th>Requirement</th><th>Details</th></tr></thead>
+    <tbody>
+      <tr><td>PSRemoting</td><td>Must be enabled on both the Segment Server and destination server (<code>Enable-PSRemoting -Force</code>)</td></tr>
+      <tr><td>Inbound WinRM allow rule</td><td>The machine running this script must have an inbound allow rule permitting WinRM to both servers (no MFA required on that rule)</td></tr>
+      <tr><td>Account permissions</td><td>The account used must be a local administrator on both servers and have write access to the destination directory. May need to run <code>Set-PSSessionConfiguration -Name Microsoft.PowerShell -ShowSecurityDescriptorUI -Force</code> on each server to grant PSRemoting permissions.</td></tr>
+      <tr><td>Disk space</td><td>Enough temporary space on the machine running the script for a zip of the BreakGlass directory</td></tr>
+    </tbody>
+  </table>
+
+  <a class="github-link" href="https://github.com/zeronetworks/Community/tree/master/Segment/Break%20Glass/Sync-ZNBreakGlassFiles" target="_blank">&#128279; View on GitHub</a>
+
+  <!-- ═══════════════════════ SYNC-BREAKGLASS-DIRECTORY ═══════════════════════ -->
+  <div class="script-separator" id="sync-breakglass-directory">
+    <div class="page-header" style="margin-bottom:1rem; border-bottom:none; padding-bottom:0.5rem;">
+      <h1>Sync-BreakGlassDirectory</h1>
+      <div class="tags"><span class="tag">PowerShell</span><span class="tag purple">PSModule</span></div>
+    </div>
+  </div>
+
+  <h2>Synopsis</h2>
+  <p>Connects to the Segment Server via PSSession, compresses <code>C:\Program Files\Zero Networks\BreakGlass\</code> to a zip, copies it locally, then copies and extracts it to a remote directory on the destination (BreakGlass) server.</p>
+
+  <h2>How It Works</h2>
+  <ol style="margin: 0.5rem 0 1rem 1.5rem; line-height: 2.1;">
+    <li>Opens a PSSession to the <strong>Segment Server</strong> (source).</li>
+    <li>Compresses the BreakGlass directory to <code>BreakGlass.zip</code> on the Segment Server.</li>
+    <li>Copies <code>BreakGlass.zip</code> from the Segment Server to the local machine running the script.</li>
+    <li>Closes the Segment Server PSSession.</li>
+    <li>Opens a PSSession to the <strong>BreakGlass Server</strong> (destination).</li>
+    <li>Copies the local <code>BreakGlass.zip</code> to the specified <code>RemoteDirectory</code> on the destination.</li>
+    <li>Extracts the zip on the destination server.</li>
+    <li>Closes the PSSession and removes the local <code>BreakGlass.zip</code>.</li>
+  </ol>
+
+  <h2 id="parameters">Parameters</h2>
+  <div class="param-entry">
+    <div class="param-name">-SegmentServer</div>
+    <div class="param-body"><p class="param-desc">Short hostname of the source Segment Server (e.g. <code>znserver</code>). Do not include the domain suffix.</p><div class="param-meta"><div class="param-meta-item"><span class="meta-label">Required:</span><span class="meta-value required">True</span></div></div></div>
+  </div>
+  <div class="param-entry">
+    <div class="param-name">-BreakGlassServer</div>
+    <div class="param-body"><p class="param-desc">Short hostname of the destination server to copy the BreakGlass directory to.</p><div class="param-meta"><div class="param-meta-item"><span class="meta-label">Required:</span><span class="meta-value required">True</span></div></div></div>
+  </div>
+  <div class="param-entry">
+    <div class="param-name">-RemoteDirectory</div>
+    <div class="param-body"><p class="param-desc">Path on the destination server where the BreakGlass directory will be copied. The account used must have write access to this path.</p><div class="param-meta"><div class="param-meta-item"><span class="meta-label">Example:</span><span class="meta-value"><code>C:\Users\Public\ZNBreakGlassFiles</code></span></div><div class="param-meta-item"><span class="meta-label">Required:</span><span class="meta-value required">True</span></div></div></div>
+  </div>
+  <div class="param-entry">
+    <div class="param-name">-Credential</div>
+    <div class="param-body"><p class="param-desc">A <code>PSCredential</code> object for authenticating to both servers. Use <code>Get-Credential</code> to create one interactively. Mutually exclusive with <code>-Username</code> / <code>-Password</code>.</p><div class="param-meta"><div class="param-meta-item"><span class="meta-label">Required:</span><span class="meta-value optional">Optional (use with -Credential or -Username/-Password)</span></div></div></div>
+  </div>
+  <div class="param-entry">
+    <div class="param-name">-Username / -Password</div>
+    <div class="param-body"><p class="param-desc">Plaintext username and password alternative to providing a <code>PSCredential</code> object. Can also be set via <code>$ENV:segmentServer</code>, <code>$ENV:breakGlassServer</code>, etc. for automation.</p><div class="param-meta"><div class="param-meta-item"><span class="meta-label">Required:</span><span class="meta-value optional">Optional</span></div></div></div>
+  </div>
+
+  <h2 id="examples">Examples</h2>
+
+  <div class="example">
+    <div class="example-header"><span class="ex-label">Example 1</span><span class="ex-title">Sync using explicit credentials</span></div>
+    <pre><span class="ps-prompt">PS&gt; </span>Import-Module .\sync_breakglass_directory.psd1
+<span class="ps-cmd">Sync-BreakGlassDirectory</span> <span class="ps-param">-Username</span> <span class="ps-value">adminUser</span> <span class="ps-param">-Password</span> <span class="ps-value">adminPwd</span> `
+  <span class="ps-param">-BreakGlassServer</span> <span class="ps-value">destinationServer</span> <span class="ps-param">-SegmentServer</span> <span class="ps-value">znSegmentServer</span> `
+  <span class="ps-param">-RemoteDirectory</span> <span class="ps-value">"C:\Users\Public\ZNBreakGlassFiles"</span></pre>
+  </div>
+
+  <div class="example">
+    <div class="example-header"><span class="ex-label">Example 2</span><span class="ex-title">Sync using Get-Credential (interactive)</span></div>
+    <pre><span class="ps-prompt">PS&gt; </span>Import-Module .\sync_breakglass_directory.psd1
+<span class="ps-cmd">Sync-BreakGlassDirectory</span> <span class="ps-param">-Credential</span> (Get-Credential) `
+  <span class="ps-param">-BreakGlassServer</span> <span class="ps-value">destinationServer</span> <span class="ps-param">-SegmentServer</span> <span class="ps-value">znSegmentServer</span> `
+  <span class="ps-param">-RemoteDirectory</span> <span class="ps-value">"C:\Users\Public\ZNBreakGlassFiles"</span></pre>
+  </div>
+
+  <div class="example">
+    <div class="example-header"><span class="ex-label">Example 3</span><span class="ex-title">Sync using environment variables (automation)</span></div>
+    <pre><span class="ps-prompt">PS&gt; </span>$ENV:segmentServer = <span class="ps-value">"ZnSegmentServer1"</span>
+$ENV:breakGlassServer = <span class="ps-value">"BackupServer"</span>
+$ENV:adminUser = <span class="ps-value">"domain\admin"</span>
+$ENV:adminPwd = <span class="ps-value">"password"</span>
+Import-Module .\sync_breakglass_directory.psd1
+<span class="ps-cmd">Sync-BreakGlassDirectory</span> <span class="ps-param">-RemoteDirectory</span> <span class="ps-value">"C:\ZNBackup"</span></pre>
+  </div>
+
+  <h2>Scheduling</h2>
+  <p>For best results, schedule this module to run regularly (e.g. via Task Scheduler or a CI pipeline) so the <code>segmentedAssets.json</code> on the backup server stays current. The asset list is updated continuously by the Segment Server as assets are added and removed.</p>
+
+</main>
+
+<script>
+  const sections = document.querySelectorAll('[id]');
+  const navLinks = document.querySelectorAll('nav.sidebar a');
+  const observer = new IntersectionObserver(entries => {
+    entries.forEach(entry => {
+      if (entry.isIntersecting) {
+        navLinks.forEach(a => a.classList.remove('active'));
+        const active = document.querySelector(`nav.sidebar a[href="#${entry.target.id}"]`);
+        if (active) active.classList.add('active');
+      }
+    });
+  }, { rootMargin: '-20% 0px -70% 0px' });
+  sections.forEach(s => observer.observe(s));
+</script>
+
+</body>
+</html>

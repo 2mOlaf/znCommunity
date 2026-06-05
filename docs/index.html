@@ -79,6 +79,19 @@
   <div class="sidebar-section">Community / Internal</div>
   <a href="zntools-user-reference.html">ZNTools — User Guide</a>
   <a href="zntools-author-reference.html">ZNTools — Author Guide</a>
+  <a href="zntools-roadmap.html">ZNTools — Roadmap</a>
+
+  <div class="sidebar-section">Community Scripts</div>
+  <a href="community-scripts-asset-management.html">Asset Management</a>
+  <a href="community-scripts-rules-mfa.html">Rules &amp; MFA</a>
+  <a href="zn-approve-reference.html">&#8627; zn-approve.py</a>
+  <a href="community-scripts-troubleshooting.html">Troubleshooting</a>
+  <a href="community-scripts-segmentation-server.html">Segmentation Server</a>
+  <a href="community-scripts-identity-segment.html">Identity Segment</a>
+  <a href="community-scripts-settings.html">Settings &amp; API</a>
+  <a href="community-scripts-connectors.html">Connectors</a>
+  <a href="community-scripts-threat-hunting.html">Threat Hunting</a>
+  <a href="community-scripts-break-glass-sync.html">Break Glass Sync</a>
 </nav>
 
 <!-- ═══════════════════════════════════════════════════════════
@@ -97,8 +110,9 @@
       <span class="tag purple">Reference Hub</span>
     </div>
     <p class="lead">
-      Reference documentation for Zero Networks PowerShell tooling — covering the official
-      PSGallery module, emergency break glass scripts, and the internal ZNTools module.
+      Reference documentation for Zero Networks tooling — covering the official PSGallery module,
+      emergency break glass scripts, the ZNTools internal module, and community scripts for
+      asset management, rules, threat hunting, and more.
     </p>
   </div>
 
@@ -201,6 +215,153 @@
       <div class="card-arrow">Read the guide &#8594;</div>
     </a>
 
+    <a class="doc-card" href="zntools-roadmap.html">
+      <div class="card-title">ZNTools — Roadmap</div>
+      <div class="card-tags">
+        <span class="tag purple">Module</span>
+        <span class="tag orange">Roadmap</span>
+        <span class="tag">Community → ZNTools</span>
+      </div>
+      <div class="card-desc">
+        Community scripts selected for formalization into ZNTools — what changes, why it matters,
+        and what each command looks like when hardened. Tracks status from Planned through Shipped.
+      </div>
+      <div class="card-note">16 commands planned across 3 tiers</div>
+      <div class="card-arrow">View the roadmap &#8594;</div>
+    </a>
+
+  </div>
+
+  <!-- ── COMMUNITY SCRIPTS ── -->
+  <div id="community-scripts" class="section-label">Community Scripts</div>
+  <p style="font-size:0.9rem; color:var(--text-muted); margin-bottom:1rem;">
+    Standalone scripts maintained in this repository for common Zero Networks operational tasks.
+    Covers asset management, rules, troubleshooting, threat hunting, and more.
+    Source available at
+    <a href="https://github.com/zeronetworks/Community/tree/master/Segment" target="_blank">github.com/zeronetworks/Community</a>.
+  </p>
+
+  <div class="doc-grid">
+
+    <a class="doc-card" href="community-scripts-asset-management.html">
+      <div class="card-title">Asset Management</div>
+      <div class="card-tags">
+        <span class="tag">PowerShell</span>
+        <span class="tag purple">20+ Scripts</span>
+      </div>
+      <div class="card-desc">
+        Asset lifecycle management — queue for learning, protect, extend, group membership, labels,
+        OT/IoT creation, cluster pinning, and Linux enrollment.
+      </div>
+      <div class="card-arrow">Read the guide &#8594;</div>
+    </a>
+
+    <a class="doc-card" href="community-scripts-rules-mfa.html">
+      <div class="card-title">Rules &amp; MFA</div>
+      <div class="card-tags">
+        <span class="tag">PowerShell</span>
+        <span class="tag">Python</span>
+        <span class="tag purple">6 Scripts</span>
+      </div>
+      <div class="card-desc">
+        Approve proposed rule deletions, update block rules from risky IPs or URL files,
+        and manage MFA reactive policies via PowerShell and Python CLI.
+      </div>
+      <div class="card-arrow">Read the guide &#8594;</div>
+    </a>
+
+    <a class="doc-card" href="community-scripts-troubleshooting.html">
+      <div class="card-title">Troubleshooting</div>
+      <div class="card-tags">
+        <span class="tag">PowerShell</span>
+        <span class="tag orange">Diagnostics</span>
+      </div>
+      <div class="card-desc">
+        Connectivity tests against all ZN cloud endpoints, machine-profile port checks,
+        GPO admin group validation, and SMB ETW trace collection.
+      </div>
+      <div class="card-arrow">Read the guide &#8594;</div>
+    </a>
+
+    <a class="doc-card" href="community-scripts-segmentation-server.html">
+      <div class="card-title">Segmentation Server</div>
+      <div class="card-tags">
+        <span class="tag">PowerShell</span>
+        <span class="tag">Segment Server</span>
+      </div>
+      <div class="card-desc">
+        Audit log export, WinRM log filtering by asset ID, outbound GPO rule injection
+        for DC traffic, and a minimal single-asset break glass script.
+      </div>
+      <div class="card-arrow">Read the guide &#8594;</div>
+    </a>
+
+    <a class="doc-card" href="community-scripts-identity-segment.html">
+      <div class="card-title">Identity Segment</div>
+      <div class="card-tags">
+        <span class="tag">PowerShell</span>
+        <span class="tag">Identity</span>
+      </div>
+      <div class="card-desc">
+        Queue client assets and service accounts for identity learning in batch.
+      </div>
+      <div class="card-arrow">Read the guide &#8594;</div>
+    </a>
+
+    <a class="doc-card" href="community-scripts-settings.html">
+      <div class="card-title">Settings &amp; API</div>
+      <div class="card-tags">
+        <span class="tag">PowerShell</span>
+        <span class="tag">Configuration</span>
+      </div>
+      <div class="card-desc">
+        Trusted external IP management, AD GPO firewall rule auditing,
+        Kerberos ticket purge with GPO force-refresh, SAML auth, and API samples.
+      </div>
+      <div class="card-arrow">Read the guide &#8594;</div>
+    </a>
+
+    <a class="doc-card" href="community-scripts-connectors.html">
+      <div class="card-title">Connectors</div>
+      <div class="card-tags">
+        <span class="tag">PowerShell</span>
+        <span class="tag">Bash</span>
+        <span class="tag">Linux</span>
+      </div>
+      <div class="card-desc">
+        Cloud Connector install/uninstall for Windows (all identity sources),
+        and Segment Connector lightweight agent enrollment and removal for Linux.
+      </div>
+      <div class="card-arrow">Read the guide &#8594;</div>
+    </a>
+
+    <a class="doc-card" href="community-scripts-threat-hunting.html">
+      <div class="card-title">Threat Hunting</div>
+      <div class="card-tags">
+        <span class="tag">Python 3</span>
+        <span class="tag orange">Security Research</span>
+      </div>
+      <div class="card-desc">
+        Python toolkits for hunting IOCs in ZN network activity. Includes a general-purpose
+        domain/IP/port/process hunter and a dedicated RMM software detection tool.
+      </div>
+      <div class="card-arrow">Read the guide &#8594;</div>
+    </a>
+
+    <a class="doc-card" href="community-scripts-break-glass-sync.html">
+      <div class="card-title">Break Glass Sync</div>
+      <div class="card-tags">
+        <span class="tag">PowerShell</span>
+        <span class="tag orange">Emergency Prep</span>
+        <span class="tag purple">Module</span>
+      </div>
+      <div class="card-desc">
+        PowerShell module that copies the BreakGlass directory (including <code>segmentedAssets.json</code>)
+        from a Segment Server to a backup destination server via PSRemoting.
+      </div>
+      <div class="card-arrow">Read the guide &#8594;</div>
+    </a>
+
   </div>
 
   <!-- ── QUICK ORIENTATION ── -->
@@ -237,6 +398,26 @@
       <tr>
         <td>Add a new command to ZNTools or understand how the module is structured</td>
         <td><a href="zntools-author-reference.html">ZNTools Author Guide</a></td>
+      </tr>
+      <tr>
+        <td>Batch-queue assets for learning, manage groups, or audit asset states via the API</td>
+        <td><a href="community-scripts-asset-management.html">Asset Management Scripts</a></td>
+      </tr>
+      <tr>
+        <td>Approve proposed rule deletions or update block rules from external data</td>
+        <td><a href="community-scripts-rules-mfa.html">Rules &amp; MFA Scripts</a></td>
+      </tr>
+      <tr>
+        <td>Test connectivity to ZN cloud endpoints or diagnose GPO/admin group issues</td>
+        <td><a href="community-scripts-troubleshooting.html">Troubleshooting Scripts</a></td>
+      </tr>
+      <tr>
+        <td>Export audit logs to CSV or filter WinRM trust server logs by asset ID</td>
+        <td><a href="community-scripts-segmentation-server.html">Segmentation Server Scripts</a></td>
+      </tr>
+      <tr>
+        <td>Hunt for suspicious domain/IP/port/process activity or detect RMM tools</td>
+        <td><a href="community-scripts-threat-hunting.html">Threat Hunting Tools</a></td>
       </tr>
     </tbody>
   </table>
