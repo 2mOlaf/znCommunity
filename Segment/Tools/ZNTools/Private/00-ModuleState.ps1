@@ -21,6 +21,9 @@ function Show-ZNModuleWelcome {
     Write-Host "Health Dashboard" -ForegroundColor Yellow
     Write-Host "  Show-ZNHealthDashboard [-IncludeDisconnected] [-ExportCsv <path>]" -ForegroundColor Gray
     Write-Host ""
+    Write-Host "Security Events" -ForegroundColor Yellow
+    Write-Host "  Get-ZNSecurityEventRate -Period <1h|4h|1d|7d>" -ForegroundColor Gray
+    Write-Host ""
     Write-Host "BreakGlass Asset Browser  (load data once, then pipe freely)" -ForegroundColor Yellow
     Write-Host "  Import-ZNBG-AssetData [-DataPath <path>]" -ForegroundColor Gray
     Write-Host "  Get-ZNBG-Asset | Get-ZNBG-AssetSummary | Find-ZNBG-Asset <name>" -ForegroundColor Gray

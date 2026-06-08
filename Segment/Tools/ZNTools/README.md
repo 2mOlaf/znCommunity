@@ -28,6 +28,15 @@ API-backed commands require a valid key. Asset browser commands work offline fro
 ### Health Dashboard
 - `Show-ZNHealthDashboard [-IncludeDisconnected] [-ExportCsv <path>]`
 
+### Security Events
+Queries the Security event log for Windows Filtering Platform (WFP) events, locally or on a remote Segment Server.
+- `Get-ZNSecurityEventRate -Period <period>` — local machine
+- `Get-ZNSecurityEventRate -Period <period> -ComputerName <host>` — remote via WinRM (current identity)
+- `Get-ZNSecurityEventRate -Period <period> -ComputerName <host> -Credential $cred` — remote with explicit credential
+
+Period format: a positive integer followed by `h` (hours) or `d` (days) — e.g. `1h`, `4h`, `1d`, `7d`.
+All computation runs on the target machine; only the final numbers are returned across the wire.
+
 ### Service Management
 Manages all `zn*` services as a group.
 - `Invoke-ZNServices -Action <Stop|Start|Restart>` — local machine (requires Administrator)

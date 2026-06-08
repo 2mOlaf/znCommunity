@@ -12,6 +12,26 @@ function Show-Banner {
         [switch]$ShowThemeInfo
     )
 
+    function Get-StringDisplayWidth {
+        # Measures actual terminal column width by probing cursor position before/after a write.
+        # Handles ZWJ sequences and wide emoji that .Length cannot account for.
+        # Writes and immediately erases so the caller's content covers any artifact.
+        param([string]$Text)
+        if ([Console]::IsOutputRedirected -or $Text.Length -eq 0) { return $Text.Length }
+        try {
+            $c = [Console]::CursorLeft
+            $r = [Console]::CursorTop
+            [Console]::Write($Text)
+            $w = [Console]::CursorLeft - $c + ([Console]::CursorTop - $r) * [Console]::WindowWidth
+            [Console]::SetCursorPosition($c, $r)
+            [Console]::Write([string]::new(' ', $w))
+            [Console]::SetCursorPosition($c, $r)
+            return $w
+        } catch {
+            return $Text.Length
+        }
+    }
+
     function Get-ConsoleTheme {
         try {
             $backgroundColor = $Host.UI.RawUI.BackgroundColor
@@ -25,30 +45,35 @@ function Show-Banner {
     $theme = Get-ConsoleTheme
 
     if ($theme -eq 'Light') {
-        $ZeroGreen = "DarkGreen"
-        $PrimaryText = "Black"
+        $ZeroGreen     = "DarkGreen"
+        $PrimaryText   = "Black"
         $SecondaryText = "DarkGray"
-        $AccentText = "DarkBlue"
+        $AccentText    = "DarkBlue"
     } else {
-        $ZeroGreen = "Green"
-        $PrimaryText = "White"
+        $ZeroGreen     = "Green"
+        $PrimaryText   = "White"
         $SecondaryText = "Gray"
-        $AccentText = "Cyan"
+        $AccentText    = "Cyan"
     }
 
-    # Super pain in the ass, but here's the source: https://patorjk.com/software/taag/#p=display&f=Fire+Font-s&t=ZERO+Networks&x=none&v=4&h=4&w=80&we=false
-    # Clear some space
+    # Pre-measure emoji display widths on the blank line before rendering begins.
+    # The top border immediately overwrites the probe position, so no artifact is visible.
     Write-Host ""
-    
+    $baseText   = "👨‍💻 Author: "
+    $clockText  = "⏰ "
+    $baseWidth  = Get-StringDisplayWidth $baseText
+    $clockWidth = Get-StringDisplayWidth $clockText
+
+    # Super pain in the ass, but here's the source: https://patorjk.com/software/taag/#p=display&f=Fire+Font-s&t=ZERO+Networks&x=none&v=4&h=4&w=80&we=false
     # Top border
     Write-Host "╔══════════════════════════════════════════════════════════════════════════════╗" -ForegroundColor $ZeroGreen
-    
+
     # FIGlet-style ZERO banner
     Write-Host "║ " -ForegroundColor $ZeroGreen -NoNewline
     Write-Host "     )     (       )       )                                  " -ForegroundColor 'DarkRed' -NoNewline
     Write-Host (" " * 14) -NoNewline
     Write-Host " ║" -ForegroundColor $ZeroGreen
-    
+
     Write-Host "║ " -ForegroundColor $ZeroGreen -NoNewline
     Write-Host "  ( /(     )\ ) ( /(    ( /(         )                  )     " -ForegroundColor 'Red' -NoNewline
     Write-Host (" " * 14) -NoNewline
@@ -58,7 +83,7 @@ function Show-Banner {
     Write-Host "  )\())(  (()/( )\())   )\())  (  ( /((  (       (   ( /(     " -ForegroundColor 'DarkYellow' -NoNewline
     Write-Host (" " * 14) -NoNewline
     Write-Host " ║" -ForegroundColor $ZeroGreen
-    
+
     Write-Host "║ " -ForegroundColor $ZeroGreen -NoNewline
     Write-Host " ((_)\ )\  /(_)|(_)\   ((_)\  ))\ )\())\))(   (  )(  )\())(   " -ForegroundColor 'DarkYellow' -NoNewline
     Write-Host (" " * 14) -NoNewline
@@ -84,45 +109,40 @@ function Show-Banner {
     Write-Host " /___||___|_|_\ \___/  |_|\_\___| \__|\_/\_/\___/_| |_|\_\/__/" -ForegroundColor $ZeroGreen -NoNewline
     Write-Host (" " * 14) -NoNewline
     Write-Host " ║" -ForegroundColor $ZeroGreen
-    
+
     Write-Host "║ " -ForegroundColor $ZeroGreen -NoNewline
     Write-Host "                               " -ForegroundColor $PrimaryText -NoNewline
     Write-Host (" " * 45) -NoNewline
     Write-Host " ║" -ForegroundColor $ZeroGreen
-        
+
     Write-Host "║ " -ForegroundColor $ZeroGreen -NoNewline
     Write-Host "                                     " -ForegroundColor $PrimaryText -NoNewline
     Write-Host "The Hottest µ-Segmentation Solution!" -ForegroundColor $AccentText -NoNewline
     Write-Host (" " * 3) -NoNewline
     Write-Host " ║" -ForegroundColor $ZeroGreen
-    
+
     # Separator line
     Write-Host "╠══════════════════════════════════════════════════════════════════════════════╣" -ForegroundColor $ZeroGreen
-    
-    # Author and script info with intelligent line length handling
+
+    # Author / script line — padding uses measured display widths, not .Length
     Write-Host "║ " -ForegroundColor $ZeroGreen -NoNewline
-    
-    # Calculate available space (78 chars total minus emoji and separators)
-    $baseText = "👨‍💻 Author: "
+
     $availableSpace = 76
-    
-    # Build the info line components
-    $authorText = $Author
-    $scriptText = if ($ScriptName) { " | Script: $ScriptName" } else { "" }
+    $authorText  = $Author
+    $scriptText  = if ($ScriptName) { " | Script: $ScriptName" } else { "" }
     $versionText = if ($Version -and $ScriptName) { " v$Version" } else { "" }
 
-    $totalLength = $baseText.Length + $authorText.Length + $scriptText.Length + $versionText.Length
-    if ($totalLength -gt $availableSpace) {
-        $initials = ($Author -split ' ' | ForEach-Object { $_.Substring(0,1).ToUpper() }) -join '.'
+    $totalWidth = $baseWidth + $authorText.Length + $scriptText.Length + $versionText.Length
+    if ($totalWidth -gt $availableSpace) {
+        $initials   = ($Author -split ' ' | ForEach-Object { $_.Substring(0,1).ToUpper() }) -join '.'
         $authorText = $initials
-        $totalLength = $baseText.Length + $authorText.Length + $scriptText.Length + $versionText.Length
-        if ($totalLength -gt $availableSpace -and $ScriptName) {
-            $availableForScript = $availableSpace - $baseText.Length - $authorText.Length - " | Script: ".Length - $versionText.Length - 3
+        $totalWidth = $baseWidth + $authorText.Length + $scriptText.Length + $versionText.Length
+        if ($totalWidth -gt $availableSpace -and $ScriptName) {
+            $availableForScript = $availableSpace - $baseWidth - $authorText.Length - " | Script: ".Length - $versionText.Length - 3
             if ($availableForScript -gt 10) {
-                $truncatedScript = $ScriptName.Substring(0, [Math]::Min($ScriptName.Length, $availableForScript)) + "..."
-                $scriptText = " | Script: $truncatedScript"
+                $scriptText = " | Script: $($ScriptName.Substring(0, [Math]::Min($ScriptName.Length, $availableForScript)))..."
             } else {
-                $scriptText = ""
+                $scriptText  = ""
                 $versionText = ""
             }
         }
@@ -133,25 +153,22 @@ function Show-Banner {
 
     if ($scriptText) {
         Write-Host " | Script: " -ForegroundColor $PrimaryText -NoNewline
-        $displayScript = $scriptText.Replace(" | Script: ", "")
-        Write-Host $displayScript -ForegroundColor $AccentText -NoNewline
+        Write-Host ($scriptText.Replace(" | Script: ", "")) -ForegroundColor $AccentText -NoNewline
     }
-
     if ($versionText) {
         Write-Host $versionText -ForegroundColor $SecondaryText -NoNewline
     }
 
-    $finalLength = $baseText.Length + $authorText.Length + $scriptText.Length + $versionText.Length
-    $padding = $availableSpace - $finalLength
-    Write-Host (" " * [Math]::Max(0, $padding)) -NoNewline
+    $finalWidth = $baseWidth + $authorText.Length + $scriptText.Length + $versionText.Length
+    Write-Host (" " * [Math]::Max(0, $availableSpace - $finalWidth + 3)) -NoNewline
     Write-Host " ║" -ForegroundColor $ZeroGreen
 
+    # Timestamp line
     Write-Host "║ " -ForegroundColor $ZeroGreen -NoNewline
-    Write-Host "⏰ " -ForegroundColor $AccentText -NoNewline
     $timestamp = Get-Date -Format "yyyy-MM-dd HH:mm:ss"
+    Write-Host $clockText -ForegroundColor $AccentText -NoNewline
     Write-Host $timestamp -ForegroundColor $SecondaryText -NoNewline
-    $padding = 75 - ("⏰ " + $timestamp).Length
-    Write-Host (" " * [Math]::Max(0, $padding)) -NoNewline
+    Write-Host (" " * [Math]::Max(0, $availableSpace - $clockWidth - $timestamp.Length - 1)) -NoNewline
     Write-Host " ║" -ForegroundColor $ZeroGreen
 
     Write-Host "╚══════════════════════════════════════════════════════════════════════════════╝" -ForegroundColor $ZeroGreen

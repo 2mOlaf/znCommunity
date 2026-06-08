@@ -31,6 +31,9 @@
   <div class="sidebar-section">Service Management</div>
   <a href="#cmd-invoke-services">Invoke-ZNServices</a>
 
+  <div class="sidebar-section">Security Events</div>
+  <a href="#cmd-security-event-rate">Get-ZNSecurityEventRate</a>
+
   <div class="sidebar-section">BG Asset Browser</div>
   <a href="#cmd-import-asset-data">Import-ZNBG-AssetData</a>
   <a href="#cmd-asset-queries">Query commands</a>
@@ -60,13 +63,13 @@
       <span class="tag">PowerShell 7+</span>
       <span class="tag purple">Module</span>
       <span class="tag green">User Reference</span>
-      <span class="tag">v1.1</span>
+      <span class="tag">v1.2</span>
     </div>
     <p class="lead">
       ZNTools is a PowerShell module for Zero Networks operators. It provides network
       connectivity checks, Linux configuration profiles, segment server clusters, environment
-      health data, asset browser queries against local JSON snapshots, and ZN service
-      lifecycle management.
+      health data, WFP security event rate analysis, asset browser queries against local JSON
+      snapshots, and ZN service lifecycle management.
     </p>
   </div>
 
@@ -386,6 +389,135 @@
     </div>
     <pre><span class="ps-prompt">PS&gt; </span><span class="ps-fn">Invoke-ZNServices</span> <span class="ps-param">-Action</span> <span class="ps-value">Stop</span> <span class="ps-switch">-AllServers</span> <span class="ps-param">-ClusterName</span> <span class="ps-value">"zero.local"</span></pre>
     <div class="example-desc">Limits the operation to Segment Servers in the zero.local cluster.</div>
+  </div>
+
+  <!-- ════════════════════════════════════════
+       Get-ZNSecurityEventRate
+  ═════════════════════════════════════════ -->
+  <div class="script-separator">
+    <div class="page-header" style="margin-bottom:1rem; border-bottom:none; padding-bottom:0.5rem;">
+      <h1 id="cmd-security-event-rate">Get-ZNSecurityEventRate</h1>
+      <div class="tags">
+        <span class="tag">Security Events</span>
+        <span class="tag green">Read-only</span>
+        <span class="tag">Local</span>
+      </div>
+    </div>
+  </div>
+
+  <h2>Synopsis</h2>
+  <p>
+    Shows average and peak rates per second for Windows Filtering Platform security events
+    <strong>5156</strong> (permitted connection) and <strong>5157</strong> (blocked connection)
+    over a specified time period.
+  </p>
+
+  <div class="callout info">
+    <strong>Audit policy requirement</strong>
+    Events 5156 and 5157 are only logged when the <em>Filtering Platform Connection</em> subcategory
+    is enabled in the local audit policy. If no events are found, verify with:<br/>
+    <code>auditpol /get /subcategory:"Filtering Platform Connection"</code>
+  </div>
+
+  <h2>Syntax</h2>
+  <div class="syntax-block">
+<span class="cmd">Get-ZNSecurityEventRate</span>
+  <span class="param">-Period</span> &lt;string&gt;
+ [<span class="param">-ComputerName</span> &lt;string&gt;]
+ [<span class="param">-Credential</span> &lt;PSCredential&gt;]
+  </div>
+
+  <h2>Parameters</h2>
+  <div class="param-entry">
+    <div class="param-name">-Period</div>
+    <div class="param-body">
+      <p class="param-desc">
+        Required. Time window to analyze. A positive integer followed by <code>h</code> (hours) or
+        <code>d</code> (days) — for example: <code>1h</code>, <code>4h</code>, <code>24h</code>,
+        <code>1d</code>, <code>7d</code>.
+      </p>
+      <p class="param-desc">
+        Peak rate is computed from 1-second buckets for periods up to 1 hour and from 1-minute buckets
+        (normalized to per-second) for longer periods.
+      </p>
+    </div>
+  </div>
+  <div class="param-entry">
+    <div class="param-name">-ComputerName</div>
+    <div class="param-body">
+      <p class="param-desc">
+        Optional. Query a remote machine via WinRM (PSRemoting). The entire computation runs on the
+        remote host — only the final numbers are returned across the wire, so no raw event objects
+        are serialized. Requires the Windows Remote Management service to be running and reachable
+        on the target.
+      </p>
+    </div>
+  </div>
+  <div class="param-entry">
+    <div class="param-name">-Credential</div>
+    <div class="param-body">
+      <p class="param-desc">
+        Optional PSCredential for the remote session. Only used with <code>-ComputerName</code>.
+        If omitted, the current session identity is used.
+      </p>
+    </div>
+  </div>
+
+  <h2>Output</h2>
+  <p>
+    Displays a table with six columns for each of the two event IDs and a combined total row:
+    event count, average events/sec, average KB/s, peak events/sec, and peak KB/s.
+  </p>
+  <div class="callout info">
+    <strong>What KB/s measures</strong>
+    The KB/s and MB/s values represent the <em>Security event log write rate</em> — how fast
+    WFP audit data is being written to the Security log. This is useful for SIEM ingestion
+    sizing and understanding audit overhead. It is not a measure of network traffic throughput.
+    The rate is estimated by sampling up to 100 event XML payloads and multiplying average size
+    by the events/sec rate.
+  </div>
+
+  <h2>Examples</h2>
+  <div class="example">
+    <div class="example-header">
+      <span class="ex-label">Example 1</span>
+      <span class="ex-title">Last 1 hour</span>
+    </div>
+    <pre><span class="ps-prompt">PS&gt; </span><span class="ps-fn">Get-ZNSecurityEventRate</span> <span class="ps-param">-Period</span> <span class="ps-value">1h</span></pre>
+    <div class="example-desc">Reports WFP event rates over the last hour using 1-second peak buckets.</div>
+  </div>
+  <div class="example">
+    <div class="example-header">
+      <span class="ex-label">Example 2</span>
+      <span class="ex-title">Last 4 hours</span>
+    </div>
+    <pre><span class="ps-prompt">PS&gt; </span><span class="ps-fn">Get-ZNSecurityEventRate</span> <span class="ps-param">-Period</span> <span class="ps-value">4h</span></pre>
+    <div class="example-desc">Reports WFP event rates over the last 4 hours using 1-minute peak buckets normalized to per-second.</div>
+  </div>
+  <div class="example">
+    <div class="example-header">
+      <span class="ex-label">Example 3</span>
+      <span class="ex-title">Last 7 days</span>
+    </div>
+    <pre><span class="ps-prompt">PS&gt; </span><span class="ps-fn">Get-ZNSecurityEventRate</span> <span class="ps-param">-Period</span> <span class="ps-value">7d</span></pre>
+    <div class="example-desc">Reports WFP event rates over the last 7 days. Useful for sizing and capacity planning.</div>
+  </div>
+  <div class="example">
+    <div class="example-header">
+      <span class="ex-label">Example 4</span>
+      <span class="ex-title">Remote — current identity</span>
+    </div>
+    <pre><span class="ps-prompt">PS&gt; </span><span class="ps-fn">Get-ZNSecurityEventRate</span> <span class="ps-param">-Period</span> <span class="ps-value">4h</span> <span class="ps-param">-ComputerName</span> <span class="ps-value">segment01.zero.local</span></pre>
+    <div class="example-desc">Queries segment01 remotely via WinRM. All computation runs on the remote host; only the results are returned.</div>
+  </div>
+  <div class="example">
+    <div class="example-header">
+      <span class="ex-label">Example 5</span>
+      <span class="ex-title">Remote — explicit credential</span>
+    </div>
+    <pre><span class="ps-prompt">PS&gt; </span>$cred = <span class="ps-fn">Get-Credential</span>
+<span class="ps-prompt">PS&gt; </span><span class="ps-fn">Get-ZNSecurityEventRate</span> <span class="ps-param">-Period</span> <span class="ps-value">1d</span> <span class="ps-param">-ComputerName</span> <span class="ps-value">segment01.zero.local</span> <span class="ps-param">-Credential</span> $cred</pre>
+    <div class="example-desc">Same as above but authenticates with explicit credentials — useful when the local session identity doesn't have remote access.</div>
   </div>
 
   <!-- ════════════════════════════════════════
