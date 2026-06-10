@@ -1,6 +1,6 @@
 # ZNTools
 
-Unified Zero Networks tooling module — health, clusters, Linux profiles, networking, asset browser, and service management.
+Unified Zero Networks tooling module — health, clusters, Linux profiles, networking, asset browser, service management, and AD-to-ZN identity sync.
 
 ## Quick start
 ```powershell
@@ -42,6 +42,17 @@ Manages all `zn*` services as a group.
 - `Invoke-ZNServices -Action <Stop|Start|Restart>` — local machine (requires Administrator)
 - `Invoke-ZNServices -Action <action> -ComputerName <host>` — single remote Segment Server via PSRemoting
 - `Invoke-ZNServices -Action <action> -AllServers [-ClusterName <name>]` — all Segment Servers via API
+
+### Identity Sync
+Syncs disabled AD accounts to inactive status in ZN. One-directional: AD disabled → ZN inactive.
+Requires the `ActiveDirectory` module (RSAT) and a ZN API key with write scope.
+
+- `Sync-ZNADUserStatus -WhatIf` — preview which users would be inactivated
+- `Sync-ZNADUserStatus -Domain corp.example.com -Note "Q2 offboarding"` — live sync with audit note
+- `Sync-ZNADUserStatus -PassThru | Where-Object Action -eq 'Inactivated' | Export-Csv offboarded.csv` — pipe results
+
+Matching uses SID (primary) then UPN (fallback). The ZN audit comment per user records the AD
+`whenChanged` timestamp — the closest proxy AD provides for a disable date — plus any `-Note` text.
 
 ### BreakGlass Asset Browser
 Offline queries against the BreakGlass `segmentedAssets.json` snapshot. Run `Import-ZNBG-AssetData` first.

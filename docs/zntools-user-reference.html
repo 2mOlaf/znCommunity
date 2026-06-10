@@ -34,6 +34,9 @@
   <div class="sidebar-section">Security Events</div>
   <a href="#cmd-security-event-rate">Get-ZNSecurityEventRate</a>
 
+  <div class="sidebar-section">Identity Sync</div>
+  <a href="#cmd-sync-ad-user-status">Sync-ZNADUserStatus</a>
+
   <div class="sidebar-section">BG Asset Browser</div>
   <a href="#cmd-import-asset-data">Import-ZNBG-AssetData</a>
   <a href="#cmd-asset-queries">Query commands</a>
@@ -63,13 +66,13 @@
       <span class="tag">PowerShell 7+</span>
       <span class="tag purple">Module</span>
       <span class="tag green">User Reference</span>
-      <span class="tag">v1.2</span>
+      <span class="tag">v1.3</span>
     </div>
     <p class="lead">
       ZNTools is a PowerShell module for Zero Networks operators. It provides network
       connectivity checks, Linux configuration profiles, segment server clusters, environment
       health data, WFP security event rate analysis, asset browser queries against local JSON
-      snapshots, and ZN service lifecycle management.
+      snapshots, ZN service lifecycle management, and AD-to-ZN identity status sync.
     </p>
   </div>
 
@@ -518,6 +521,160 @@
     <pre><span class="ps-prompt">PS&gt; </span>$cred = <span class="ps-fn">Get-Credential</span>
 <span class="ps-prompt">PS&gt; </span><span class="ps-fn">Get-ZNSecurityEventRate</span> <span class="ps-param">-Period</span> <span class="ps-value">1d</span> <span class="ps-param">-ComputerName</span> <span class="ps-value">segment01.zero.local</span> <span class="ps-param">-Credential</span> $cred</pre>
     <div class="example-desc">Same as above but authenticates with explicit credentials — useful when the local session identity doesn't have remote access.</div>
+  </div>
+
+  <!-- ════════════════════════════════════════
+       Sync-ZNADUserStatus
+  ═════════════════════════════════════════ -->
+  <div class="script-separator">
+    <div class="page-header" style="margin-bottom:1rem; border-bottom:none; padding-bottom:0.5rem;">
+      <h1 id="cmd-sync-ad-user-status">Sync-ZNADUserStatus</h1>
+      <div class="tags">
+        <span class="tag">Identity Sync</span>
+        <span class="tag orange">Destructive</span>
+        <span class="tag orange">R/W API Key Required</span>
+      </div>
+    </div>
+  </div>
+
+  <h2>Synopsis</h2>
+  <p>
+    Syncs disabled Active Directory accounts to inactive status in the Zero Networks platform.
+    One-directional: AD disabled → ZN inactive. Does not reactivate users.
+  </p>
+
+  <div class="callout">
+    <strong>Requirements</strong>
+    Requires the <code>ActiveDirectory</code> PowerShell module (RSAT) and a ZN API key with
+    write scope. Install RSAT with:<br/>
+    <code>Add-WindowsCapability -Online -Name Rsat.ActiveDirectory.DS-LDS.Tools~~~~0.0.1.0</code>
+  </div>
+
+  <div class="callout info">
+    <strong>Matching strategy</strong>
+    Users are matched by SID (primary key). If no SID match is found, the UserPrincipalName
+    is used as a fallback. Only users with <code>source = Active Directory</code> in ZN are
+    considered.
+  </div>
+
+  <div class="callout info">
+    <strong>AD disabled date</strong>
+    Active Directory does not store a dedicated "disabled on" timestamp. The <code>whenChanged</code>
+    attribute (last-modified date) is carried into the ZN audit comment as the closest available proxy.
+    It is labeled <code>AD whenChanged</code> in the audit entry, not "disabled on", to be accurate.
+  </div>
+
+  <h2>Syntax</h2>
+  <div class="syntax-block">
+<span class="cmd">Sync-ZNADUserStatus</span>
+ [<span class="param">-ApiKey</span> &lt;string&gt;]
+ [<span class="param">-ApiUrl</span> &lt;string&gt;]
+ [<span class="param">-Domain</span> &lt;string&gt;]
+ [<span class="param">-Server</span> &lt;string&gt;]
+ [<span class="param">-Credential</span> &lt;PSCredential&gt;]
+ [<span class="param">-Note</span> &lt;string&gt;]
+ [<span class="param">-PassThru</span>]
+ [<span class="param">-WhatIf</span>]
+ [<span class="param">-Confirm</span>]
+  </div>
+
+  <h2>Parameters</h2>
+  <div class="param-entry">
+    <div class="param-name">-Domain</div>
+    <div class="param-body"><p class="param-desc">AD domain name to query. Defaults to the current user's domain.</p></div>
+  </div>
+  <div class="param-entry">
+    <div class="param-name">-Server</div>
+    <div class="param-body"><p class="param-desc">Specific domain controller FQDN to target. Takes precedence over <code>-Domain</code>.</p></div>
+  </div>
+  <div class="param-entry">
+    <div class="param-name">-Credential</div>
+    <div class="param-body"><p class="param-desc">PSCredential for the AD query when alternate credentials are required.</p></div>
+  </div>
+  <div class="param-entry">
+    <div class="param-name">-Note</div>
+    <div class="param-body"><p class="param-desc">Admin note appended to each ZN audit comment entry (e.g., <code>"Q2 offboarding"</code>).</p></div>
+  </div>
+  <div class="param-entry">
+    <div class="param-name">-PassThru</div>
+    <div class="param-body"><p class="param-desc">Emit one result object per user to the pipeline after the sync completes. Useful for piping to <code>Export-Csv</code> or <code>Where-Object</code>.</p></div>
+  </div>
+  <div class="param-entry">
+    <div class="param-name">-WhatIf</div>
+    <div class="param-body"><p class="param-desc">Shows what would be inactivated without making any API calls. Displays the full results table and summary with "Would inactivate" labels.</p></div>
+  </div>
+
+  <h2>Output</h2>
+  <p>Displays a results table followed by a summary line. The summary always shows a count for each action category.</p>
+  <table class="fn-table">
+    <thead>
+      <tr><th>Action</th><th>Meaning</th></tr>
+    </thead>
+    <tbody>
+      <tr><td>Inactivated</td><td>User was disabled in AD and has been marked inactive in ZN.</td></tr>
+      <tr><td>Would inactivate</td><td>WhatIf mode — user would be inactivated on a live run.</td></tr>
+      <tr><td>Already inactive</td><td>User is disabled in AD and already inactive in ZN — no action taken.</td></tr>
+      <tr><td>Not found in ZN</td><td>User is disabled in AD but has no matching record in ZN.</td></tr>
+      <tr><td>Failed</td><td>API call for this user failed. A warning is written; other users continue processing.</td></tr>
+    </tbody>
+  </table>
+
+  <p>With <code>-PassThru</code>, each user is emitted as an object with these properties:</p>
+  <table class="fn-table">
+    <thead>
+      <tr><th>Property</th><th>Description</th></tr>
+    </thead>
+    <tbody>
+      <tr><td>Name</td><td>Display name or SAMAccountName.</td></tr>
+      <tr><td>Domain</td><td>Domain derived from ZN record or UPN.</td></tr>
+      <tr><td>ADModified</td><td>AD <code>whenChanged</code> date (yyyy-MM-dd) — closest proxy for disable date.</td></tr>
+      <tr><td>ZNStatus</td><td>ZN status before the sync: <code>Active</code>, <code>Inactive</code>, or <code>—</code> (not in ZN).</td></tr>
+      <tr><td>Action</td><td>Outcome: <code>Inactivated</code>, <code>AlreadyInactive</code>, <code>NotInZN</code>, <code>Failed</code>, or <code>WouldInactivate</code>.</td></tr>
+      <tr><td>ZNUserId</td><td>ZN user ID, or <code>$null</code> if not found in ZN.</td></tr>
+      <tr><td>SID</td><td>AD Security Identifier used for matching.</td></tr>
+    </tbody>
+  </table>
+
+  <h2>ZN audit comment format</h2>
+  <p>Each inactivated user receives an individual ZN audit comment with their specific AD data:</p>
+  <div class="syntax-block" style="font-family:monospace; font-size:0.85rem;">
+AD sync | AD whenChanged: 2025-11-14 | Domain: corp.example.com | Note: Q2 offboarding
+  </div>
+  <p>The <code>Note:</code> segment is omitted when <code>-Note</code> is not provided.</p>
+
+  <h2>Examples</h2>
+  <div class="example">
+    <div class="example-header">
+      <span class="ex-label">Example 1</span>
+      <span class="ex-title">Preview changes</span>
+    </div>
+    <pre><span class="ps-prompt">PS&gt; </span><span class="ps-fn">Sync-ZNADUserStatus</span> <span class="ps-switch">-WhatIf</span></pre>
+    <div class="example-desc">Shows which users would be inactivated. No API calls are made. Safe to run anytime.</div>
+  </div>
+  <div class="example">
+    <div class="example-header">
+      <span class="ex-label">Example 2</span>
+      <span class="ex-title">Live sync with a note</span>
+    </div>
+    <pre><span class="ps-prompt">PS&gt; </span><span class="ps-fn">Sync-ZNADUserStatus</span> <span class="ps-param">-Domain</span> <span class="ps-value">corp.example.com</span> <span class="ps-param">-Note</span> <span class="ps-value">"Q2 offboarding"</span></pre>
+    <div class="example-desc">Inactivates all matching users in ZN. Each ZN audit entry records the user's AD <code>whenChanged</code> date and the note.</div>
+  </div>
+  <div class="example">
+    <div class="example-header">
+      <span class="ex-label">Example 3</span>
+      <span class="ex-title">Export inactivated users to CSV</span>
+    </div>
+    <pre><span class="ps-prompt">PS&gt; </span><span class="ps-fn">Sync-ZNADUserStatus</span> <span class="ps-switch">-PassThru</span> | <span class="ps-fn">Where-Object</span> Action <span class="ps-value">-eq</span> <span class="ps-value">'Inactivated'</span> | <span class="ps-fn">Export-Csv</span> <span class="ps-value">offboarded.csv</span> -NoTypeInformation</pre>
+    <div class="example-desc">Runs the sync and writes only the successfully inactivated users to a CSV file.</div>
+  </div>
+  <div class="example">
+    <div class="example-header">
+      <span class="ex-label">Example 4</span>
+      <span class="ex-title">Target a specific DC with alternate credentials</span>
+    </div>
+    <pre><span class="ps-prompt">PS&gt; </span>$cred = <span class="ps-fn">Get-Credential</span>
+<span class="ps-prompt">PS&gt; </span><span class="ps-fn">Sync-ZNADUserStatus</span> <span class="ps-param">-Server</span> <span class="ps-value">dc01.corp.example.com</span> <span class="ps-param">-Credential</span> $cred <span class="ps-switch">-WhatIf</span></pre>
+    <div class="example-desc">Queries a specific domain controller with explicit credentials, in preview mode.</div>
   </div>
 
   <!-- ════════════════════════════════════════
