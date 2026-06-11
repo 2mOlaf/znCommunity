@@ -572,6 +572,9 @@
  [<span class="param">-Domain</span> &lt;string&gt;]
  [<span class="param">-Server</span> &lt;string&gt;]
  [<span class="param">-Credential</span> &lt;PSCredential&gt;]
+ [<span class="param">-SearchBase</span> &lt;string&gt;]
+ [<span class="param">-Since</span> &lt;datetime&gt;]
+ [<span class="param">-BatchSize</span> &lt;int&gt;]
  [<span class="param">-Note</span> &lt;string&gt;]
  [<span class="param">-PassThru</span>]
  [<span class="param">-WhatIf</span>]
@@ -592,16 +595,43 @@
     <div class="param-body"><p class="param-desc">PSCredential for the AD query when alternate credentials are required.</p></div>
   </div>
   <div class="param-entry">
+    <div class="param-name">-SearchBase</div>
+    <div class="param-body">
+      <p class="param-desc">AD OU distinguished name to scope the query (e.g., <code>'OU=Users,DC=corp,DC=example,DC=com'</code>).
+      Without this the entire domain is scanned. Strongly recommended for large directories to reduce
+      AD query time and result set size.</p>
+    </div>
+  </div>
+  <div class="param-entry">
+    <div class="param-name">-Since</div>
+    <div class="param-body">
+      <p class="param-desc">Only process AD accounts with <code>whenChanged</code> on or after this date.
+      Use for incremental runs after an initial full sync. Running with <code>-WhatIf</code> will
+      automatically suggest the correct date based on the most recent previous sync detected in
+      the ZN audit log.</p>
+      <p class="param-desc"><strong>Caution:</strong> accounts disabled before this cutoff that were
+      not captured in a previous sync will be skipped.</p>
+    </div>
+  </div>
+  <div class="param-entry">
+    <div class="param-name">-BatchSize</div>
+    <div class="param-body">
+      <p class="param-desc">Number of users per bulk inactivation API call. Default: <code>100</code>. Range: <code>1–400</code>.
+      Each batch produces one ZN audit entry with a shared comment containing the <code>whenChanged</code>
+      date range for the users in that batch. Increase toward 400 for very large inactivation sets.</p>
+    </div>
+  </div>
+  <div class="param-entry">
     <div class="param-name">-Note</div>
-    <div class="param-body"><p class="param-desc">Admin note appended to each ZN audit comment entry (e.g., <code>"Q2 offboarding"</code>).</p></div>
+    <div class="param-body"><p class="param-desc">Admin note appended to each batch's ZN audit comment (e.g., <code>"Q2 offboarding"</code>).</p></div>
   </div>
   <div class="param-entry">
     <div class="param-name">-PassThru</div>
-    <div class="param-body"><p class="param-desc">Emit one result object per user to the pipeline after the sync completes. Useful for piping to <code>Export-Csv</code> or <code>Where-Object</code>.</p></div>
+    <div class="param-body"><p class="param-desc">Emit one result object per user to the pipeline. The console table is capped at 100 rows; use <code>-PassThru</code> to retrieve the full result set for reporting or further filtering.</p></div>
   </div>
   <div class="param-entry">
     <div class="param-name">-WhatIf</div>
-    <div class="param-body"><p class="param-desc">Shows what would be inactivated without making any API calls. Displays the full results table and summary with "Would inactivate" labels.</p></div>
+    <div class="param-body"><p class="param-desc">Shows what would be inactivated without making any API calls. Displays the results table, summary, and a <strong>Performance Recommendations</strong> section — including last-sync date detected from the ZN audit log, <code>-SearchBase</code> and <code>-Since</code> suggestions, and projected API call count.</p></div>
   </div>
 
   <h2>Output</h2>
@@ -636,9 +666,16 @@
   </table>
 
   <h2>ZN audit comment format</h2>
-  <p>Each inactivated user receives an individual ZN audit comment with their specific AD data:</p>
+  <p>
+    Each batch produces one ZN audit entry. The comment records the <code>whenChanged</code>
+    date range of the users in that batch, plus any <code>-Note</code> text.
+  </p>
   <div class="syntax-block" style="font-family:monospace; font-size:0.85rem;">
-AD sync | AD whenChanged: 2025-11-14 | Domain: corp.example.com | Note: Q2 offboarding
+<em>Single user in batch:</em>
+AD sync | AD whenChanged: 2025-11-14 | Note: Q2 offboarding
+
+<em>Multiple users in batch:</em>
+AD sync | AD whenChanged range: 2024-06-01 to 2025-11-14 | Note: Q2 offboarding
   </div>
   <p>The <code>Note:</code> segment is omitted when <code>-Note</code> is not provided.</p>
 
@@ -675,6 +712,14 @@ AD sync | AD whenChanged: 2025-11-14 | Domain: corp.example.com | Note: Q2 offbo
     <pre><span class="ps-prompt">PS&gt; </span>$cred = <span class="ps-fn">Get-Credential</span>
 <span class="ps-prompt">PS&gt; </span><span class="ps-fn">Sync-ZNADUserStatus</span> <span class="ps-param">-Server</span> <span class="ps-value">dc01.corp.example.com</span> <span class="ps-param">-Credential</span> $cred <span class="ps-switch">-WhatIf</span></pre>
     <div class="example-desc">Queries a specific domain controller with explicit credentials, in preview mode.</div>
+  </div>
+  <div class="example">
+    <div class="example-header">
+      <span class="ex-label">Example 5</span>
+      <span class="ex-title">Scoped incremental sync</span>
+    </div>
+    <pre><span class="ps-prompt">PS&gt; </span><span class="ps-fn">Sync-ZNADUserStatus</span> <span class="ps-param">-SearchBase</span> <span class="ps-value">'OU=Corp Users,DC=corp,DC=example,DC=com'</span> <span class="ps-param">-Since</span> <span class="ps-value">'2025-11-15'</span> <span class="ps-param">-BatchSize</span> <span class="ps-value">400</span></pre>
+    <div class="example-desc">Incremental run scoped to one OU, processing only accounts modified since Nov 15, with maximum batch size for fewest API calls. Typical follow-on command after reviewing WhatIf recommendations.</div>
   </div>
 
   <!-- ════════════════════════════════════════

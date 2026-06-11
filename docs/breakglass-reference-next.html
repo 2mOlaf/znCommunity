@@ -110,7 +110,7 @@
       <tr><td>PowerShell version</td><td>7.0 or higher (<code>#Requires -Version 7</code>)</td></tr>
       <tr><td>POSH-SSH module</td><td>Required for Linux operations. Script auto-installs from the internet or falls back to the bundled <code>posh-ssh.3.1.1.nupkg</code>.</td></tr>
       <tr><td>segmentedAssets.json</td><td>Auto-generated and routinely updated by the Zero Networks Segment Server. Located at <code>C:\Program Files\Zero Networks\Breakglass\segmentedAssets.json</code>. Required for bulk operations; not read for single-asset (<code>-Asset</code> / <code>-IPAddress</code>) runs. Do not edit manually.</td></tr>
-      <tr><td>Windows credentials</td><td>Account with WinRM/PSRemoting access to target asset(s). When omitted, the script reads <code>ForestsConfig</code> from <code>segmentedAssets.json</code> and prompts once per domain and once per OU that has <code>OuCredentials</code> configured. Supply <code>-ADUserName</code> / <code>-ADSvcPassword</code> to override with a single explicit credential for all targets.</td></tr>
+      <tr><td>Windows credentials</td><td>Account with WinRM/PSRemoting access to target asset(s). When omitted, the script reads <code>ForestsConfig</code> from <code>segmentedAssets.json</code> and prompts once per domain and once per OU that has <code>OuCredentials</code> configured. Supply <code>-ADUserName</code> / <code>-ADSvcPassword</code> to override with a single explicit credential for all targets, or use <code>-Credential</code> with <code>Get-Credential</code> / <code>Import-Clixml</code> for interactive or headless runs.</td></tr>
       <tr><td>Linux credentials</td><td>Linux service account with <code>sudo su</code> access on target assets. Use <code>-LinuxUserName</code> / <code>-LinuxSvcPassword</code> for password auth, or <code>-LinuxUseSSHKey</code> to supply an SSH key path at runtime.</td></tr>
       <tr><td>Network access</td><td>Required ports (WinRM TCP 5985/5986 for Windows; SSH TCP 22 for Linux) are automatically provisioned to Segment Servers, which is where this script is intended to run.</td></tr>
       <tr><td>Linux firewall backend</td><td>The script supports both <strong>iptables</strong> (via python-iptables) and <strong>nftables</strong> (via python-nftables). For bulk operations, the backend is read from the <code>AppliedFirewallType</code> field in <code>segmentedAssets.json</code>. For single-asset operations, both backends are attempted automatically.</td></tr>
@@ -156,7 +156,7 @@
     <span class="param">-Mode</span> { <span class="opt">Privileged</span> | <span class="opt">All</span> }
    [<span class="param">-Network</span>] [<span class="param">-Identity</span>]
    [<span class="param">-ServersOnly</span>] [<span class="param">-DisableBlockRule</span>]
-   [<span class="param">-ADUserName</span> &lt;string&gt;] [<span class="param">-ADSvcPassword</span> &lt;string&gt;]
+   [<span class="param">-ADUserName</span> &lt;string&gt;] [<span class="param">-ADSvcPassword</span> &lt;string&gt;] [<span class="param">-Credential</span> &lt;PSCredential&gt;]
    [<span class="param">-DeploymentClusterName</span> &lt;string&gt;]
   </div>
 
@@ -179,7 +179,7 @@
     <span class="param">-Mode</span> { <span class="opt">Privileged</span> | <span class="opt">All</span> }
    [<span class="param">-Network</span>] [<span class="param">-Identity</span>]
    [<span class="param">-LinuxUseSSHKey</span>] [<span class="param">-ServersOnly</span>] [<span class="param">-DisableBlockRule</span>]
-   [<span class="param">-ADUserName</span> &lt;string&gt;] [<span class="param">-ADSvcPassword</span> &lt;string&gt;]
+   [<span class="param">-ADUserName</span> &lt;string&gt;] [<span class="param">-ADSvcPassword</span> &lt;string&gt;] [<span class="param">-Credential</span> &lt;PSCredential&gt;]
    [<span class="param">-LinuxUserName</span> &lt;string&gt;] [<span class="param">-LinuxSvcPassword</span> &lt;string&gt;]
    [<span class="param">-DeploymentClusterName</span> &lt;string&gt;]
   </div>
@@ -192,7 +192,7 @@
     <span class="param">-Mode</span> { <span class="opt">Privileged</span> | <span class="opt">All</span> }
    [<span class="param">-Network</span>] [<span class="param">-Identity</span>]
    [<span class="param">-LinuxUseSSHKey</span>]
-   [<span class="param">-ADUserName</span> &lt;string&gt;] [<span class="param">-ADSvcPassword</span> &lt;string&gt;]
+   [<span class="param">-ADUserName</span> &lt;string&gt;] [<span class="param">-ADSvcPassword</span> &lt;string&gt;] [<span class="param">-Credential</span> &lt;PSCredential&gt;]
    [<span class="param">-LinuxUserName</span> &lt;string&gt;] [<span class="param">-LinuxSvcPassword</span> &lt;string&gt;]
   </div>
 
@@ -203,7 +203,7 @@
    { <span class="param">-Windows</span> | <span class="param">-Linux</span> }
     <span class="param">-Mode</span> { <span class="opt">Privileged</span> | <span class="opt">All</span> }
    [<span class="param">-Network</span>] [<span class="param">-Identity</span>]
-   [<span class="param">-ADUserName</span> &lt;string&gt;] [<span class="param">-ADSvcPassword</span> &lt;string&gt;]
+   [<span class="param">-ADUserName</span> &lt;string&gt;] [<span class="param">-ADSvcPassword</span> &lt;string&gt;] [<span class="param">-Credential</span> &lt;PSCredential&gt;]
   </div>
 
   <h2 id="bg-parameters">Parameters</h2>
@@ -384,6 +384,25 @@
       </div>
     </div>
   </div>
+  <!-- -Credential -->
+  <div class="param-entry">
+    <div class="param-name">-Credential</div>
+    <div class="param-body">
+      <p class="param-desc">
+        A <code>PSCredential</code> used to connect to Windows assets via WinRM. Supply an explicit
+        credential (for example, <code>(Get-Credential)</code>) or load one from disk with
+        <code>Import-Clixml</code>. Cannot be combined with <code>-ADUserName</code> /
+        <code>-ADSvcPassword</code>. When provided, it is used for all Windows targets and the
+        domain/OU prompt flow is skipped.
+      </p>
+      <div class="param-meta">
+        <div class="param-meta-item"><span class="meta-label">Type:</span><span class="meta-value">PSCredential</span></div>
+        <div class="param-meta-item"><span class="meta-label">Required:</span><span class="meta-value optional">Optional</span></div>
+        <div class="param-meta-item"><span class="meta-label">Windows only:</span><span class="meta-value">Yes</span></div>
+        <div class="param-meta-item"><span class="meta-label">Pipeline input:</span><span class="meta-value">False</span></div>
+      </div>
+    </div>
+  </div>
 
   <!-- -ADUserName -->
   <div class="param-entry">
@@ -392,7 +411,7 @@
       <p class="param-desc">
         Active Directory credential username used to connect to Windows assets via WinRM.
         Accepted formats: <code>DOMAIN\username</code> or <code>username@domain.com</code>.
-        Must be paired with <code>-ADSvcPassword</code>. If omitted, the script reads
+        Must be paired with <code>-ADSvcPassword</code> and cannot be combined with <code>-Credential</code>. If omitted, the script reads
         <code>ForestsConfig</code> from <code>segmentedAssets.json</code> and prompts once
         per primary domain, once per secondary domain, and once per OU that has
         <code>OuCredentials</code> configured. When an asset has an
@@ -412,7 +431,7 @@
   <div class="param-entry">
     <div class="param-name">-ADSvcPassword</div>
     <div class="param-body">
-      <p class="param-desc">Plain-text password for the AD account specified in <code>-ADUserName</code>. Must be used together with <code>-ADUserName</code>. The value is converted to a <code>SecureString</code> internally before use.</p>
+      <p class="param-desc">Plain-text password for the AD account specified in <code>-ADUserName</code>. Must be used together with <code>-ADUserName</code> and cannot be combined with <code>-Credential</code>. The value is converted to a <code>SecureString</code> internally before use.</p>
       <div class="param-meta">
         <div class="param-meta-item"><span class="meta-label">Type:</span><span class="meta-value">String</span></div>
         <div class="param-meta-item"><span class="meta-label">Required:</span><span class="meta-value optional">Optional</span></div>
@@ -553,6 +572,31 @@
   <div class="example">
     <div class="example-header">
       <span class="ex-label">Example 6</span>
+      <span class="ex-title">Bulk Windows run using Get-Credential</span>
+    </div>
+    <pre><span class="ps-prompt">PS&gt; </span><span class="ps-cmd">.\\BreakGlass.ps1</span> <span class="ps-switch">-Windows</span> <span class="ps-switch">-Network</span> <span class="ps-param">-Mode</span> <span class="ps-value">All</span> <span class="ps-param">-Credential</span> <span class="ps-value">(Get-Credential)</span></pre>
+    <div class="example-desc">
+      Prompts for credentials once and uses the resulting <code>PSCredential</code> for all Windows targets.
+      This bypasses per-domain and per-OU prompts from <code>segmentedAssets.json</code>.
+    </div>
+  </div>
+
+  <div class="example">
+    <div class="example-header">
+      <span class="ex-label">Example 7</span>
+      <span class="ex-title">Headless Windows run using Export-Clixml / Import-Clixml</span>
+    </div>
+    <pre><span class="ps-prompt">PS&gt; </span><span class="ps-cmd">Get-Credential</span> <span class="ps-param">|</span> <span class="ps-cmd">Export-Clixml</span> <span class="ps-param">-Path</span> <span class="ps-value">C:\\secure\\breakglass-cred.xml</span>
+<span class="ps-prompt">PS&gt; </span><span class="ps-cmd">.\\BreakGlass.ps1</span> <span class="ps-switch">-Windows</span> <span class="ps-switch">-Network</span> <span class="ps-param">-Mode</span> <span class="ps-value">All</span> <span class="ps-param">-Credential</span> <span class="ps-value">(Import-Clixml -Path C:\\\\secure\\\\breakglass-cred.xml)</span></pre>
+    <div class="example-desc">
+      Exports a credential once, then reuses it in a headless run. The encrypted CLIXML can only be
+      decrypted by the same Windows user on the same machine.
+    </div>
+  </div>
+
+  <div class="example">
+    <div class="example-header">
+      <span class="ex-label">Example 8</span>
       <span class="ex-title">Scope to a single deployment cluster</span>
     </div>
     <pre><span class="ps-prompt">PS&gt; </span><span class="ps-cmd">.\BreakGlass.ps1</span> <span class="ps-switch">-Windows</span> <span class="ps-param">-Mode</span> <span class="ps-value">All</span> <span class="ps-switch">-Network</span> <span class="ps-param">-DeploymentClusterName</span> <span class="ps-value">"zero.local"</span></pre>

@@ -12,27 +12,7 @@ function Show-Banner {
         [switch]$ShowThemeInfo
     )
 
-    function Get-StringDisplayWidth {
-        # Measures actual terminal column width by probing cursor position before/after a write.
-        # Handles ZWJ sequences and wide emoji that .Length cannot account for.
-        # Writes and immediately erases so the caller's content covers any artifact.
-        param([string]$Text)
-        if ([Console]::IsOutputRedirected -or $Text.Length -eq 0) { return $Text.Length }
-        try {
-            $c = [Console]::CursorLeft
-            $r = [Console]::CursorTop
-            [Console]::Write($Text)
-            $w = [Console]::CursorLeft - $c + ([Console]::CursorTop - $r) * [Console]::WindowWidth
-            [Console]::SetCursorPosition($c, $r)
-            [Console]::Write([string]::new(' ', $w))
-            [Console]::SetCursorPosition($c, $r)
-            return $w
-        } catch {
-            return $Text.Length
-        }
-    }
-
-    function Get-ConsoleTheme {
+function Get-ConsoleTheme {
         try {
             $backgroundColor = $Host.UI.RawUI.BackgroundColor
             $lightBackgrounds = @('White', 'Gray', 'Yellow', 'Cyan', 'Magenta')
@@ -56,13 +36,12 @@ function Show-Banner {
         $AccentText    = "Cyan"
     }
 
-    # Pre-measure emoji display widths on the blank line before rendering begins.
-    # The top border immediately overwrites the probe position, so no artifact is visible.
-    Write-Host ""
-    $baseText   = "👨‍💻 Author: "
-    $clockText  = "⏰ "
-    $baseWidth  = Get-StringDisplayWidth $baseText
-    $clockWidth = Get-StringDisplayWidth $clockText
+    # Simple supplementary-plane emoji: each is one surrogate pair (2 UTF-16 code units)
+    # and renders as exactly 2 terminal columns, so .Length == visual width — no probe needed.
+    $baseText   = "🧙 Author: "
+    $clockText  = "📅 "
+    $baseWidth  = $baseText.Length
+    $clockWidth = $clockText.Length
 
     # Super pain in the ass, but here's the source: https://patorjk.com/software/taag/#p=display&f=Fire+Font-s&t=ZERO+Networks&x=none&v=4&h=4&w=80&we=false
     # Top border
@@ -160,15 +139,20 @@ function Show-Banner {
     }
 
     $finalWidth = $baseWidth + $authorText.Length + $scriptText.Length + $versionText.Length
-    Write-Host (" " * [Math]::Max(0, $availableSpace - $finalWidth + 3)) -NoNewline
+    Write-Host (" " * [Math]::Max(0, $availableSpace - $finalWidth)) -NoNewline
     Write-Host " ║" -ForegroundColor $ZeroGreen
 
-    # Timestamp line
+    # Timestamp line — use the calling script's mtime, not the current time
     Write-Host "║ " -ForegroundColor $ZeroGreen -NoNewline
-    $timestamp = Get-Date -Format "yyyy-MM-dd HH:mm:ss"
+    $callerPath = (Get-PSCallStack | Where-Object { $_.ScriptName -and $_.ScriptName -ne $PSCommandPath } | Select-Object -First 1).ScriptName
+    $timestamp = if ($callerPath -and (Test-Path $callerPath)) {
+        (Get-Item $callerPath).LastWriteTime.ToString("yyyy-MM-dd HH:mm:ss")
+    } else {
+        Get-Date -Format "yyyy-MM-dd HH:mm:ss"
+    }
     Write-Host $clockText -ForegroundColor $AccentText -NoNewline
     Write-Host $timestamp -ForegroundColor $SecondaryText -NoNewline
-    Write-Host (" " * [Math]::Max(0, $availableSpace - $clockWidth - $timestamp.Length - 1)) -NoNewline
+    Write-Host (" " * [Math]::Max(0, $availableSpace - $clockWidth - $timestamp.Length)) -NoNewline
     Write-Host " ║" -ForegroundColor $ZeroGreen
 
     Write-Host "╚══════════════════════════════════════════════════════════════════════════════╝" -ForegroundColor $ZeroGreen

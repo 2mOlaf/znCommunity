@@ -47,12 +47,19 @@ Manages all `zn*` services as a group.
 Syncs disabled AD accounts to inactive status in ZN. One-directional: AD disabled → ZN inactive.
 Requires the `ActiveDirectory` module (RSAT) and a ZN API key with write scope.
 
-- `Sync-ZNADUserStatus -WhatIf` — preview which users would be inactivated
-- `Sync-ZNADUserStatus -Domain corp.example.com -Note "Q2 offboarding"` — live sync with audit note
-- `Sync-ZNADUserStatus -PassThru | Where-Object Action -eq 'Inactivated' | Export-Csv offboarded.csv` — pipe results
+- `Sync-ZNADUserStatus -WhatIf` — preview changes and receive performance recommendations
+- `Sync-ZNADUserStatus -SearchBase 'OU=Users,DC=corp,DC=example,DC=com' -Note "Q2 offboarding"` — scoped sync
+- `Sync-ZNADUserStatus -Since '2025-11-15' -BatchSize 400` — incremental sync, max batch size
+- `Sync-ZNADUserStatus -PassThru | Where-Object Action -eq 'Inactivated' | Export-Csv offboarded.csv`
 
-Matching uses SID (primary) then UPN (fallback). The ZN audit comment per user records the AD
-`whenChanged` timestamp — the closest proxy AD provides for a disable date — plus any `-Note` text.
+Matching uses SID (primary) then UPN (fallback). Inactivation uses bulk batched API calls
+(`-BatchSize`, default 100, max 400). Each batch audit comment records the `whenChanged` date
+range for that batch.
+
+Running with `-WhatIf` queries the ZN audit log (1-year retention) for a previous sync by this
+tool and surfaces the last-run date as a `-Since` suggestion, along with `-SearchBase` and
+`-BatchSize` recommendations based on result set size. The console table is capped at 100 rows;
+use `-PassThru` to retrieve the full result set.
 
 ### BreakGlass Asset Browser
 Offline queries against the BreakGlass `segmentedAssets.json` snapshot. Run `Import-ZNBG-AssetData` first.
