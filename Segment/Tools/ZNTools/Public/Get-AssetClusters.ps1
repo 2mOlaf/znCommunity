@@ -1,4 +1,4 @@
-function Get-BG-AssetCluster {
+function Get-BGAssetCluster {
     <#
     .SYNOPSIS
         Returns all asset clusters from BreakGlass data with per-cluster asset counts and segmentation breakdown.
@@ -6,11 +6,11 @@ function Get-BG-AssetCluster {
         Queries the locally-loaded BreakGlass asset data. This is distinct from Get-ZNSegmentCluster,
         which queries the Zero Networks API for Segment Server infrastructure clusters.
 
-        Requires BreakGlass asset data to be loaded with Import-ZNBG-AssetData.
+        Requires BreakGlass asset data to be loaded with Import-ZNBGAssetData.
     .AUTHOR
         Olaf Gradin
     .EXAMPLE
-        Get-ZNBG-AssetCluster | Sort-Object TotalAssets -Descending
+        Get-ZNBGAssetCluster | Sort-Object TotalAssets -Descending
     #>
     [CmdletBinding()]
     param()
@@ -31,20 +31,20 @@ function Get-BG-AssetCluster {
     } | Sort-Object TotalAssets -Descending
 }
 
-function Get-BG-ClusterMemberAsset {
+function Get-BGClusterMemberAsset {
     <#
     .SYNOPSIS
         Returns BreakGlass assets belonging to a specific cluster. Partial name match, case-insensitive.
     .PARAMETER ClusterName
         Cluster name to match (partial, case-insensitive).
     .DESCRIPTION
-        Requires BreakGlass asset data to be loaded with Import-ZNBG-AssetData.
+        Requires BreakGlass asset data to be loaded with Import-ZNBGAssetData.
     .AUTHOR
         Olaf Gradin
     .EXAMPLE
-        Get-ZNBG-ClusterMemberAsset "zero.local"
+        Get-ZNBGClusterMemberAsset "zero.local"
     .EXAMPLE
-        Get-ZNBG-ClusterMemberAsset "zero.local" | Where-Object OS -eq Linux
+        Get-ZNBGClusterMemberAsset "zero.local" | Where-Object OS -eq Linux
     #>
     [CmdletBinding()]
     param(
@@ -54,7 +54,7 @@ function Get-BG-ClusterMemberAsset {
     Assert-ZNAssetDataLoaded
     $matchedIds = $script:ZNClusterMap.Keys | Where-Object { $script:ZNClusterMap[$_] -ilike "*$ClusterName*" }
     if (-not $matchedIds) {
-        Write-Warning "No cluster matching '$ClusterName'. Run Get-ZNBG-AssetCluster to see available clusters."
+        Write-Warning "No cluster matching '$ClusterName'. Run Get-ZNBGAssetCluster to see available clusters."
         return
     }
     $script:ZNAssets | Where-Object ClusterId -in $matchedIds | ConvertTo-EnrichedAsset

@@ -15,13 +15,13 @@
         'Invoke-Services',
         # Identity sync
         'Sync-ADUserStatus',
-        # BreakGlass asset browser — load data first with Import-BG-AssetData
-        'Import-BG-AssetData',
-        'Get-BG-AssetSummary', 'Get-BG-Asset', 'Find-BG-Asset',
-        'Get-BG-WindowsAsset', 'Get-BG-LinuxAsset', 'Get-BG-ServerAsset', 'Get-BG-ClientAsset',
-        'Get-BG-NetworkSegmentedAsset', 'Get-BG-IdentitySegmentedAsset', 'Get-BG-AssetBySource',
-        'Get-BG-AssetCluster', 'Get-BG-ClusterMemberAsset',
-        'Get-BG-AssetForest', 'Get-BG-AssetSwitch'
+        # BreakGlass asset browser — load data first with Import-ZNBGAssetData
+        'Import-BGAssetData',
+        'Get-BGAssetSummary', 'Get-BGAsset', 'Find-BGAsset',
+        'Get-BGWindowsAsset', 'Get-BGLinuxAsset', 'Get-BGServerAsset', 'Get-BGClientAsset',
+        'Get-BGNetworkSegmentedAsset', 'Get-BGIdentitySegmentedAsset', 'Get-BGAssetBySource',
+        'Get-BGAssetCluster', 'Get-BGClusterMemberAsset',
+        'Get-BGAssetForest', 'Get-BGAssetSwitch'
     )
     CmdletsToExport = @()
     VariablesToExport = @()

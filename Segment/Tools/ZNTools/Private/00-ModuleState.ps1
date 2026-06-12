@@ -25,12 +25,12 @@ function Show-ZNModuleWelcome {
     Write-Host "  Get-ZNSecurityEventRate -Period <1h|4h|1d|7d>" -ForegroundColor Gray
     Write-Host ""
     Write-Host "BreakGlass Asset Browser  (load data once, then pipe freely)" -ForegroundColor Yellow
-    Write-Host "  Import-ZNBG-AssetData [-DataPath <path>]" -ForegroundColor Gray
-    Write-Host "  Get-ZNBG-Asset | Get-ZNBG-AssetSummary | Find-ZNBG-Asset <name>" -ForegroundColor Gray
-    Write-Host "  Get-ZNBG-WindowsAsset | Get-ZNBG-LinuxAsset | Get-ZNBG-ServerAsset | Get-ZNBG-ClientAsset" -ForegroundColor Gray
-    Write-Host "  Get-ZNBG-NetworkSegmentedAsset | Get-ZNBG-IdentitySegmentedAsset" -ForegroundColor Gray
-    Write-Host "  Get-ZNBG-AssetCluster | Get-ZNBG-ClusterMemberAsset <cluster>" -ForegroundColor Gray
-    Write-Host "  Get-ZNBG-AssetForest | Get-ZNBG-AssetSwitch | Get-ZNBG-AssetBySource" -ForegroundColor Gray
+    Write-Host "  Import-ZNBGAssetData [-DataPath <path>]" -ForegroundColor Gray
+    Write-Host "  Get-ZNBGAsset | Get-ZNBGAssetSummary | Find-ZNBGAsset <name>" -ForegroundColor Gray
+    Write-Host "  Get-ZNBGWindowsAsset | Get-ZNBGLinuxAsset | Get-ZNBGServerAsset | Get-ZNBGClientAsset" -ForegroundColor Gray
+    Write-Host "  Get-ZNBGNetworkSegmentedAsset | Get-ZNBGIdentitySegmentedAsset" -ForegroundColor Gray
+    Write-Host "  Get-ZNBGAssetCluster | Get-ZNBGClusterMemberAsset <cluster>" -ForegroundColor Gray
+    Write-Host "  Get-ZNBGAssetForest | Get-ZNBGAssetSwitch | Get-ZNBGAssetBySource" -ForegroundColor Gray
     Write-Host ""
     Write-Host "Service Management  (manages zn* services)" -ForegroundColor Yellow
     Write-Host "  Invoke-ZNServices -Action <Stop|Start|Restart>" -ForegroundColor Gray

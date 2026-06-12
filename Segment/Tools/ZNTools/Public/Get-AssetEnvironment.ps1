@@ -1,13 +1,13 @@
-function Get-BG-AssetForest {
+function Get-BGAssetForest {
     <#
     .SYNOPSIS
         Returns AD forest and domain configuration with service account info from BreakGlass data.
     .DESCRIPTION
-        Requires BreakGlass asset data to be loaded with Import-ZNBG-AssetData.
+        Requires BreakGlass asset data to be loaded with Import-ZNBGAssetData.
     .AUTHOR
         Olaf Gradin
     .EXAMPLE
-        Get-ZNBG-AssetForest
+        Get-ZNBGAssetForest
     #>
     [CmdletBinding()]
     param()
@@ -42,16 +42,16 @@ function Get-BG-AssetForest {
     }
 }
 
-function Get-BG-AssetSwitch {
+function Get-BGAssetSwitch {
     <#
     .SYNOPSIS
         Returns OT switches from the BreakGlass switches.json data.
     .DESCRIPTION
-        Requires BreakGlass asset data to be loaded with Import-ZNBG-AssetData.
+        Requires BreakGlass asset data to be loaded with Import-ZNBGAssetData.
     .AUTHOR
         Olaf Gradin
     .EXAMPLE
-        Get-ZNBG-AssetSwitch
+        Get-ZNBGAssetSwitch
     #>
     [CmdletBinding()]
     param()

@@ -1,14 +1,14 @@
-function Import-BG-AssetData {
+function Import-BGAssetData {
     <#
     .SYNOPSIS
         Loads segmented asset and OT switch data from BreakGlass JSON files into the ZNTools session.
     .DESCRIPTION
         Reads segmentedAssets.json and (optionally) switches.json — files maintained by the Zero Networks
-        BreakGlass installation — into module state. After loading, use Get-ZNBG-Asset,
-        Find-ZNBG-Asset, Get-ZNBG-AssetSummary, and related commands to query the data
+        BreakGlass installation — into module state. After loading, use Get-ZNBGAsset,
+        Find-ZNBGAsset, Get-ZNBGAssetSummary, and related commands to query the data
         without further API calls.
 
-        Re-run Import-ZNBG-AssetData to refresh after segmentedAssets.json has been updated.
+        Re-run Import-ZNBGAssetData to refresh after segmentedAssets.json has been updated.
     .PARAMETER DataPath
         Path to segmentedAssets.json. Defaults to the BreakGlass installation directory.
     .PARAMETER SwitchesPath
@@ -16,10 +16,10 @@ function Import-BG-AssetData {
     .AUTHOR
         Olaf Gradin
     .EXAMPLE
-        Import-ZNBG-AssetData
+        Import-ZNBGAssetData
         Loads from the default BreakGlass installation path.
     .EXAMPLE
-        Import-ZNBG-AssetData -DataPath ".\segmentedAssets.json"
+        Import-ZNBGAssetData -DataPath ".\segmentedAssets.json"
         Loads from the current directory.
     #>
     [CmdletBinding()]
@@ -55,6 +55,6 @@ function Import-BG-AssetData {
     if ($script:ZNSwitches.Count -gt 0) {
         Write-Host "Loaded $($script:ZNSwitches.Count) OT switch(es)." -ForegroundColor Green
     }
-    Write-Host "Use Get-ZNBG-Asset, Find-ZNBG-Asset, Get-ZNBG-AssetSummary, and more to explore the data." -ForegroundColor DarkGray
+    Write-Host "Use Get-ZNBGAsset, Find-ZNBGAsset, Get-ZNBGAssetSummary, and more to explore the data." -ForegroundColor DarkGray
     Write-Host "Pipe freely — all query functions return objects." -ForegroundColor DarkGray
 }

@@ -1,4 +1,4 @@
-# Module state for asset browser data (loaded via Import-ZNAssetData)
+# Module state for asset browser data (loaded via Import-ZNBGAssetData)
 $script:ZNAssets     = @()
 $script:ZNSwitches   = @()
 $script:ZNClusterMap = @{}
@@ -25,7 +25,7 @@ $script:OsTypeMap = @{
 
 function Assert-ZNAssetDataLoaded {
     if ($script:ZNAssets.Count -eq 0) {
-        throw "No asset data loaded. Run Import-ZNAssetData first."
+        throw "No asset data loaded. Run Import-ZNBGAssetData first."
     }
 }
 

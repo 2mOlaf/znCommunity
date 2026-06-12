@@ -38,7 +38,7 @@
   <a href="#cmd-sync-ad-user-status">Sync-ZNADUserStatus</a>
 
   <div class="sidebar-section">BG Asset Browser</div>
-  <a href="#cmd-import-asset-data">Import-ZNBG-AssetData</a>
+  <a href="#cmd-import-asset-data">Import-ZNBGAssetData</a>
   <a href="#cmd-asset-queries">Query commands</a>
   <a href="#cmd-asset-clusters">Cluster commands</a>
   <a href="#cmd-asset-environment">Environment commands</a>
@@ -79,7 +79,7 @@
   <div class="callout info">
     <strong>Prefixing</strong>
     All commands are exported with the <code>ZN</code> prefix via the module manifest.
-    Use <code>Test-ZNPort</code>, <code>Get-ZNBG-Asset</code>, <code>Invoke-ZNServices</code>, etc.
+    Use <code>Test-ZNPort</code>, <code>Get-ZNBGAsset</code>, <code>Invoke-ZNServices</code>, etc.
   </div>
 
   <h2 id="quickstart">Quick start</h2>
@@ -353,7 +353,7 @@
   </div>
   <div class="param-entry">
     <div class="param-name">-ClusterName</div>
-    <div class="param-body"><p class="param-desc">With <code>-AllServers</code>: limit to Segment Servers in this cluster. Partial match, case-insensitive. Uses in-memory cluster data if <code>Import-ZNBG-AssetData</code> has been run.</p></div>
+    <div class="param-body"><p class="param-desc">With <code>-AllServers</code>: limit to Segment Servers in this cluster. Partial match, case-insensitive. Uses in-memory cluster data if <code>Import-ZNBGAssetData</code> has been run.</p></div>
   </div>
   <div class="param-entry">
     <div class="param-name">-Credential</div>
@@ -748,23 +748,23 @@ AD sync | AD whenChanged range: 2024-06-01 to 2025-11-14 | Note: Q2 offboarding
   </p>
 
   <p>
-    All commands in this section use the <code>ZNBG-</code> noun prefix to clearly distinguish
+    All commands in this section use the <code>ZNBG</code> noun prefix to clearly distinguish
     them from API-backed ZNTools commands.
   </p>
 
   <div class="callout info">
     <strong>Workflow</strong>
-    Run <code>Import-ZNBG-AssetData</code> once per session. The data stays in memory until you
+    Run <code>Import-ZNBGAssetData</code> once per session. The data stays in memory until you
     re-import or close the session. All query commands below will throw if called before
-    <code>Import-ZNBG-AssetData</code>.
+    <code>Import-ZNBGAssetData</code>.
   </div>
 
-  <!-- Import-ZNBG-AssetData -->
-  <h2 id="cmd-import-asset-data">Import-ZNBG-AssetData</h2>
+  <!-- Import-ZNBGAssetData -->
+  <h2 id="cmd-import-asset-data">Import-ZNBGAssetData</h2>
   <p>Loads <code>segmentedAssets.json</code> and <code>switches.json</code> into the ZNTools session.</p>
 
   <div class="syntax-block">
-<span class="cmd">Import-ZNBG-AssetData</span>
+<span class="cmd">Import-ZNBGAssetData</span>
  [<span class="param">-DataPath</span> &lt;string&gt;]
  [<span class="param">-SwitchesPath</span> &lt;string&gt;]
   </div>
@@ -783,7 +783,7 @@ AD sync | AD whenChanged range: 2024-06-01 to 2025-11-14 | Note: Q2 offboarding
       <span class="ex-label">Example 1</span>
       <span class="ex-title">Load from default path</span>
     </div>
-    <pre><span class="ps-prompt">PS&gt; </span><span class="ps-fn">Import-ZNBG-AssetData</span></pre>
+    <pre><span class="ps-prompt">PS&gt; </span><span class="ps-fn">Import-ZNBGAssetData</span></pre>
     <div class="example-desc">Loads from the Breakglass installation directory on the local machine.</div>
   </div>
   <div class="example">
@@ -791,7 +791,7 @@ AD sync | AD whenChanged range: 2024-06-01 to 2025-11-14 | Note: Q2 offboarding
       <span class="ex-label">Example 2</span>
       <span class="ex-title">Load from a custom path</span>
     </div>
-    <pre><span class="ps-prompt">PS&gt; </span><span class="ps-fn">Import-ZNBG-AssetData</span> <span class="ps-param">-DataPath</span> <span class="ps-value">.\segmentedAssets.json</span></pre>
+    <pre><span class="ps-prompt">PS&gt; </span><span class="ps-fn">Import-ZNBGAssetData</span> <span class="ps-param">-DataPath</span> <span class="ps-value">.\segmentedAssets.json</span></pre>
     <div class="example-desc">Loads from the current directory — useful when working with an exported copy.</div>
   </div>
 
@@ -803,16 +803,16 @@ AD sync | AD whenChanged range: 2024-06-01 to 2025-11-14 | Note: Q2 offboarding
       <tr><th>Command</th><th>Description</th></tr>
     </thead>
     <tbody>
-      <tr><td>Get-ZNBG-AssetSummary</td><td>High-level counts: total assets, OS, type, segmentation, clusters.</td></tr>
-      <tr><td>Get-ZNBG-Asset</td><td>All assets as enriched objects — the base for piped queries.</td></tr>
-      <tr><td>Find-ZNBG-Asset -Name &lt;string&gt;</td><td>Find assets by partial FQDN or hostname (case-insensitive).</td></tr>
-      <tr><td>Get-ZNBG-WindowsAsset</td><td>Windows assets only.</td></tr>
-      <tr><td>Get-ZNBG-LinuxAsset</td><td>Linux assets only.</td></tr>
-      <tr><td>Get-ZNBG-ServerAsset</td><td>Server-type assets (all OS).</td></tr>
-      <tr><td>Get-ZNBG-ClientAsset</td><td>Client/workstation-type assets.</td></tr>
-      <tr><td>Get-ZNBG-NetworkSegmentedAsset</td><td>Assets with network segmentation active.</td></tr>
-      <tr><td>Get-ZNBG-IdentitySegmentedAsset</td><td>Assets with identity segmentation active.</td></tr>
-      <tr><td>Get-ZNBG-AssetBySource</td><td>Asset counts grouped by entity source (AD, Ansible, Workgroup, etc.).</td></tr>
+      <tr><td>Get-ZNBGAssetSummary</td><td>High-level counts: total assets, OS, type, segmentation, clusters.</td></tr>
+      <tr><td>Get-ZNBGAsset</td><td>All assets as enriched objects — the base for piped queries.</td></tr>
+      <tr><td>Find-ZNBGAsset -Name &lt;string&gt;</td><td>Find assets by partial FQDN or hostname (case-insensitive).</td></tr>
+      <tr><td>Get-ZNBGWindowsAsset</td><td>Windows assets only.</td></tr>
+      <tr><td>Get-ZNBGLinuxAsset</td><td>Linux assets only.</td></tr>
+      <tr><td>Get-ZNBGServerAsset</td><td>Server-type assets (all OS).</td></tr>
+      <tr><td>Get-ZNBGClientAsset</td><td>Client/workstation-type assets.</td></tr>
+      <tr><td>Get-ZNBGNetworkSegmentedAsset</td><td>Assets with network segmentation active.</td></tr>
+      <tr><td>Get-ZNBGIdentitySegmentedAsset</td><td>Assets with identity segmentation active.</td></tr>
+      <tr><td>Get-ZNBGAssetBySource</td><td>Asset counts grouped by entity source (AD, Ansible, Workgroup, etc.).</td></tr>
     </tbody>
   </table>
 
@@ -821,10 +821,10 @@ AD sync | AD whenChanged range: 2024-06-01 to 2025-11-14 | Note: Q2 offboarding
       <span class="ex-label">Examples</span>
       <span class="ex-title">Pipeline queries</span>
     </div>
-    <pre><span class="ps-prompt">PS&gt; </span><span class="ps-fn">Get-ZNBG-Asset</span> | <span class="ps-fn">Where-Object</span> { $_.OS -eq 'Linux' -and $_.NetworkSegmented }
-<span class="ps-prompt">PS&gt; </span><span class="ps-fn">Get-ZNBG-ServerAsset</span> | <span class="ps-fn">Group-Object</span> Cluster | <span class="ps-fn">Select-Object</span> Name, Count
-<span class="ps-prompt">PS&gt; </span><span class="ps-fn">Find-ZNBG-Asset</span> <span class="ps-value">"dc01"</span> | <span class="ps-fn">Select-Object</span> FQDN, Cluster, NetworkSegmented
-<span class="ps-prompt">PS&gt; </span><span class="ps-fn">Get-ZNBG-Asset</span> | <span class="ps-fn">Export-Csv</span> <span class="ps-value">assets.csv</span> -NoTypeInformation</pre>
+    <pre><span class="ps-prompt">PS&gt; </span><span class="ps-fn">Get-ZNBGAsset</span> | <span class="ps-fn">Where-Object</span> { $_.OS -eq 'Linux' -and $_.NetworkSegmented }
+<span class="ps-prompt">PS&gt; </span><span class="ps-fn">Get-ZNBGServerAsset</span> | <span class="ps-fn">Group-Object</span> Cluster | <span class="ps-fn">Select-Object</span> Name, Count
+<span class="ps-prompt">PS&gt; </span><span class="ps-fn">Find-ZNBGAsset</span> <span class="ps-value">"dc01"</span> | <span class="ps-fn">Select-Object</span> FQDN, Cluster, NetworkSegmented
+<span class="ps-prompt">PS&gt; </span><span class="ps-fn">Get-ZNBGAsset</span> | <span class="ps-fn">Export-Csv</span> <span class="ps-value">assets.csv</span> -NoTypeInformation</pre>
     <div class="example-desc">All query functions return objects with FQDN, Cluster, OS, Type, Source, NetworkSegmented, IdentitySegmented, and OU properties.</div>
   </div>
 
@@ -837,11 +837,11 @@ AD sync | AD whenChanged range: 2024-06-01 to 2025-11-14 | Note: Q2 offboarding
     </thead>
     <tbody>
       <tr>
-        <td>Get-ZNBG-AssetCluster</td>
+        <td>Get-ZNBGAssetCluster</td>
         <td>All asset clusters with per-cluster breakdown (counts, OS, type, segmentation). Note: this reflects asset data clusters, not Segment Server infrastructure clusters (<code>Get-ZNSegmentCluster</code>).</td>
       </tr>
       <tr>
-        <td>Get-ZNBG-ClusterMemberAsset -ClusterName &lt;string&gt;</td>
+        <td>Get-ZNBGClusterMemberAsset -ClusterName &lt;string&gt;</td>
         <td>Assets in a specific cluster. Partial name match, case-insensitive.</td>
       </tr>
     </tbody>
@@ -852,9 +852,9 @@ AD sync | AD whenChanged range: 2024-06-01 to 2025-11-14 | Note: Q2 offboarding
       <span class="ex-label">Examples</span>
       <span class="ex-title">Cluster queries</span>
     </div>
-    <pre><span class="ps-prompt">PS&gt; </span><span class="ps-fn">Get-ZNBG-AssetCluster</span> | <span class="ps-fn">Sort-Object</span> TotalAssets -Descending
-<span class="ps-prompt">PS&gt; </span><span class="ps-fn">Get-ZNBG-ClusterMemberAsset</span> <span class="ps-value">"zero.local"</span>
-<span class="ps-prompt">PS&gt; </span><span class="ps-fn">Get-ZNBG-ClusterMemberAsset</span> <span class="ps-value">"zero.local"</span> | <span class="ps-fn">Where-Object</span> OS -eq Linux</pre>
+    <pre><span class="ps-prompt">PS&gt; </span><span class="ps-fn">Get-ZNBGAssetCluster</span> | <span class="ps-fn">Sort-Object</span> TotalAssets -Descending
+<span class="ps-prompt">PS&gt; </span><span class="ps-fn">Get-ZNBGClusterMemberAsset</span> <span class="ps-value">"zero.local"</span>
+<span class="ps-prompt">PS&gt; </span><span class="ps-fn">Get-ZNBGClusterMemberAsset</span> <span class="ps-value">"zero.local"</span> | <span class="ps-fn">Where-Object</span> OS -eq Linux</pre>
   </div>
 
   <!-- Environment commands -->
@@ -865,8 +865,8 @@ AD sync | AD whenChanged range: 2024-06-01 to 2025-11-14 | Note: Q2 offboarding
       <tr><th>Command</th><th>Description</th></tr>
     </thead>
     <tbody>
-      <tr><td>Get-ZNBG-AssetForest</td><td>AD forest and domain configuration with service account info.</td></tr>
-      <tr><td>Get-ZNBG-AssetSwitch</td><td>OT switches loaded from <code>switches.json</code>.</td></tr>
+      <tr><td>Get-ZNBGAssetForest</td><td>AD forest and domain configuration with service account info.</td></tr>
+      <tr><td>Get-ZNBGAssetSwitch</td><td>OT switches loaded from <code>switches.json</code>.</td></tr>
     </tbody>
   </table>
 
