@@ -44,38 +44,39 @@ function Get-ConsoleTheme {
     $clockWidth = $clockText.Length
 
     # Super pain in the ass, but here's the source: https://patorjk.com/software/taag/#p=display&f=Fire+Font-s&t=ZERO+Networks&x=none&v=4&h=4&w=80&we=false
+    # All lines inside the box need to equal 76 not counting the border and a space between
     # Top border
     Write-Host "╔══════════════════════════════════════════════════════════════════════════════╗" -ForegroundColor $ZeroGreen
     
     # FIGlet-style ZERO banner
     Write-Host "║ " -ForegroundColor $ZeroGreen -NoNewline
-    Write-Host "     )     (       )       )                                  " -ForegroundColor 'DarkRed' -NoNewline
-    Write-Host (" " * 14) -NoNewline
+    Write-Host "     )     (       )       )" -ForegroundColor 'DarkRed' -NoNewline
+    Write-Host (" " * 48) -NoNewline
     Write-Host " ║" -ForegroundColor $ZeroGreen
     
     Write-Host "║ " -ForegroundColor $ZeroGreen -NoNewline
-    Write-Host "  ( /(     )\ ) ( /(    ( /(         )                  )     " -ForegroundColor 'Red' -NoNewline
-    Write-Host (" " * 14) -NoNewline
+    Write-Host "  ( /(     )\ ) ( /(    ( /(         )                  )" -ForegroundColor 'Red' -NoNewline
+    Write-Host (" " * 19) -NoNewline
     Write-Host " ║" -ForegroundColor $ZeroGreen
 
     Write-Host "║ " -ForegroundColor $ZeroGreen -NoNewline
-    Write-Host "  )\())(  (()/( )\())   )\())  (  ( /((  (       (   ( /(     " -ForegroundColor 'DarkYellow' -NoNewline
-    Write-Host (" " * 14) -NoNewline
+    Write-Host "  )\())(  (()/( )\())   )\())  (  ( /((  (       (   ( /(" -ForegroundColor 'DarkYellow' -NoNewline
+    Write-Host (" " * 19) -NoNewline
     Write-Host " ║" -ForegroundColor $ZeroGreen
     
     Write-Host "║ " -ForegroundColor $ZeroGreen -NoNewline
-    Write-Host " ((_)\ )\  /(_)|(_)\   ((_)\  ))\ )\())\))(   (  )(  )\())(   " -ForegroundColor 'DarkYellow' -NoNewline
-    Write-Host (" " * 14) -NoNewline
+    Write-Host " ((_)\ )\  /(_)|(_)\   ((_)\  ))\ )\())\))(   (  )(  )\())(" -ForegroundColor 'DarkYellow' -NoNewline
+    Write-Host (" " * 17) -NoNewline
     Write-Host " ║" -ForegroundColor $ZeroGreen
 
     Write-Host "║ " -ForegroundColor $ZeroGreen -NoNewline
-    Write-Host "  _((_|(_)(_))   ((_)   _((_)/((_|_))((_)()\  )\(()\((_)\ )\ " -ForegroundColor 'Yellow' -NoNewline
-    Write-Host (" " * 15) -NoNewline
+    Write-Host "  _((_|(_)(_))   ((_)   _((_)/((_|_))((_)()\  )\(()\((_)\ )\" -ForegroundColor 'Yellow' -NoNewline
+    Write-Host (" " * 16) -NoNewline
     Write-Host " ║" -ForegroundColor $ZeroGreen
 
     Write-Host "║ " -ForegroundColor $ZeroGreen -NoNewline
-    Write-Host " |_  /| __| _ \ / _ \  | \| " -ForegroundColor $ZeroGreen -NoNewline
-    Write-Host "(_)) | |__(()((_)((_)((_) |(_|(_)" -ForegroundColor 'Yellow' -NoNewline
+    Write-Host " |_  /| __| _ \ / _ \  | \|" -ForegroundColor $ZeroGreen -NoNewline
+    Write-Host " (_)) | |__(()((_)((_)((_) |(_|(_)" -ForegroundColor 'Yellow' -NoNewline
     Write-Host (" " * 15) -NoNewline
     Write-Host " ║" -ForegroundColor $ZeroGreen
 
@@ -90,16 +91,15 @@ function Get-ConsoleTheme {
     Write-Host " ║" -ForegroundColor $ZeroGreen
     
     Write-Host "║ " -ForegroundColor $ZeroGreen -NoNewline
-    Write-Host "                               " -ForegroundColor $PrimaryText -NoNewline
-    Write-Host (" " * 45) -NoNewline
+    Write-Host (" " * 76) -NoNewline
     Write-Host " ║" -ForegroundColor $ZeroGreen
         
     Write-Host "║ " -ForegroundColor $ZeroGreen -NoNewline
-    Write-Host "                                     " -ForegroundColor $PrimaryText -NoNewline
+    Write-Host (" " * 37) -NoNewline
     Write-Host "The Hottest µ-Segmentation Solution!" -ForegroundColor $AccentText -NoNewline
     Write-Host (" " * 3) -NoNewline
     Write-Host " ║" -ForegroundColor $ZeroGreen
-    
+
     # Separator line
     Write-Host "╠══════════════════════════════════════════════════════════════════════════════╣" -ForegroundColor $ZeroGreen
 
