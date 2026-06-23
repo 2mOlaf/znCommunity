@@ -75,6 +75,7 @@
   <a href="zeronetworks-module-reference.html">ZeroNetworks Module</a>
   <a href="breakglass-reference.html">BreakGlass Scripts</a>
   <a href="breakglass-reference-next.html">BreakGlass Scripts (v.Next)</a>
+  <a href="breakglass-reference-v2.html">BreakGlass Scripts (v2 — Creds)</a>
 
   <div class="sidebar-section">Community / Internal</div>
   <a href="zntools-user-reference.html">ZNTools — User Guide</a>
@@ -136,9 +137,6 @@
       <div class="card-desc">
         Emergency access recovery scripts pre-installed on Segment Servers.
         <code>BreakGlass.ps1</code> bypasses network and identity segmentation on Windows and Linux assets.
-        Includes nftables Linux backend, expanded Privileged-mode port sets (RDP, WinRM, ADWS, SMB on Windows;
-        SSH, Telnet, SMB on Linux), single-asset targeting by hostname or IP, and automatic
-        dual-backend detection for single-asset runs.
         <code>OTBreakGlass.ps1</code> removes ACLs from Cisco IOS-XE switches.
       </div>
       <div class="card-note">Located at C:\Program Files\Zero Networks\Breakglass\</div>
@@ -153,13 +151,29 @@
         <span class="tag">Not Yet Deployed</span>
       </div>
       <div class="card-desc">
-        Documentation for the upcoming credential update to <code>BreakGlass.ps1</code>.
-        Adds <code>-LinuxSSHKeyPath</code> for non-interactive SSH key auth, fixes the broken
-        <code>[SecureString]</code> type on <code>-ADSvcPassword</code> and
-        <code>-LinuxSvcPassword</code>, and replaces <code>Read-Host</code> interactive prompts
-        with <code>Get-Credential</code>. Includes breaking-change and deprecation callouts.
+        Documentation for the upcoming version of <code>BreakGlass.ps1</code>.
+        New in this version: nftables Linux backend, expanded Privileged-mode port sets for Windows
+        (RDP, WinRM, ADWS, SMB) and Linux (SSH, Telnet, SMB), and automatic dual-backend for
+        single-asset runs.
       </div>
-      <div class="card-note">Staged — credential update awaiting deployment to Segment Servers</div>
+      <div class="card-note">Staged — awaiting deployment to Segment Servers</div>
+      <div class="card-arrow">Read the staged guide &#8594;</div>
+    </a>
+
+    <a class="doc-card staged" href="breakglass-reference-v2.html">
+      <div class="card-title">BreakGlass Scripts (v2)</div>
+      <div class="card-tags">
+        <span class="tag orange">Emergency Use</span>
+        <span class="tag purple">Staged</span>
+        <span class="tag">Not Yet Deployed</span>
+      </div>
+      <div class="card-desc">
+        Credential update layered on top of v.Next. Adds <code>-LinuxSSHKeyPath</code>
+        for non-interactive SSH key auth and replaces <code>Read-Host</code> interactive
+        prompts with <code>Get-Credential</code> for both Windows and Linux.
+        No breaking changes relative to v.Next.
+      </div>
+      <div class="card-note">Staged — credential update on top of v.Next (in progress)</div>
       <div class="card-arrow">Read the staged guide &#8594;</div>
     </a>
 
