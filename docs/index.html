@@ -136,6 +136,9 @@
       <div class="card-desc">
         Emergency access recovery scripts pre-installed on Segment Servers.
         <code>BreakGlass.ps1</code> bypasses network and identity segmentation on Windows and Linux assets.
+        Includes nftables Linux backend, expanded Privileged-mode port sets (RDP, WinRM, ADWS, SMB on Windows;
+        SSH, Telnet, SMB on Linux), single-asset targeting by hostname or IP, and automatic
+        dual-backend detection for single-asset runs.
         <code>OTBreakGlass.ps1</code> removes ACLs from Cisco IOS-XE switches.
       </div>
       <div class="card-note">Located at C:\Program Files\Zero Networks\Breakglass\</div>
@@ -150,12 +153,13 @@
         <span class="tag">Not Yet Deployed</span>
       </div>
       <div class="card-desc">
-        Documentation for the upcoming version of <code>BreakGlass.ps1</code>.
-        New in this version: nftables Linux backend, expanded Privileged-mode port sets for Windows
-        (RDP, WinRM, ADWS, SMB) and Linux (SSH, Telnet, SMB), and automatic dual-backend for
-        single-asset runs.
+        Documentation for the upcoming credential update to <code>BreakGlass.ps1</code>.
+        Adds <code>-LinuxSSHKeyPath</code> for non-interactive SSH key auth, fixes the broken
+        <code>[SecureString]</code> type on <code>-ADSvcPassword</code> and
+        <code>-LinuxSvcPassword</code>, and replaces <code>Read-Host</code> interactive prompts
+        with <code>Get-Credential</code>. Includes breaking-change and deprecation callouts.
       </div>
-      <div class="card-note">Staged — awaiting deployment to Segment Servers</div>
+      <div class="card-note">Staged — credential update awaiting deployment to Segment Servers</div>
       <div class="card-arrow">Read the staged guide &#8594;</div>
     </a>
 

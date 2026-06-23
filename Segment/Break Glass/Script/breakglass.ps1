@@ -104,7 +104,7 @@ param (
     [Parameter(ParameterSetName = "Windows")]
     [Parameter(ParameterSetName = "Linux")]
     [Parameter(ParameterSetName = "Both")]
-    [SecureString]
+    [string]
     $ADSvcPassword,
 
     [Parameter(ParameterSetName = "Windows")]
@@ -116,8 +116,13 @@ param (
     [Parameter(ParameterSetName = "Windows")]
     [Parameter(ParameterSetName = "Linux")]
     [Parameter(ParameterSetName = "Both")]
-    [SecureString]
-    $LinuxSvcPassword
+    [string]
+    $LinuxSvcPassword,
+
+    [Parameter(ParameterSetName = "Linux")]
+    [Parameter(ParameterSetName = "Both")]
+    [string]
+    $LinuxSSHKeyPath
 
 )
 
@@ -166,51 +171,48 @@ if ($PSBoundParameters['Windows']) {
         foreach ($forest in $ADInfo.ForestsConfig) {
             $user = $forest.PrimaryDomain.AdUserName
             $domain = $forest.PrimaryDomain.DomainDnsName
-            $WinRMSecretPassword = Read-Host "Please enter the password for $domain\$user" -AsSecureString
-            $userName = "$domain\$user"
             $object = @{
                 "Domain"     = $domain
-                "Credential" = New-Object -TypeName System.Management.Automation.PSCredential -ArgumentList $userName, $WinRMSecretPassword
+                "Credential" = Get-Credential -Message "Enter credentials for $domain" -UserName "$domain\$user"
             }
             $creds += New-Object -TypeName PSObject -Property $object
-            #Placeholder to check secondary domains for different username and passwords.
             foreach ($secondaryDomain in $forest.SecondaryDomains) {
                 $user = $secondaryDomain.AdUserName
                 $domain = $secondaryDomain.DomainDnsName
-                $WinRMSecretPassword = Read-Host "Please enter the password for $domain\$user" -AsSecureString
-                $userName = "$domain\$user"
                 $object = @{
                     "Domain"     = $secondaryDomain.DomainDnsName
-                    "Credential" = New-Object -TypeName System.Management.Automation.PSCredential -ArgumentList $userName, $WinRMSecretPassword
+                    "Credential" = Get-Credential -Message "Enter credentials for $domain" -UserName "$domain\$user"
                 }
                 $creds += New-Object -TypeName PSObject -Property $object
             }
-                    
         }
     }
 }
 if ($PSBoundParameters['Linux']) {
     if (!$PSBoundParameters['LinuxUseSSHKey']) {
-        if($PSBoundParameters['LinuxUserName']){
+        if ($PSBoundParameters['LinuxUserName'] -and $PSBoundParameters['LinuxSvcPassword']) {
             $linuxUsername = $LinuxUserName
-        } else {
-            $linuxUsername = Read-Host 'Enter the username for the Linux User'
-        }
-        if($PSBoundParameters['LinuxSvcPassword']){
             $LinuxSecretPassword = ConvertTo-SecureString $LinuxSvcPassword -AsPlainText -Force
+            $LinuxCredential = New-Object -TypeName System.Management.Automation.PSCredential -ArgumentList $linuxUsername, $LinuxSecretPassword
+        } elseif ($PSBoundParameters['LinuxUserName']) {
+            $LinuxCredential = Get-Credential -Message "Enter credentials for Linux assets" -UserName $LinuxUserName
         } else {
-            $LinuxSecretPassword = Read-Host 'Enter password for the Linux User' -AsSecureString
+            $LinuxCredential = Get-Credential -Message "Enter credentials for Linux assets"
         }
-        $LinuxCredential = New-Object -TypeName System.Management.Automation.PSCredential -ArgumentList $linuxUsername, $LinuxSecretPassword
     }
     else {
-        if($PSBoundParameters['LinuxUserName']){
+        if ($PSBoundParameters['LinuxUserName']) {
             $linuxUsername = $LinuxUserName
         } else {
             $linuxUsername = Read-Host 'Enter the username for the Linux User'
         }
         $LinuxCredential = New-Object -TypeName System.Management.Automation.PSCredential -ArgumentList $linuxUsername, (New-Object System.Security.SecureString)
-        $linuxSSHKey = Read-Host 'Enter the path to the SSH Key file'
+        if ($PSBoundParameters['LinuxSSHKeyPath']) {
+            $linuxSSHKey = $LinuxSSHKeyPath
+        } else {
+            Write-Warning "-LinuxUseSSHKey without -LinuxSSHKeyPath is deprecated. Use -LinuxSSHKeyPath to supply the key path programmatically."
+            $linuxSSHKey = Read-Host 'Enter the path to the SSH Key file'
+        }
     }
 
 }
@@ -364,7 +366,7 @@ if ($PSBoundParameters['Linux']) {
                 }
                 if ($connect -eq $true) {
                     if ($($using:useKey) -eq $true) {
-                        $ssh = New-SSHSession -ComputerName $AssetFQDN -KeyFile $($global:linuxSSHKey) -Credential $($using:Credential) -AcceptKey -ErrorAction SilentlyContinue -ErrorVariable errmsg -KnownHost (Get-SSHOpenSSHKnownHost -LocalFile $env:TEMP\$AssetFQDN_known_hosts.json)
+                        $ssh = New-SSHSession -ComputerName $AssetFQDN -KeyFile $($using:linuxSSHKey) -Credential $($using:Credential) -AcceptKey -ErrorAction SilentlyContinue -ErrorVariable errmsg -KnownHost (Get-SSHOpenSSHKnownHost -LocalFile $env:TEMP\$AssetFQDN_known_hosts.json)
                     }
                     else {
                         $ssh = New-SSHSession -ComputerName $AssetFQDN -Credential $($using:Credential) -AcceptKey -ErrorAction SilentlyContinue -ErrorVariable errmsg -KnownHost (Get-SSHOpenSSHKnownHost -LocalFile $env:TEMP\$AssetFQDN_known_hosts.json)

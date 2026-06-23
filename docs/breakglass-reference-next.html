@@ -84,8 +84,9 @@
     This document covers the <em>v.Next</em> version of <code>BreakGlass.ps1</code>, which has not
     yet been deployed to Segment Servers. The currently-deployed version is documented in
     <a href="breakglass-reference.html">breakglass-reference.html</a>.
-    Key additions in this version: nftables Linux backend, expanded Privileged-mode port sets
-    for both Windows and Linux.
+    Key additions in this version: programmatic SSH key path for Linux (<code>-LinuxSSHKeyPath</code>),
+    <code>Get-Credential</code> prompts replacing <code>Read-Host</code>, and fixes to the
+    <code>-ADSvcPassword</code> and <code>-LinuxSvcPassword</code> parameter types.
   </div>
 
   <div class="callout info">
@@ -103,6 +104,46 @@
     audit every use.
   </div>
 
+  <!-- ── BREAKING CHANGES ── -->
+  <div class="callout" style="border-left-color: #f97316;">
+    <strong>Breaking Changes in this version</strong>
+    <p style="margin: 0.5rem 0 0.25rem;">
+      Two parameters have a type change relative to the currently-deployed version.
+      If you have automation runbooks that pass these parameters, review them before deploying.
+    </p>
+    <ul style="margin: 0.5rem 0 0 1.25rem; line-height: 2;">
+      <li>
+        <code>-ADSvcPassword</code> — type changed from <code>[SecureString]</code> to
+        <code>[string]</code>. <strong>Note:</strong> the previous <code>[SecureString]</code>
+        declaration was a bug; passing a plain-text string was silently coerced to a
+        SecureString at bind time and then double-converted to the literal string
+        <em>"System.Security.SecureString"</em> as the password, causing authentication
+        failures. The programmatic path was effectively non-functional in the prior version.
+        No working caller is broken by this change.
+      </li>
+      <li>
+        <code>-LinuxSvcPassword</code> — same type change and same root cause.
+      </li>
+    </ul>
+  </div>
+
+  <!-- ── DEPRECATIONS ── -->
+  <div class="callout" style="border-left-color: #a78bfa;">
+    <strong>Deprecations in this version</strong>
+    <p style="margin: 0.5rem 0 0.25rem;">
+      The following usage pattern still works but emits a <code>Write-Warning</code> at runtime.
+      It will be removed in a future version.
+    </p>
+    <ul style="margin: 0.5rem 0 0 1.25rem; line-height: 2;">
+      <li>
+        Using <code>-LinuxUseSSHKey</code> without <code>-LinuxSSHKeyPath</code> — the script
+        still falls back to a <code>Read-Host</code> prompt for the SSH key file path, but
+        emits a deprecation warning. Pair with <code>-LinuxSSHKeyPath</code> to suppress the
+        warning and supply the path non-interactively.
+      </li>
+    </ul>
+  </div>
+
   <h2 id="prerequisites">Prerequisites</h2>
   <table>
     <thead><tr><th>Requirement</th><th>Details</th></tr></thead>
@@ -110,8 +151,8 @@
       <tr><td>PowerShell version</td><td>7.0 or higher (<code>#Requires -Version 7</code>)</td></tr>
       <tr><td>POSH-SSH module</td><td>Required for Linux operations. Script auto-installs from the internet or falls back to the bundled <code>posh-ssh.3.1.1.nupkg</code>.</td></tr>
       <tr><td>segmentedAssets.json</td><td>Auto-generated and routinely updated by the Zero Networks Segment Server. Located at <code>C:\Program Files\Zero Networks\Breakglass\segmentedAssets.json</code>. Required for bulk operations; not read for single-asset (<code>-Asset</code> / <code>-IPAddress</code>) runs. Do not edit manually.</td></tr>
-      <tr><td>Windows credentials</td><td>Account with WinRM/PSRemoting access to target asset(s). When omitted, the script reads <code>ForestsConfig</code> from <code>segmentedAssets.json</code> and prompts once per domain and once per OU that has <code>OuCredentials</code> configured. Supply <code>-ADUserName</code> / <code>-ADSvcPassword</code> to override with a single explicit credential for all targets.</td></tr>
-      <tr><td>Linux credentials</td><td>Linux service account with <code>sudo su</code> access on target assets. Use <code>-LinuxUserName</code> / <code>-LinuxSvcPassword</code> for password auth, or <code>-LinuxUseSSHKey</code> to supply an SSH key path at runtime.</td></tr>
+      <tr><td>Windows credentials</td><td>Account with WinRM/PSRemoting access to target asset(s). When omitted, the script reads <code>ForestsConfig</code> from <code>segmentedAssets.json</code> and calls <code>Get-Credential</code> once per primary domain, once per secondary domain, and once per OU that has <code>OuCredentials</code> configured. Supply <code>-ADUserName</code> / <code>-ADSvcPassword</code> to override with a single explicit credential for all targets.</td></tr>
+      <tr><td>Linux credentials</td><td>Linux service account with <code>sudo su</code> access on target assets. Use <code>-LinuxUserName</code> / <code>-LinuxSvcPassword</code> for password auth. For SSH key auth, use <code>-LinuxUseSSHKey -LinuxSSHKeyPath &lt;path&gt;</code> to supply the key path non-interactively, or <code>-LinuxUseSSHKey</code> alone to be prompted (deprecated).</td></tr>
       <tr><td>Network access</td><td>Required ports (WinRM TCP 5985/5986 for Windows; SSH TCP 22 for Linux) are automatically provisioned to Segment Servers, which is where this script is intended to run.</td></tr>
       <tr><td>Linux firewall backend</td><td>The script supports both <strong>iptables</strong> (via python-iptables) and <strong>nftables</strong> (via python-nftables). For bulk operations, the backend is read from the <code>AppliedFirewallType</code> field in <code>segmentedAssets.json</code>. For single-asset operations, both backends are attempted automatically.</td></tr>
     </tbody>
@@ -166,7 +207,7 @@
     <span class="param">-Linux</span>
     <span class="param">-Mode</span> { <span class="opt">Privileged</span> | <span class="opt">All</span> }
    [<span class="param">-Network</span>]
-   [<span class="param">-LinuxUseSSHKey</span>]
+   [<span class="param">-LinuxUseSSHKey</span>] [<span class="param">-LinuxSSHKeyPath</span> &lt;string&gt;]
    [<span class="param">-ServersOnly</span>]
    [<span class="param">-LinuxUserName</span> &lt;string&gt;] [<span class="param">-LinuxSvcPassword</span> &lt;string&gt;]
    [<span class="param">-DeploymentClusterName</span> &lt;string&gt;]
@@ -178,7 +219,7 @@
     <span class="param">-WindowsAndLinux</span>
     <span class="param">-Mode</span> { <span class="opt">Privileged</span> | <span class="opt">All</span> }
    [<span class="param">-Network</span>] [<span class="param">-Identity</span>]
-   [<span class="param">-LinuxUseSSHKey</span>] [<span class="param">-ServersOnly</span>] [<span class="param">-DisableBlockRule</span>]
+   [<span class="param">-LinuxUseSSHKey</span>] [<span class="param">-LinuxSSHKeyPath</span> &lt;string&gt;] [<span class="param">-ServersOnly</span>] [<span class="param">-DisableBlockRule</span>]
    [<span class="param">-ADUserName</span> &lt;string&gt;] [<span class="param">-ADSvcPassword</span> &lt;string&gt;]
    [<span class="param">-LinuxUserName</span> &lt;string&gt;] [<span class="param">-LinuxSvcPassword</span> &lt;string&gt;]
    [<span class="param">-DeploymentClusterName</span> &lt;string&gt;]
@@ -191,7 +232,7 @@
    { <span class="param">-Windows</span> | <span class="param">-Linux</span> }
     <span class="param">-Mode</span> { <span class="opt">Privileged</span> | <span class="opt">All</span> }
    [<span class="param">-Network</span>] [<span class="param">-Identity</span>]
-   [<span class="param">-LinuxUseSSHKey</span>]
+   [<span class="param">-LinuxUseSSHKey</span>] [<span class="param">-LinuxSSHKeyPath</span> &lt;string&gt;]
    [<span class="param">-ADUserName</span> &lt;string&gt;] [<span class="param">-ADSvcPassword</span> &lt;string&gt;]
    [<span class="param">-LinuxUserName</span> &lt;string&gt;] [<span class="param">-LinuxSvcPassword</span> &lt;string&gt;]
   </div>
@@ -257,9 +298,7 @@
   <div class="param-entry">
     <div class="param-name">-Mode</div>
     <div class="param-body">
-      <p class="param-desc">
-        Controls which firewall ports are opened on each target. Required whenever <code>-Network</code> is specified.
-      </p>
+      <p class="param-desc">Controls which firewall ports are opened on each target. Required whenever <code>-Network</code> is specified.</p>
       <table style="margin:0.5rem 0;">
         <thead><tr><th>Value</th><th>Windows effect</th><th>Linux effect</th></tr></thead>
         <tbody>
@@ -302,12 +341,7 @@
   <div class="param-entry">
     <div class="param-name">-Identity</div>
     <div class="param-body">
-      <p class="param-desc">
-        Triggers identity segmentation break glass on Windows assets. Exports the current security policy
-        (<code>secedit</code>), removes all <code>ZeroNetworks*</code> local groups from User Rights
-        assignments, re-applies the policy, and forces a Group Policy update. Only runs on assets
-        where <code>IsIdentitySegmented</code> is <code>$true</code>.
-      </p>
+      <p class="param-desc">Triggers identity segmentation break glass on Windows assets. Exports the current security policy (<code>secedit</code>), removes all <code>ZeroNetworks*</code> local groups from User Rights assignments, re-applies the policy, and forces a Group Policy update. Only runs on assets where <code>IsIdentitySegmented</code> is <code>$true</code>.</p>
       <div class="callout" style="margin:0.5rem 0;">
         <strong>Note</strong>
         Available for Windows and WindowsAndLinux parameter sets only. Not applicable to Linux assets.
@@ -325,7 +359,7 @@
   <div class="param-entry">
     <div class="param-name">-ServersOnly</div>
     <div class="param-body">
-      <p class="param-desc">Restricts the asset list to servers (type = 2 in <code>segmentedAssets.json</code>). Workstations and clients are skipped. Not available in the Asset or IP parameter sets since those already target a single asset explicitly.</p>
+      <p class="param-desc">Restricts the asset list to servers (type = 2 in <code>segmentedAssets.json</code>). Workstations and clients are skipped. Not available in the Asset or IP parameter sets.</p>
       <div class="param-meta">
         <div class="param-meta-item"><span class="meta-label">Type:</span><span class="meta-value">Switch</span></div>
         <div class="param-meta-item"><span class="meta-label">Required:</span><span class="meta-value optional">Optional</span></div>
@@ -339,11 +373,7 @@
   <div class="param-entry">
     <div class="param-name">-DisableBlockRule</div>
     <div class="param-body">
-      <p class="param-desc">
-        On Windows, also disables all enabled Windows Firewall block rules and removes any WFP
-        explicit-block filters installed by Zero Networks. Use this when the standard allow rules
-        are still being overridden by block rules.
-      </p>
+      <p class="param-desc">On Windows, also disables all enabled Windows Firewall block rules and removes any WFP explicit-block filters installed by Zero Networks. Use this when the standard allow rules are still being overridden by block rules.</p>
       <div class="callout" style="margin:0.5rem 0;">
         <strong>Warning</strong>
         This disables <em>all</em> block rules currently active on the target host, not only Zero Networks rules. Use with caution.
@@ -361,7 +391,7 @@
   <div class="param-entry">
     <div class="param-name">-Asset</div>
     <div class="param-body">
-      <p class="param-desc">Targets a single asset by hostname or FQDN. The value is resolved via DNS; a valid A record must exist. <code>segmentedAssets.json</code> is not read for single-asset runs. Mutually exclusive with <code>-IPAddress</code> and the bulk parameter sets.</p>
+      <p class="param-desc">Targets a single asset by hostname or FQDN. Resolved via DNS; a valid A record must exist. <code>segmentedAssets.json</code> is not read. Mutually exclusive with <code>-IPAddress</code> and the bulk parameter sets.</p>
       <div class="param-meta">
         <div class="param-meta-item"><span class="meta-label">Type:</span><span class="meta-value">String</span></div>
         <div class="param-meta-item"><span class="meta-label">Required:</span><span class="meta-value required">True (in Asset set)</span></div>
@@ -375,7 +405,7 @@
   <div class="param-entry">
     <div class="param-name">-IPAddress</div>
     <div class="param-body">
-      <p class="param-desc">Targets a single asset by IP address. The IP is resolved via a DNS PTR lookup; a valid PTR record must exist. <code>segmentedAssets.json</code> is not read for single-asset runs. Mutually exclusive with <code>-Asset</code>.</p>
+      <p class="param-desc">Targets a single asset by IP address. Resolved via a DNS PTR lookup; a valid PTR record must exist. <code>segmentedAssets.json</code> is not read. Mutually exclusive with <code>-Asset</code>.</p>
       <div class="param-meta">
         <div class="param-meta-item"><span class="meta-label">Type:</span><span class="meta-value">String</span></div>
         <div class="param-meta-item"><span class="meta-label">Required:</span><span class="meta-value required">True (in IP set)</span></div>
@@ -393,11 +423,9 @@
         Active Directory credential username used to connect to Windows assets via WinRM.
         Accepted formats: <code>DOMAIN\username</code> or <code>username@domain.com</code>.
         Must be paired with <code>-ADSvcPassword</code>. If omitted, the script reads
-        <code>ForestsConfig</code> from <code>segmentedAssets.json</code> and prompts once
-        per primary domain, once per secondary domain, and once per OU that has
-        <code>OuCredentials</code> configured. When an asset has an
-        <code>OrganizationalUnit</code> value, the OU-specific credential is tried first,
-        then the script falls back to the domain-level credential.
+        <code>ForestsConfig</code> from <code>segmentedAssets.json</code> and calls
+        <code>Get-Credential</code> once per primary domain, once per secondary domain, and
+        once per OU that has <code>OuCredentials</code> configured.
       </p>
       <div class="param-meta">
         <div class="param-meta-item"><span class="meta-label">Type:</span><span class="meta-value">String</span></div>
@@ -412,7 +440,15 @@
   <div class="param-entry">
     <div class="param-name">-ADSvcPassword</div>
     <div class="param-body">
-      <p class="param-desc">Plain-text password for the AD account specified in <code>-ADUserName</code>. Must be used together with <code>-ADUserName</code>. The value is converted to a <code>SecureString</code> internally before use.</p>
+      <p class="param-desc">Plain-text password for the AD account specified in <code>-ADUserName</code>. Must be used together with <code>-ADUserName</code>. Converted to a <code>SecureString</code> internally before use.</p>
+      <div class="callout" style="margin:0.5rem 0; border-left-color: #f97316;">
+        <strong>Breaking change vs. current version</strong>
+        Type changed from <code>[SecureString]</code> to <code>[string]</code>. The prior
+        declaration caused the password to be silently converted to the literal string
+        <em>"System.Security.SecureString"</em>, making authentication always fail. Runbooks
+        that constructed a <code>SecureString</code> before passing must be updated to pass
+        the plain-text string directly.
+      </div>
       <div class="param-meta">
         <div class="param-meta-item"><span class="meta-label">Type:</span><span class="meta-value">String</span></div>
         <div class="param-meta-item"><span class="meta-label">Required:</span><span class="meta-value optional">Optional</span></div>
@@ -426,7 +462,18 @@
   <div class="param-entry">
     <div class="param-name">-LinuxUseSSHKey</div>
     <div class="param-body">
-      <p class="param-desc">When present, the script uses an SSH private key file instead of a password to authenticate against Linux assets. The script will prompt interactively for the path to the key file at runtime.</p>
+      <p class="param-desc">
+        When present, the script uses an SSH private key file instead of a password to authenticate
+        against Linux assets. Pair with <code>-LinuxSSHKeyPath</code> to supply the key file path
+        non-interactively. If <code>-LinuxSSHKeyPath</code> is omitted, the script falls back to a
+        <code>Read-Host</code> prompt and emits a deprecation warning.
+      </p>
+      <div class="callout" style="margin:0.5rem 0; border-left-color: #a78bfa;">
+        <strong>Deprecation notice</strong>
+        Using <code>-LinuxUseSSHKey</code> without <code>-LinuxSSHKeyPath</code> is deprecated.
+        The interactive fallback still works but emits a <code>Write-Warning</code>.
+        Use <code>-LinuxSSHKeyPath</code> to suppress the warning and supply the path programmatically.
+      </div>
       <div class="param-meta">
         <div class="param-meta-item"><span class="meta-label">Type:</span><span class="meta-value">Switch</span></div>
         <div class="param-meta-item"><span class="meta-label">Required:</span><span class="meta-value optional">Optional</span></div>
@@ -436,11 +483,30 @@
     </div>
   </div>
 
+  <!-- -LinuxSSHKeyPath -->
+  <div class="param-entry">
+    <div class="param-name">-LinuxSSHKeyPath <span style="font-size:0.75rem; font-weight:400; color: #4ade80; margin-left:0.5rem;">New in v.Next</span></div>
+    <div class="param-body">
+      <p class="param-desc">
+        Path to the SSH private key file used for Linux authentication. Must be used together with
+        <code>-LinuxUseSSHKey</code>. When supplied, the script uses this path directly and skips
+        any interactive prompt. When omitted while <code>-LinuxUseSSHKey</code> is set, the script
+        falls back to a <code>Read-Host</code> prompt and emits a deprecation warning.
+      </p>
+      <div class="param-meta">
+        <div class="param-meta-item"><span class="meta-label">Type:</span><span class="meta-value">String</span></div>
+        <div class="param-meta-item"><span class="meta-label">Required:</span><span class="meta-value optional">Optional</span></div>
+        <div class="param-meta-item"><span class="meta-label">Must pair with:</span><span class="meta-value">-LinuxUseSSHKey</span></div>
+        <div class="param-meta-item"><span class="meta-label">Pipeline input:</span><span class="meta-value">False</span></div>
+      </div>
+    </div>
+  </div>
+
   <!-- -LinuxUserName -->
   <div class="param-entry">
     <div class="param-name">-LinuxUserName</div>
     <div class="param-body">
-      <p class="param-desc">SSH username for Linux assets. Must be paired with <code>-LinuxSvcPassword</code> (or <code>-LinuxUseSSHKey</code>). If omitted, the user is prompted at runtime.</p>
+      <p class="param-desc">SSH username for Linux assets. When used with <code>-LinuxSvcPassword</code>, the credential is built programmatically with no interactive prompt. When used alone, the username is pre-filled in the <code>Get-Credential</code> dialog. If omitted entirely, <code>Get-Credential</code> is called without a pre-filled username.</p>
       <div class="param-meta">
         <div class="param-meta-item"><span class="meta-label">Type:</span><span class="meta-value">String</span></div>
         <div class="param-meta-item"><span class="meta-label">Required:</span><span class="meta-value optional">Optional</span></div>
@@ -453,7 +519,12 @@
   <div class="param-entry">
     <div class="param-name">-LinuxSvcPassword</div>
     <div class="param-body">
-      <p class="param-desc">Plain-text SSH password for the Linux user. Must be used together with <code>-LinuxUserName</code>. Cannot be combined with <code>-LinuxUseSSHKey</code>.</p>
+      <p class="param-desc">Plain-text SSH password for the Linux user. Must be used together with <code>-LinuxUserName</code>. Cannot be combined with <code>-LinuxUseSSHKey</code>. Converted to a <code>SecureString</code> internally before use.</p>
+      <div class="callout" style="margin:0.5rem 0; border-left-color: #f97316;">
+        <strong>Breaking change vs. current version</strong>
+        Type changed from <code>[SecureString]</code> to <code>[string]</code> for the same
+        reason as <code>-ADSvcPassword</code>. Pass the plain-text password string directly.
+      </div>
       <div class="param-meta">
         <div class="param-meta-item"><span class="meta-label">Type:</span><span class="meta-value">String</span></div>
         <div class="param-meta-item"><span class="meta-label">Required:</span><span class="meta-value optional">Optional</span></div>
@@ -468,10 +539,9 @@
     <div class="param-name">-DeploymentClusterName</div>
     <div class="param-body">
       <p class="param-desc">
-        Limits the asset scope to a single Zero Networks deployment cluster. The value is matched
+        Limits the asset scope to a single Zero Networks deployment cluster. Matched
         case-insensitively against cluster names in <code>segmentedAssets.json</code>. Tab-completion
-        is supported — press <kbd>Tab</kbd> to cycle through available cluster names.
-        If omitted, all clusters are included. Not available in the Asset or IP parameter sets.
+        is supported. If omitted, all clusters are included. Not available in the Asset or IP parameter sets.
       </p>
       <div class="param-meta">
         <div class="param-meta-item"><span class="meta-label">Type:</span><span class="meta-value">String</span></div>
@@ -488,78 +558,93 @@
   <div class="example">
     <div class="example-header">
       <span class="ex-label">Example 1</span>
-      <span class="ex-title">Open privileged ports on all Windows assets (network segment)</span>
+      <span class="ex-title">Open privileged ports on all Windows assets (interactive credentials)</span>
     </div>
     <pre><span class="ps-prompt">PS&gt; </span><span class="ps-cmd">.\BreakGlass.ps1</span> <span class="ps-switch">-Windows</span> <span class="ps-param">-Mode</span> <span class="ps-value">Privileged</span> <span class="ps-switch">-Network</span></pre>
     <div class="example-desc">
       Connects to every Windows asset in <code>segmentedAssets.json</code> that has network
-      segmentation active. Opens inbound TCP 3389, 5985, 5986, 9389, and 445 via Windows Firewall
-      and WFP. Credentials are prompted interactively per AD domain (and per OU if configured).
+      segmentation active. Credentials are collected via <code>Get-Credential</code> — once per AD
+      domain (and per OU if configured). The username field is pre-filled from
+      <code>ForestsConfig</code>.
     </div>
   </div>
 
   <div class="example">
     <div class="example-header">
       <span class="ex-label">Example 2</span>
-      <span class="ex-title">Open all ports on Linux servers using SSH key</span>
+      <span class="ex-title">Open all ports on Windows assets (explicit credentials)</span>
     </div>
-    <pre><span class="ps-prompt">PS&gt; </span><span class="ps-cmd">.\BreakGlass.ps1</span> <span class="ps-switch">-Linux</span> <span class="ps-switch">-LinuxUseSSHKey</span> <span class="ps-switch">-Network</span> <span class="ps-param">-Mode</span> <span class="ps-value">All</span> <span class="ps-switch">-ServersOnly</span></pre>
+    <pre><span class="ps-prompt">PS&gt; </span><span class="ps-cmd">.\BreakGlass.ps1</span> <span class="ps-switch">-Windows</span> <span class="ps-switch">-Network</span> <span class="ps-param">-Mode</span> <span class="ps-value">All</span> `
+         <span class="ps-param">-ADUserName</span> <span class="ps-value">contoso.local\Administrator</span> <span class="ps-param">-ADSvcPassword</span> <span class="ps-value">P@ssw0rd</span></pre>
     <div class="example-desc">
-      Targets only Linux server-type assets. Uses an SSH key for authentication (path prompted at runtime).
-      Each asset's <code>AppliedFirewallType</code> from <code>segmentedAssets.json</code> determines
-      whether iptables or nftables is used. Inserts an ACCEPT-all rule on each target.
+      Supplies credentials non-interactively. <code>-ADSvcPassword</code> now accepts a plain-text
+      string. Suitable for automated break glass runbooks.
     </div>
   </div>
 
   <div class="example">
     <div class="example-header">
       <span class="ex-label">Example 3</span>
-      <span class="ex-title">Single Linux server by hostname using SSH key</span>
+      <span class="ex-title">Open all ports on Linux servers using SSH key (programmatic)</span>
     </div>
-    <pre><span class="ps-prompt">PS&gt; </span><span class="ps-cmd">.\BreakGlass.ps1</span> <span class="ps-param">-Asset</span> <span class="ps-value">linuxserver.contoso.local</span> <span class="ps-switch">-Linux</span> <span class="ps-switch">-LinuxUseSSHKey</span> <span class="ps-switch">-Network</span> <span class="ps-param">-Mode</span> <span class="ps-value">All</span></pre>
+    <pre><span class="ps-prompt">PS&gt; </span><span class="ps-cmd">.\BreakGlass.ps1</span> <span class="ps-switch">-Linux</span> <span class="ps-switch">-LinuxUseSSHKey</span> <span class="ps-param">-LinuxSSHKeyPath</span> <span class="ps-value">"C:\keys\zn_breakglass.pem"</span> `
+         <span class="ps-param">-LinuxUserName</span> <span class="ps-value">znbg</span> <span class="ps-switch">-Network</span> <span class="ps-param">-Mode</span> <span class="ps-value">All</span> <span class="ps-switch">-ServersOnly</span></pre>
     <div class="example-desc">
-      Resolves <code>linuxserver.contoso.local</code> via DNS and runs break glass against that single host.
-      Because the firewall type is unknown for a manually-specified asset, both iptables and nftables
-      backends are attempted. A failure on one backend does not abort the other. The SSH key path is
-      prompted interactively.
+      Supplies the SSH key path directly via <code>-LinuxSSHKeyPath</code> — no interactive prompt,
+      no deprecation warning. Each asset's <code>AppliedFirewallType</code> determines whether
+      iptables or nftables is used.
     </div>
   </div>
 
   <div class="example">
     <div class="example-header">
       <span class="ex-label">Example 4</span>
-      <span class="ex-title">Single Windows asset by IP address (interactive credentials)</span>
+      <span class="ex-title">Open all ports on Linux servers using SSH key (interactive — deprecated)</span>
     </div>
-    <pre><span class="ps-prompt">PS&gt; </span><span class="ps-cmd">.\BreakGlass.ps1</span> <span class="ps-param">-IPAddress</span> <span class="ps-value">1.1.1.1</span> <span class="ps-switch">-Windows</span> <span class="ps-switch">-Network</span> <span class="ps-param">-Mode</span> <span class="ps-value">All</span></pre>
+    <pre><span class="ps-prompt">PS&gt; </span><span class="ps-cmd">.\BreakGlass.ps1</span> <span class="ps-switch">-Linux</span> <span class="ps-switch">-LinuxUseSSHKey</span> <span class="ps-switch">-Network</span> <span class="ps-param">-Mode</span> <span class="ps-value">All</span> <span class="ps-switch">-ServersOnly</span></pre>
     <div class="example-desc">
-      Resolves <code>1.1.1.1</code> via a PTR record, then prompts interactively for a domain name
-      and AD username before opening all ports on the target.
+      Same operation without <code>-LinuxSSHKeyPath</code>. The script falls back to a
+      <code>Read-Host</code> prompt and emits a deprecation warning. Add
+      <code>-LinuxSSHKeyPath</code> to suppress the warning.
     </div>
   </div>
 
   <div class="example">
     <div class="example-header">
       <span class="ex-label">Example 5</span>
-      <span class="ex-title">Single Windows asset by IP address (explicit credentials)</span>
+      <span class="ex-title">Single Linux server by hostname — SSH key, fully non-interactive</span>
     </div>
-    <pre><span class="ps-prompt">PS&gt; </span><span class="ps-cmd">.\BreakGlass.ps1</span> <span class="ps-param">-IPAddress</span> <span class="ps-value">1.1.1.1</span> <span class="ps-switch">-Windows</span> <span class="ps-switch">-Network</span> <span class="ps-param">-Mode</span> <span class="ps-value">All</span> `
-         <span class="ps-param">-ADUserName</span> <span class="ps-value">contoso.local\Administrator</span> <span class="ps-param">-ADSvcPassword</span> <span class="ps-value">P@ssw0rd</span></pre>
+    <pre><span class="ps-prompt">PS&gt; </span><span class="ps-cmd">.\BreakGlass.ps1</span> <span class="ps-param">-Asset</span> <span class="ps-value">linuxserver.contoso.local</span> <span class="ps-switch">-Linux</span> <span class="ps-switch">-LinuxUseSSHKey</span> `
+         <span class="ps-param">-LinuxSSHKeyPath</span> <span class="ps-value">"C:\keys\zn_breakglass.pem"</span> <span class="ps-param">-LinuxUserName</span> <span class="ps-value">znbg</span> <span class="ps-switch">-Network</span> <span class="ps-param">-Mode</span> <span class="ps-value">All</span></pre>
     <div class="example-desc">
-      Same as Example 4 but supplies credentials non-interactively. Suitable for scripted
-      or automated break glass runbooks.
+      Resolves <code>linuxserver.contoso.local</code> via DNS and runs break glass against that
+      single host. Both iptables and nftables backends are attempted automatically. No prompts.
     </div>
   </div>
 
   <div class="example">
     <div class="example-header">
       <span class="ex-label">Example 6</span>
+      <span class="ex-title">Open privileged ports on Linux assets using password auth</span>
+    </div>
+    <pre><span class="ps-prompt">PS&gt; </span><span class="ps-cmd">.\BreakGlass.ps1</span> <span class="ps-switch">-Linux</span> <span class="ps-switch">-Network</span> <span class="ps-param">-Mode</span> <span class="ps-value">Privileged</span> `
+         <span class="ps-param">-LinuxUserName</span> <span class="ps-value">znbg</span> <span class="ps-param">-LinuxSvcPassword</span> <span class="ps-value">P@ssw0rd</span></pre>
+    <div class="example-desc">
+      Supplies Linux credentials non-interactively. Both <code>-LinuxUserName</code> and
+      <code>-LinuxSvcPassword</code> must be provided to skip the <code>Get-Credential</code>
+      prompt entirely.
+    </div>
+  </div>
+
+  <div class="example">
+    <div class="example-header">
+      <span class="ex-label">Example 7</span>
       <span class="ex-title">Scope to a single deployment cluster</span>
     </div>
     <pre><span class="ps-prompt">PS&gt; </span><span class="ps-cmd">.\BreakGlass.ps1</span> <span class="ps-switch">-Windows</span> <span class="ps-param">-Mode</span> <span class="ps-value">All</span> <span class="ps-switch">-Network</span> <span class="ps-param">-DeploymentClusterName</span> <span class="ps-value">"zero.local"</span></pre>
     <div class="example-desc">
-      Restricts the affected asset pool to the <code>zero.local</code> deployment cluster only.
-      Assets in other clusters are skipped entirely. Use <kbd>Tab</kbd> to cycle through available
-      cluster names.
+      Restricts the affected asset pool to the <code>zero.local</code> cluster only.
+      Use <kbd>Tab</kbd> to cycle through available cluster names.
     </div>
   </div>
 
@@ -591,7 +676,7 @@
     </div>
   </div>
 
-  <p>OTBreakGlass.ps1 is unchanged from the currently deployed version. See
+  <p>OTBreakGlass.ps1 is unchanged from the currently-deployed version. See
   <a href="breakglass-reference.html#ot-synopsis">breakglass-reference.html</a> for full documentation.</p>
 
   <h2 id="ot-synopsis">Synopsis</h2>
@@ -656,30 +741,10 @@
       <tr><th>Mode</th><th>OS</th><th>Mechanism</th><th>Result</th></tr>
     </thead>
     <tbody>
-      <tr>
-        <td><code>Privileged</code></td>
-        <td>Windows</td>
-        <td>Windows Firewall + WFP</td>
-        <td>Inbound TCP 3389 (RDP), 5985 (WinRM), 5986 (WinRM HTTPS), 9389 (ADWS), 445 (SMB) allowed; all outbound allowed</td>
-      </tr>
-      <tr>
-        <td><code>All</code></td>
-        <td>Windows</td>
-        <td>Windows Firewall + WFP</td>
-        <td>All inbound and outbound traffic allowed</td>
-      </tr>
-      <tr>
-        <td><code>Privileged</code></td>
-        <td>Linux</td>
-        <td>iptables or nftables (per <code>AppliedFirewallType</code>)</td>
-        <td>Inbound TCP 22 (SSH), 23 (Telnet), 445 (SMB) ACCEPT; all outbound ACCEPT</td>
-      </tr>
-      <tr>
-        <td><code>All</code></td>
-        <td>Linux</td>
-        <td>iptables or nftables (per <code>AppliedFirewallType</code>)</td>
-        <td>ACCEPT all rule inserted in INPUT and OUTPUT chains</td>
-      </tr>
+      <tr><td><code>Privileged</code></td><td>Windows</td><td>Windows Firewall + WFP</td><td>Inbound TCP 3389 (RDP), 5985 (WinRM), 5986 (WinRM HTTPS), 9389 (ADWS), 445 (SMB) allowed; all outbound allowed</td></tr>
+      <tr><td><code>All</code></td><td>Windows</td><td>Windows Firewall + WFP</td><td>All inbound and outbound traffic allowed</td></tr>
+      <tr><td><code>Privileged</code></td><td>Linux</td><td>iptables or nftables</td><td>Inbound TCP 22 (SSH), 23 (Telnet), 445 (SMB) ACCEPT; all outbound ACCEPT</td></tr>
+      <tr><td><code>All</code></td><td>Linux</td><td>iptables or nftables</td><td>ACCEPT all rule inserted in INPUT and OUTPUT chains</td></tr>
     </tbody>
   </table>
 
@@ -700,12 +765,13 @@
   <h2 id="notes">Notes</h2>
   <ul style="line-height: 2.1; margin-left: 1.5rem;">
     <li>Rules and filters added by the break glass scripts are <strong>persistent</strong> across reboots. They must be manually removed or will be cleaned up when the Zero Networks agent next synchronises policy.</li>
-    <li>For Windows assets the script uses <strong>PowerShell Remoting (WinRM)</strong> with Negotiate authentication. Ensure WinRM is enabled and accessible on targets.</li>
-    <li>For Linux assets the script connects via <strong>SSH</strong> using the POSH-SSH module, escalates to root with <code>sudo su</code>, and manipulates the firewall through a Zero Networks Python virtual environment bundled on the asset. Both <strong>iptables</strong> (via python-iptables) and <strong>nftables</strong> (via python-nftables) backends are supported. For bulk operations, the backend is selected from <code>AppliedFirewallType</code> in <code>segmentedAssets.json</code>. For single-asset operations (<code>-Asset</code> / <code>-IPAddress</code>), both backends are attempted; a failure on one does not abort the other.</li>
-    <li>Both scripts create <code>success_list.txt</code> and <code>failed_list.txt</code> (or <code>ot_success_list.txt</code> / <code>ot_failed_list.txt</code> for OT) in the working directory.</li>
+    <li>For Windows assets the script uses <strong>PowerShell Remoting (WinRM)</strong> with Kerberos authentication. Ensure WinRM is enabled and accessible on targets.</li>
+    <li>Interactive credential collection uses <code>Get-Credential</code>. On Windows GUI sessions this shows a credential dialog; on headless or console sessions it falls back to a text prompt. The username is pre-filled from <code>ForestsConfig</code> (Windows) or <code>-LinuxUserName</code> (Linux) when available.</li>
+    <li>For Linux assets the script connects via <strong>SSH</strong> using the POSH-SSH module, escalates to root with <code>sudo su</code>, and manipulates the firewall through a Zero Networks Python virtual environment bundled on the asset. Both <strong>iptables</strong> and <strong>nftables</strong> backends are supported; the backend is selected from <code>AppliedFirewallType</code> for bulk operations, or both are tried for single-asset runs.</li>
+    <li>Both scripts create <code>success_list.txt</code> and <code>failed_list.txt</code> in the working directory.</li>
     <li>Bulk operations run with <code>-ThrottleLimit 100</code> (up to 100 assets processed concurrently).</li>
-    <li><code>segmentedAssets.json</code> is only loaded for bulk operations. Single-asset runs (<code>-Asset</code> / <code>-IPAddress</code>) do not read the inventory file.</li>
-    <li>The <code>segmentedAssets.json</code> file is automatically generated and kept up to date by the Zero Networks Segment Server. It is read from <code>C:\Program Files\Zero Networks\Breakglass\</code> on the machine running the script. Do not edit it manually.</li>
+    <li><code>segmentedAssets.json</code> is only loaded for bulk operations. Single-asset runs do not read the inventory file.</li>
+    <li>The <code>segmentedAssets.json</code> file is automatically generated by the Zero Networks Segment Server. It is read from <code>C:\Program Files\Zero Networks\Breakglass\</code>. Do not edit it manually.</li>
     <li>For OT, switch credentials are never stored; they are held in memory only for the duration of the script run and cleared afterwards.</li>
   </ul>
 
@@ -716,40 +782,68 @@
     <div class="page-header" style="margin-bottom:1rem; border-bottom:none; padding-bottom:0.5rem;">
       <h1 id="changelog">Change Manifest</h1>
       <div class="tags">
-        <span class="tag purple">vs. Deployed Version</span>
+        <span class="tag purple">vs. Current Deployed Version</span>
       </div>
     </div>
   </div>
 
-  <p>Functional changes in this version of <code>BreakGlass.ps1</code> relative to the currently-deployed script documented in <a href="breakglass-reference.html">breakglass-reference.html</a>.</p>
+  <p>
+    Changes in this staged version relative to the currently-deployed version documented in
+    <a href="breakglass-reference.html">breakglass-reference.html</a>.
+  </p>
 
+  <h3 style="margin: 1.5rem 0 0.5rem; color: #f97316;">Breaking Changes</h3>
+  <table>
+    <thead><tr><th>Parameter</th><th>Change</th><th>Migration</th></tr></thead>
+    <tbody>
+      <tr>
+        <td><code>-ADSvcPassword</code></td>
+        <td>Type changed from <code>[SecureString]</code> to <code>[string]</code>. The prior declaration caused PowerShell to coerce a plain-text input to a <code>SecureString</code> at bind time, then convert it to the literal string <em>"System.Security.SecureString"</em> during processing — always producing the wrong credential. The parameter was non-functional in the current deployed version.</td>
+        <td>Pass the password as a plain string. If your runbook first ran <code>ConvertTo-SecureString "..." -AsPlainText -Force</code>, remove that wrapper.</td>
+      </tr>
+      <tr>
+        <td><code>-LinuxSvcPassword</code></td>
+        <td>Same type change and root cause as <code>-ADSvcPassword</code>.</td>
+        <td>Same migration: pass the plain-text string directly.</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <h3 style="margin: 1.5rem 0 0.5rem; color: #a78bfa;">Deprecations</h3>
+  <table>
+    <thead><tr><th>Usage pattern</th><th>Reason</th><th>Replacement</th></tr></thead>
+    <tbody>
+      <tr>
+        <td><code>-LinuxUseSSHKey</code> without <code>-LinuxSSHKeyPath</code></td>
+        <td>Relying on a <code>Read-Host</code> prompt for the SSH key path prevents unattended execution and is inconsistent with how all other credential inputs are handled.</td>
+        <td>Add <code>-LinuxSSHKeyPath "&lt;path&gt;"</code>. The interactive fallback still works but emits a <code>Write-Warning</code>.</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <h3 style="margin: 1.5rem 0 0.5rem; color: var(--text-head);">New Features</h3>
   <table>
     <thead><tr><th>Area</th><th>Change</th><th>Impact</th></tr></thead>
     <tbody>
       <tr>
-        <td>Linux firewall backend</td>
-        <td>Added nftables support alongside iptables. The backend is selected per-asset from <code>AppliedFirewallType</code> in <code>segmentedAssets.json</code> for bulk operations.</td>
-        <td>Required for modern Linux distributions (e.g. RHEL 10) that ship without iptables-legacy.</td>
+        <td><code>-LinuxSSHKeyPath</code></td>
+        <td>New parameter. Accepts the SSH private key file path as a string. When provided with <code>-LinuxUseSSHKey</code>, the interactive prompt is skipped entirely and no deprecation warning is emitted.</td>
+        <td>Enables fully unattended Linux SSH-key-based break glass in automated runbooks.</td>
       </tr>
       <tr>
-        <td>Single-asset Linux (<code>-Asset</code> / <code>-IPAddress</code>)</td>
-        <td>Both iptables and nftables backends are now attempted automatically in sequence. Each attempt is isolated; a failure on one backend does not abort the other.</td>
-        <td>Eliminates the need to know which backend is active when targeting a single Linux host manually.</td>
+        <td>Windows interactive credential collection</td>
+        <td>The interactive path now calls <code>Get-Credential</code> instead of <code>Read-Host -AsSecureString</code>. The username field is pre-filled from <code>ForestsConfig</code>.</td>
+        <td>Both username and password are collected in a single prompt per domain instead of two sequential <code>Read-Host</code> calls. On GUI sessions this shows a credential dialog.</td>
       </tr>
       <tr>
-        <td>Linux Privileged mode ports</td>
-        <td>Expanded from SSH (22) only to SSH (22), Telnet (23), and SMB (445) via <code>multiport</code> match.</td>
-        <td>Restores management access for environments that require SMB or legacy Telnet alongside SSH.</td>
+        <td>Linux password interactive credential collection</td>
+        <td>The interactive path now calls <code>Get-Credential</code> instead of separate <code>Read-Host</code> prompts. When only <code>-LinuxUserName</code> is provided, the username is pre-filled.</td>
+        <td>Consistent with Windows behavior; one prompt collects both credentials.</td>
       </tr>
       <tr>
-        <td>Windows Privileged mode ports</td>
-        <td>Expanded from RDP (3389) only to RDP (3389), WinRM HTTP (5985), WinRM HTTPS (5986), ADWS (9389), and SMB (445). Applied at both the Windows Firewall and WFP layers.</td>
-        <td>Enables PSRemoting, AD management tooling, and file access in a single Privileged-mode run — previously a second <code>-Mode All</code> run was needed to restore WinRM access.</td>
-      </tr>
-      <tr>
-        <td><code>segmentedAssets.json</code> loading</td>
-        <td>The inventory file is now only loaded for bulk operations. Single-asset runs (<code>-Asset</code> / <code>-IPAddress</code>) skip the load entirely.</td>
-        <td>Avoids a misleading error if the JSON is stale or absent when targeting a known asset directly.</td>
+        <td>Bug fix: <code>$using:linuxSSHKey</code> in parallel block</td>
+        <td>The SSH key path variable was referenced as <code>$global:linuxSSHKey</code> inside the <code>ForEach-Object -Parallel</code> block, which is inaccessible from a parallel runspace. Corrected to <code>$using:linuxSSHKey</code>.</td>
+        <td>SSH key-based Linux break glass now reliably passes the key path to each parallel SSH session. Previously the key path was always <code>$null</code> in parallel workers, causing every SSH session to fail.</td>
       </tr>
     </tbody>
   </table>

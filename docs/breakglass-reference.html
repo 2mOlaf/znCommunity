@@ -42,6 +42,7 @@
   <a href="#changelog">Change Manifest</a>
 
   <div class="sidebar-section">See Also</div>
+  <a href="breakglass-reference-next.html">BreakGlass Reference (v.Next)</a>
   <a href="zeronetworks-module-reference.html">ZeroNetworks Module (PSGallery)</a>
   <a href="zntools-user-reference.html">ZNTools User Reference</a>
   <a href="zntools-author-reference.html">ZNTools Author Reference</a>
@@ -70,9 +71,9 @@
     </div>
     <p class="lead">
       The Zero Networks Break Glass scripts provide emergency access recovery when
-      Zero Networks Segment Server, the portal, or IdP is unavailable or blocking critical access. They directly
-      modify firewall rules, WFP filters, and (for OT) network switch ACLs on targeted
-      assets to restore connectivity.
+      Zero Networks Segment Server, the portal, or IdP is unavailable or blocking critical access.
+      They directly modify firewall rules, WFP filters, and (for OT) network switch ACLs on
+      targeted assets to restore connectivity.
     </p>
   </div>
 
@@ -96,11 +97,12 @@
     <thead><tr><th>Requirement</th><th>Details</th></tr></thead>
     <tbody>
       <tr><td>PowerShell version</td><td>7.0 or higher (<code>#Requires -Version 7</code>)</td></tr>
-      <tr><td>POSH-SSH module</td><td>Required for Linux operations. Script auto-installs from the internet or falls back to the bundled <code>posh-ssh.3.1.1.nupkg</code></td></tr>
-      <tr><td>segmentedAssets.json</td><td>Auto-generated and routinely updated by the Zero Networks Segment Server. Located at <code>C:\Program Files\Zero Networks\Breakglass\segmentedAssets.json</code> on the machine running the script. Do not edit manually.</td></tr>
-      <tr><td>Windows credentials</td><td>Account with WinRM/PSRemoting access to target asset(s). When omitted, the script reads <code>ForestsConfig</code> from <code>segmentedAssets.json</code> and prompts once per domain and once per OU that has <code>OuCredentials</code> configured. Supply <code>-ADUserName</code> / <code>-ADSvcPassword</code> to override with a single explicit credential for all targets.</td></tr>
-      <tr><td>Linux credentials</td><td>Assumed: Linux service account with an SSH key file. Supply <code>-LinuxUserName</code> / <code>-LinuxSvcPassword</code> to use password auth instead, or <code>-LinuxUseSSHKey</code> to be prompted for a key path at runtime. The account must have <code>sudo su</code> access on target assets.</td></tr>
+      <tr><td>POSH-SSH module</td><td>Required for Linux operations. Script auto-installs from the internet or falls back to the bundled <code>posh-ssh.3.1.1.nupkg</code>.</td></tr>
+      <tr><td>segmentedAssets.json</td><td>Auto-generated and routinely updated by the Zero Networks Segment Server. Located at <code>C:\Program Files\Zero Networks\Breakglass\segmentedAssets.json</code>. Required for bulk operations; not read for single-asset (<code>-Asset</code> / <code>-IPAddress</code>) runs. Do not edit manually.</td></tr>
+      <tr><td>Windows credentials</td><td>Account with WinRM/PSRemoting access to target asset(s). When omitted, the script reads <code>ForestsConfig</code> from <code>segmentedAssets.json</code> and prompts once per primary domain, once per secondary domain, and once per OU that has <code>OuCredentials</code> configured. Supply <code>-ADUserName</code> / <code>-ADSvcPassword</code> to override with a single explicit credential for all targets.</td></tr>
+      <tr><td>Linux credentials</td><td>Linux service account with <code>sudo su</code> access on target assets. Use <code>-LinuxUserName</code> / <code>-LinuxSvcPassword</code> for password auth, or <code>-LinuxUseSSHKey</code> to supply an SSH key path at runtime.</td></tr>
       <tr><td>Network access</td><td>Required ports (WinRM TCP 5985/5986 for Windows; SSH TCP 22 for Linux) are automatically provisioned to Segment Servers, which is where this script is intended to run.</td></tr>
+      <tr><td>Linux firewall backend</td><td>The script supports both <strong>iptables</strong> (via python-iptables) and <strong>nftables</strong> (via python-nftables). For bulk operations, the backend is read from the <code>AppliedFirewallType</code> field in <code>segmentedAssets.json</code>. For single-asset operations, both backends are attempted automatically.</td></tr>
     </tbody>
   </table>
 
@@ -130,7 +132,8 @@
   <h2 id="bg-synopsis">Synopsis</h2>
   <p>
     Restores network and/or identity access to segmented Windows and Linux assets by remotely
-    modifying firewall rules, WFP filters, and Group Policy on each target.
+    modifying firewall rules, WFP filters, and Group Policy on each target. Linux assets are
+    handled via either iptables or nftables depending on the firewall backend in use on each host.
   </p>
 
   <h2 id="bg-syntax">Syntax</h2>
@@ -249,8 +252,16 @@
       <table style="margin:0.5rem 0;">
         <thead><tr><th>Value</th><th>Windows effect</th><th>Linux effect</th></tr></thead>
         <tbody>
-          <tr><td><code>Privileged</code></td><td>Opens inbound RDP (TCP 3389) via Windows Firewall and WFP. Outbound unrestricted.</td><td>Opens inbound SSH (TCP 22) via iptables.</td></tr>
-          <tr><td><code>All</code></td><td>Opens all inbound traffic via Windows Firewall and WFP. Outbound unrestricted.</td><td>Accepts all inbound and outbound traffic via iptables.</td></tr>
+          <tr>
+            <td><code>Privileged</code></td>
+            <td>Opens inbound TCP 3389 (RDP), 5985 (WinRM), 5986 (WinRM HTTPS), 9389 (ADWS), 445 (SMB) via Windows Firewall and WFP. All outbound allowed.</td>
+            <td>Opens inbound TCP 22 (SSH), 23 (Telnet), 445 (SMB) via iptables or nftables. All outbound allowed.</td>
+          </tr>
+          <tr>
+            <td><code>All</code></td>
+            <td>Opens all inbound and outbound traffic via Windows Firewall and WFP.</td>
+            <td>Accepts all inbound and outbound traffic via iptables or nftables.</td>
+          </tr>
         </tbody>
       </table>
       <div class="param-meta">
@@ -266,7 +277,7 @@
   <div class="param-entry">
     <div class="param-name">-Network</div>
     <div class="param-body">
-      <p class="param-desc">Triggers network segmentation break glass. Adds Windows Firewall and WFP allow rules (Windows) or iptables ACCEPT rules (Linux). Must be combined with <code>-Mode</code>. Only runs on assets where <code>IsNetworkSegmented</code> is <code>$true</code>.</p>
+      <p class="param-desc">Triggers network segmentation break glass. Adds Windows Firewall and WFP allow rules (Windows) or iptables/nftables ACCEPT rules (Linux). Must be combined with <code>-Mode</code>. Only runs on assets where <code>IsNetworkSegmented</code> is <code>$true</code>.</p>
       <div class="param-meta">
         <div class="param-meta-item"><span class="meta-label">Type:</span><span class="meta-value">Switch</span></div>
         <div class="param-meta-item"><span class="meta-label">Required:</span><span class="meta-value optional">Optional</span></div>
@@ -339,7 +350,7 @@
   <div class="param-entry">
     <div class="param-name">-Asset</div>
     <div class="param-body">
-      <p class="param-desc">Targets a single asset by hostname or FQDN. The value is resolved via DNS; a valid A record must exist. Mutually exclusive with <code>-IPAddress</code> and the bulk parameter sets.</p>
+      <p class="param-desc">Targets a single asset by hostname or FQDN. The value is resolved via DNS; a valid A record must exist. <code>segmentedAssets.json</code> is not read for single-asset runs. Mutually exclusive with <code>-IPAddress</code> and the bulk parameter sets.</p>
       <div class="param-meta">
         <div class="param-meta-item"><span class="meta-label">Type:</span><span class="meta-value">String</span></div>
         <div class="param-meta-item"><span class="meta-label">Required:</span><span class="meta-value required">True (in Asset set)</span></div>
@@ -353,7 +364,7 @@
   <div class="param-entry">
     <div class="param-name">-IPAddress</div>
     <div class="param-body">
-      <p class="param-desc">Targets a single asset by IP address. The IP is resolved via a DNS PTR lookup; a valid PTR record must exist. Mutually exclusive with <code>-Asset</code>.</p>
+      <p class="param-desc">Targets a single asset by IP address. The IP is resolved via a DNS PTR lookup; a valid PTR record must exist. <code>segmentedAssets.json</code> is not read for single-asset runs. Mutually exclusive with <code>-Asset</code>.</p>
       <div class="param-meta">
         <div class="param-meta-item"><span class="meta-label">Type:</span><span class="meta-value">String</span></div>
         <div class="param-meta-item"><span class="meta-label">Required:</span><span class="meta-value required">True (in IP set)</span></div>
@@ -431,7 +442,7 @@
   <div class="param-entry">
     <div class="param-name">-LinuxSvcPassword</div>
     <div class="param-body">
-      <p class="param-desc">Plain-text SSH password for the Linux user. Must be used together with <code>-LinuxUserName</code>. Cannot be combined with <code>-LinuxUseSSHKey</code> — if SSH key authentication is in use, this parameter is ignored.</p>
+      <p class="param-desc">Plain-text SSH password for the Linux user. Must be used together with <code>-LinuxUserName</code>. Cannot be combined with <code>-LinuxUseSSHKey</code>.</p>
       <div class="param-meta">
         <div class="param-meta-item"><span class="meta-label">Type:</span><span class="meta-value">String</span></div>
         <div class="param-meta-item"><span class="meta-label">Required:</span><span class="meta-value optional">Optional</span></div>
@@ -449,7 +460,7 @@
         Limits the asset scope to a single Zero Networks deployment cluster. The value is matched
         case-insensitively against cluster names in <code>segmentedAssets.json</code>. Tab-completion
         is supported — press <kbd>Tab</kbd> to cycle through available cluster names.
-        If omitted, all clusters are included.
+        If omitted, all clusters are included. Not available in the Asset or IP parameter sets.
       </p>
       <div class="param-meta">
         <div class="param-meta-item"><span class="meta-label">Type:</span><span class="meta-value">String</span></div>
@@ -471,9 +482,8 @@
     <pre><span class="ps-prompt">PS&gt; </span><span class="ps-cmd">.\BreakGlass.ps1</span> <span class="ps-switch">-Windows</span> <span class="ps-param">-Mode</span> <span class="ps-value">Privileged</span> <span class="ps-switch">-Network</span></pre>
     <div class="example-desc">
       Connects to every Windows asset in <code>segmentedAssets.json</code> that has network
-      segmentation active. Adds a Windows Firewall rule allowing inbound RDP (TCP 3389) and
-      a WFP filter allowing inbound RDP and all outbound traffic.
-      Credentials are prompted interactively per AD domain found in the configuration.
+      segmentation active. Opens inbound TCP 3389, 5985, 5986, 9389, and 445 via Windows Firewall
+      and WFP. Credentials are prompted interactively per AD domain (and per OU if configured).
     </div>
   </div>
 
@@ -484,9 +494,9 @@
     </div>
     <pre><span class="ps-prompt">PS&gt; </span><span class="ps-cmd">.\BreakGlass.ps1</span> <span class="ps-switch">-Linux</span> <span class="ps-switch">-LinuxUseSSHKey</span> <span class="ps-switch">-Network</span> <span class="ps-param">-Mode</span> <span class="ps-value">All</span> <span class="ps-switch">-ServersOnly</span></pre>
     <div class="example-desc">
-      Targets only Linux server-type assets. Uses an SSH key for authentication (path
-      prompted at runtime). Inserts an iptables ACCEPT rule for all inbound and outbound
-      traffic on each target.
+      Targets only Linux server-type assets. Uses an SSH key for authentication (path prompted at runtime).
+      Each asset's <code>AppliedFirewallType</code> from <code>segmentedAssets.json</code> determines
+      whether iptables or nftables is used. Inserts an ACCEPT-all rule on each target.
     </div>
   </div>
 
@@ -497,8 +507,10 @@
     </div>
     <pre><span class="ps-prompt">PS&gt; </span><span class="ps-cmd">.\BreakGlass.ps1</span> <span class="ps-param">-Asset</span> <span class="ps-value">linuxserver.contoso.local</span> <span class="ps-switch">-Linux</span> <span class="ps-switch">-LinuxUseSSHKey</span> <span class="ps-switch">-Network</span> <span class="ps-param">-Mode</span> <span class="ps-value">All</span></pre>
     <div class="example-desc">
-      Resolves <code>linuxserver.contoso.local</code> via DNS and runs the full-open iptables
-      break glass against that single host. The SSH key path is prompted interactively.
+      Resolves <code>linuxserver.contoso.local</code> via DNS and runs break glass against that single host.
+      Because the firewall type is unknown for a manually-specified asset, both iptables and nftables
+      backends are attempted. A failure on one backend does not abort the other. The SSH key path is
+      prompted interactively.
     </div>
   </div>
 
@@ -509,8 +521,8 @@
     </div>
     <pre><span class="ps-prompt">PS&gt; </span><span class="ps-cmd">.\BreakGlass.ps1</span> <span class="ps-param">-IPAddress</span> <span class="ps-value">1.1.1.1</span> <span class="ps-switch">-Windows</span> <span class="ps-switch">-Network</span> <span class="ps-param">-Mode</span> <span class="ps-value">All</span></pre>
     <div class="example-desc">
-      Resolves <code>1.1.1.1</code> via a PTR record, then prompts interactively for
-      a domain name and AD username before opening all ports on the target.
+      Resolves <code>1.1.1.1</code> via a PTR record, then prompts interactively for a domain name
+      and AD username before opening all ports on the target.
     </div>
   </div>
 
@@ -535,7 +547,8 @@
     <pre><span class="ps-prompt">PS&gt; </span><span class="ps-cmd">.\BreakGlass.ps1</span> <span class="ps-switch">-Windows</span> <span class="ps-param">-Mode</span> <span class="ps-value">All</span> <span class="ps-switch">-Network</span> <span class="ps-param">-DeploymentClusterName</span> <span class="ps-value">"zero.local"</span></pre>
     <div class="example-desc">
       Restricts the affected asset pool to the <code>zero.local</code> deployment cluster only.
-      Assets in other clusters are skipped entirely.
+      Assets in other clusters are skipped entirely. Use <kbd>Tab</kbd> to cycle through available
+      cluster names.
     </div>
   </div>
 
@@ -573,7 +586,6 @@
   </p>
 
   <h2 id="ot-syntax">Syntax</h2>
-
   <div class="syntax-block">
 <span class="cmd">.\OTBreakGlass.ps1</span>
    [<span class="param">-SwitchPassword</span> &lt;SecureString&gt;]
@@ -582,7 +594,6 @@
 
   <h2 id="ot-parameters">Parameters</h2>
 
-  <!-- -SwitchPassword -->
   <div class="param-entry">
     <div class="param-name">-SwitchPassword</div>
     <div class="param-body">
@@ -603,7 +614,6 @@
     </div>
   </div>
 
-  <!-- -RemoveMonitoring -->
   <div class="param-entry">
     <div class="param-name">-RemoveMonitoring</div>
     <div class="param-body">
@@ -662,7 +672,7 @@
         <td><code>Privileged</code></td>
         <td>Windows</td>
         <td>Windows Firewall + WFP</td>
-        <td>Inbound RDP (TCP 3389) allowed; all outbound allowed</td>
+        <td>Inbound TCP 3389 (RDP), 5985 (WinRM), 5986 (WinRM HTTPS), 9389 (ADWS), 445 (SMB) allowed; all outbound allowed</td>
       </tr>
       <tr>
         <td><code>All</code></td>
@@ -673,14 +683,14 @@
       <tr>
         <td><code>Privileged</code></td>
         <td>Linux</td>
-        <td>iptables (via python-iptables)</td>
-        <td>Inbound SSH (TCP 22) ACCEPT rule inserted at position 0 in INPUT chain</td>
+        <td>iptables or nftables (per <code>AppliedFirewallType</code>)</td>
+        <td>Inbound TCP 22 (SSH), 23 (Telnet), 445 (SMB) ACCEPT; all outbound ACCEPT</td>
       </tr>
       <tr>
         <td><code>All</code></td>
         <td>Linux</td>
-        <td>iptables (via python-iptables)</td>
-        <td>ACCEPT all rule inserted at position 0 in INPUT and OUTPUT chains</td>
+        <td>iptables or nftables (per <code>AppliedFirewallType</code>)</td>
+        <td>ACCEPT all rule inserted in INPUT and OUTPUT chains</td>
       </tr>
     </tbody>
   </table>
@@ -694,8 +704,8 @@
       <tr><td><code>Windows</code></td><td><code>-Windows</code></td><td>Bulk Windows assets from segmentedAssets.json</td></tr>
       <tr><td><code>Linux</code></td><td><code>-Linux</code></td><td>Bulk Linux assets from segmentedAssets.json</td></tr>
       <tr><td><code>WindowsAndLinux</code></td><td><code>-WindowsAndLinux</code></td><td>Bulk Windows + Linux in one run</td></tr>
-      <tr><td><code>Asset</code></td><td><code>-Asset</code> + <code>-Windows</code> or <code>-Linux</code></td><td>Single asset by hostname or FQDN</td></tr>
-      <tr><td><code>IP</code></td><td><code>-IPAddress</code> + <code>-Windows</code> or <code>-Linux</code></td><td>Single asset by IP (PTR lookup required)</td></tr>
+      <tr><td><code>Asset</code></td><td><code>-Asset</code> + <code>-Windows</code> or <code>-Linux</code></td><td>Single asset by hostname or FQDN; does not read segmentedAssets.json</td></tr>
+      <tr><td><code>IP</code></td><td><code>-IPAddress</code> + <code>-Windows</code> or <code>-Linux</code></td><td>Single asset by IP (PTR lookup required); does not read segmentedAssets.json</td></tr>
     </tbody>
   </table>
 
@@ -703,10 +713,11 @@
   <ul style="line-height: 2.1; margin-left: 1.5rem;">
     <li>Rules and filters added by the break glass scripts are <strong>persistent</strong> across reboots. They must be manually removed or will be cleaned up when the Zero Networks agent next synchronises policy.</li>
     <li>For Windows assets the script uses <strong>PowerShell Remoting (WinRM)</strong> with Negotiate authentication. Ensure WinRM is enabled and accessible on targets.</li>
-    <li>For Linux assets the script connects via <strong>SSH</strong> using the POSH-SSH module, escalates to root with <code>sudo su</code>, and manipulates iptables through a Zero Networks Python virtual environment bundled on the asset.</li>
+    <li>For Linux assets the script connects via <strong>SSH</strong> using the POSH-SSH module, escalates to root with <code>sudo su</code>, and manipulates the firewall through a Zero Networks Python virtual environment bundled on the asset. Both <strong>iptables</strong> (via python-iptables) and <strong>nftables</strong> (via python-nftables) backends are supported. For bulk operations, the backend is selected from <code>AppliedFirewallType</code> in <code>segmentedAssets.json</code>. For single-asset operations (<code>-Asset</code> / <code>-IPAddress</code>), both backends are attempted; a failure on one does not abort the other.</li>
     <li>Both scripts create <code>success_list.txt</code> and <code>failed_list.txt</code> (or <code>ot_success_list.txt</code> / <code>ot_failed_list.txt</code> for OT) in the working directory.</li>
     <li>Bulk operations run with <code>-ThrottleLimit 100</code> (up to 100 assets processed concurrently).</li>
-    <li>The <code>segmentedAssets.json</code> file is automatically generated and kept up to date by the Zero Networks Segment Server. It is read from <code>C:\Program Files\Zero Networks\Breakglass\</code> on the machine running the script, not on the target assets. Do not edit it manually.</li>
+    <li><code>segmentedAssets.json</code> is only loaded for bulk operations. Single-asset runs (<code>-Asset</code> / <code>-IPAddress</code>) do not read the inventory file.</li>
+    <li>The <code>segmentedAssets.json</code> file is automatically generated and kept up to date by the Zero Networks Segment Server. It is read from <code>C:\Program Files\Zero Networks\Breakglass\</code> on the machine running the script. Do not edit it manually.</li>
     <li>For OT, switch credentials are never stored; they are held in memory only for the duration of the script run and cleared afterwards.</li>
   </ul>
 
@@ -717,30 +728,40 @@
     <div class="page-header" style="margin-bottom:1rem; border-bottom:none; padding-bottom:0.5rem;">
       <h1 id="changelog">Change Manifest</h1>
       <div class="tags">
-        <span class="tag purple">Documentation</span>
+        <span class="tag purple">vs. Previous Deployed Version</span>
       </div>
     </div>
   </div>
 
-  <p>Records changes to script behaviour that were previously undocumented, and documentation corrections applied to this reference.</p>
+  <p>Functional changes in this version of <code>BreakGlass.ps1</code> relative to the previously-deployed version.</p>
 
   <table>
-    <thead><tr><th>Area</th><th>Change</th><th>Notes</th></tr></thead>
+    <thead><tr><th>Area</th><th>Change</th><th>Impact</th></tr></thead>
     <tbody>
       <tr>
-        <td><code>-ADUserName</code></td>
-        <td>Accepts UPN format (<code>user@domain.com</code>) in addition to <code>DOMAIN\user</code></td>
-        <td>Both formats parse correctly when supplying explicit credentials for bulk Windows operations.</td>
+        <td>Linux firewall backend</td>
+        <td>Added nftables support alongside iptables. The backend is selected per-asset from <code>AppliedFirewallType</code> in <code>segmentedAssets.json</code> for bulk operations.</td>
+        <td>Required for modern Linux distributions (e.g. RHEL 10) that ship without iptables-legacy.</td>
       </tr>
       <tr>
-        <td><code>-DeploymentClusterName</code></td>
-        <td>Tab-completion reads live cluster names from <code>segmentedAssets.json</code>; parameter also validates against that list and throws a descriptive error with valid options on mismatch</td>
-        <td>Tab-complete with <kbd>Tab</kbd> in PowerShell 7+. Names containing spaces are quoted automatically.</td>
+        <td>Single-asset Linux (<code>-Asset</code> / <code>-IPAddress</code>)</td>
+        <td>Both iptables and nftables backends are now attempted automatically in sequence. Each attempt is isolated; a failure on one backend does not abort the other.</td>
+        <td>Eliminates the need to know which backend is active when targeting a single Linux host manually.</td>
       </tr>
       <tr>
-        <td>Windows credential collection (bulk)</td>
-        <td>Per-OU credentials are now collected and matched at runtime</td>
-        <td>The script reads <code>OuCredentials</code> from each domain in <code>ForestsConfig</code> and prompts separately for each OU. Assets with an <code>OrganizationalUnit</code> field are matched to the appropriate OU credential before falling back to the domain credential.</td>
+        <td>Linux <code>Privileged</code> mode ports</td>
+        <td>Expanded from SSH (22) only to SSH (22), Telnet (23), and SMB (445) via <code>multiport</code> match.</td>
+        <td>Restores management access for environments that require SMB or legacy Telnet alongside SSH. Previously a second <code>-Mode All</code> run was needed to restore those ports.</td>
+      </tr>
+      <tr>
+        <td>Windows <code>Privileged</code> mode ports</td>
+        <td>Expanded from RDP (3389) only to RDP (3389), WinRM HTTP (5985), WinRM HTTPS (5986), ADWS (9389), and SMB (445). Applied at both the Windows Firewall and WFP layers.</td>
+        <td>Enables PSRemoting, AD management tooling, and file access in a single Privileged-mode run — previously a second <code>-Mode All</code> run was needed to restore WinRM access.</td>
+      </tr>
+      <tr>
+        <td><code>segmentedAssets.json</code> loading</td>
+        <td>The inventory file is now only loaded for bulk operations. Single-asset runs (<code>-Asset</code> / <code>-IPAddress</code>) skip the load entirely.</td>
+        <td>Avoids a misleading error if the JSON is stale or absent when targeting a known asset directly.</td>
       </tr>
     </tbody>
   </table>
@@ -748,10 +769,8 @@
 </main>
 
 <script>
-  // Highlight active sidebar link based on scroll position
   const sections = document.querySelectorAll('[id]');
   const navLinks = document.querySelectorAll('nav.sidebar a');
-
   const observer = new IntersectionObserver(entries => {
     entries.forEach(entry => {
       if (entry.isIntersecting) {
@@ -761,10 +780,8 @@
       }
     });
   }, { rootMargin: '-20% 0px -70% 0px' });
-
   sections.forEach(s => observer.observe(s));
 
-  // Copy buttons on code examples
   document.querySelectorAll('.example').forEach(ex => {
     const pre = ex.querySelector('pre');
     const header = ex.querySelector('.example-header');
@@ -789,4 +806,3 @@
 
 </body>
 </html>
-
