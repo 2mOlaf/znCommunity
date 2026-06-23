@@ -217,6 +217,11 @@ param (
 
 )
 
+enum LinuxFirewallType {
+    Iptables = 1
+    Nftables = 2
+}
+
 Function Invoke-WindowsBreakGlass {
     param (
         [Parameter(Mandatory = $true)]
@@ -265,9 +270,12 @@ Function Invoke-LinuxBreakGlass {
         [string]$LinuxSSHKey,
         [switch]$Network = $false,
         [string]$Mode,
+        [ValidateSet("iptables", "nftables")]
+        [string]$AppliedFirewallType,
         [string]$success_list,
         [string]$failed_list
     )
+
     if ($useKey -eq $true) {
         # write-host "SSH with key"
         $ssh = New-SSHSession -ComputerName $AssetFQDN -KeyFile $LinuxSSHKey -Credential $Credential -AcceptKey -ErrorAction SilentlyContinue -ErrorVariable errmsg -KnownHost (Get-SSHOpenSSHKnownHost -LocalFile $env:TEMP\$AssetFQDN_known_hosts.json) -Verbose
@@ -276,15 +284,37 @@ Function Invoke-LinuxBreakGlass {
         $ssh = New-SSHSession -ComputerName $AssetFQDN -Credential $Credential -AcceptKey -ErrorAction SilentlyContinue -ErrorVariable errmsg -KnownHost (Get-SSHOpenSSHKnownHost -LocalFile $env:TEMP\$AssetFQDN_known_hosts.json) -Verbose
     }
     if ($null -ne $ssh ) {
-        function Insert-IptablesRule {
+        function Insert-IptablesBgRule {
             param (
                 $stream,
                 $chain,
-                $index,
-                $rule
+                [switch]$OnlyPrivileged
             )
 
-            $command = "python -c `"import iptc; table = iptc.Table(iptc.Table.FILTER); chain = iptc.Chain(table, '$chain'); rule = iptc.easy.encode_iptc_rule($rule); chain.insert_rule(rule, $index)`" 2>breakglass_errors"
+            if ($OnlyPrivileged) {
+                $rule = "{'protocol': 'tcp', 'multiport': {'dports': '22,23,445'}, 'target': 'ACCEPT'}"
+            } else {
+                $rule = "{'target': 'ACCEPT'}"
+            }
+
+            $command = "python -c `"import iptc; table = iptc.Table(iptc.Table.FILTER); chain = iptc.Chain(table, '$chain'); rule = iptc.easy.encode_iptc_rule($rule); chain.insert_rule(rule, 0)`" 2>>breakglass_errors || echo 'breakglass: iptables backend unavailable or insert failed on this host, skipping' >>breakglass_errors"
+            Invoke-SSHStreamShellCommand -ShellStream $stream -Command $command -ErrorAction Stop -ErrorVariable errmsg | Out-Null
+        }
+
+        function Insert-NftablesBgRule {
+            param (
+                $stream,
+                $chain,
+                [switch]$OnlyPrivileged
+            )
+
+            if ($OnlyPrivileged) {
+                $body = "tcp dport { 22, 23, 445 } accept"
+            } else {
+                $body = "accept"
+            }
+
+            $command = "python -c `"import sys, subprocess, nftables; lib = next((line.split('=> ')[-1].strip() for line in subprocess.check_output(['ldconfig', '-p'], universal_newlines=True).splitlines() if 'libnftables.so' in line), ''); exec('try:\n n = nftables.Nftables(lib) if lib else nftables.Nftables()\nexcept Exception:\n n = nftables.Nftables()'); chk = lambda r: sys.stderr.write('breakglass nft insert failed: {}\n'.format(r[2])) if r[0] != 0 else None; chk(n.cmd('insert rule ip zn_filter_ipv4 $chain $body')); chk(n.cmd('insert rule ip6 zn_filter_ipv6 $chain $body'))`" 2>>breakglass_errors || echo 'breakglass: nftables backend unavailable or insert failed on this host, skipping' >>breakglass_errors"
 
             Invoke-SSHStreamShellCommand -ShellStream $stream -Command $command -ErrorAction Stop -ErrorVariable errmsg | Out-Null
         }
@@ -301,26 +331,38 @@ Function Invoke-LinuxBreakGlass {
             $ActivatePythonVirtualEnvCommand = ". ./.zn-internal/venv3/bin/activate || . ./.zn-internal/venv2/bin/activate"
             Invoke-SSHStreamShellCommand -ShellStream $stream -Command $ActivatePythonVirtualEnvCommand -ErrorAction stop -ErrorVariable errmsg | Out-Null
 
-            $SetXtablesLibDir = "python -c 'import iptc' || export XTABLES_LIBDIR=`$(cat '.zn-internal/cached_xtables_libdir')"
-            Invoke-SSHStreamShellCommand -ShellStream $stream -Command $SetXtablesLibDir  -ErrorAction stop -ErrorVariable errmsg | Out-Null
+            if ($AppliedFirewallType -eq "iptables") {
+                $SetXtablesLibDir = "python -c 'import iptc' || export XTABLES_LIBDIR=`$(cat '.zn-internal/cached_xtables_libdir')"
+                Invoke-SSHStreamShellCommand -ShellStream $stream -Command $SetXtablesLibDir  -ErrorAction stop -ErrorVariable errmsg | Out-Null
 
-            $inboundRule = ''
-
-            if ($Mode -eq "All" ) {
-                Write-Output "Adding Zero Networks Break Glass All rule on $AssetFQDN"
-                $inboundRule = "{'target': 'ACCEPT'}"
+                if ($Mode -eq "All" ) {
+                    Write-Output "Adding Zero Networks Break Glass All rule (iptables) on $AssetFQDN"
+                    Insert-IptablesBgRule -stream $stream -chain "INPUT"
+                    Insert-IptablesBgRule -stream $stream -chain "OUTPUT"
+                }
+                elseif ($Mode -eq "Privileged") {
+                    Write-Output "Adding Zero Networks Break Glass Privileged rule (iptables) on $AssetFQDN"
+                    Insert-IptablesBgRule -stream $stream -chain "INPUT" -OnlyPrivileged
+                    Insert-IptablesBgRule -stream $stream -chain "OUTPUT"
+                }
             }
-            if ($Mode -eq "Privileged") {
-                Write-Output "Adding Zero Networks Break Glass SSH rule on $AssetFQDN"
-                $inboundRule = "{'protocol': 'tcp', 'tcp': {'dport': '22'}, 'target': 'ACCEPT'}"
+            elseif ($AppliedFirewallType -eq "nftables") {
+                if ($Mode -eq "All" ) {
+                    Write-Output "Adding Zero Networks Break Glass All rule (nftables) on $AssetFQDN"
+                    Insert-NftablesBgRule -stream $stream -chain "INPUT"
+                    Insert-NftablesBgRule -stream $stream -chain "OUTPUT"
+                }
+                elseif ($Mode -eq "Privileged") {
+                    Write-Output "Adding Zero Networks Break Glass Privileged rule (nftables) on $AssetFQDN"
+                    Insert-NftablesBgRule -stream $stream -chain "INPUT" -OnlyPrivileged
+                    Insert-NftablesBgRule -stream $stream -chain "OUTPUT"
+                }
             }
-
-            Insert-IptablesRule -stream $stream -chain "INPUT" -index 0 -rule $inboundRule
-
-            $outboundRule = "{'target': 'ACCEPT'}"
-            Insert-IptablesRule -stream $stream -chain "OUTPUT" -index 0 -rule $outboundRule
+            else {
+                Write-Output "Unsupported firewall type '$AppliedFirewallType' for $AssetFQDN, skipping network break glass"
+            }
         }
-        Remove-SSHSession $ssh
+        Remove-SSHSession $ssh | Out-Null
         if ($errmsg -eq '' -or $errmsg.count -eq 0) {
             Add-Content -Path $success_list -Value $AssetFQDN
         }
@@ -426,12 +468,15 @@ if ($PSBoundParameters['IPAddress']) {
     }
 }
 
-#Load segmented Assets early to avoid prompting for credentials when single asset is missing
-$segmentedAssetsJson = Get-Content "C:\Program Files\Zero Networks\Breakglass\segmentedAssets.json" | ConvertFrom-Json
-$segmentedAssets = $segmentedAssetsJson.segmentedAssets
-if ($null -eq $segmentedAssets) {
-    Write-Host "segmentedAssets.json not found."
-    exit
+#Load segmented Assets early to avoid prompting for credentials when single asset is missing.
+#Only the multi-asset modes use the inventory; single asset (-Asset/-IPAddress) does not.
+if (-not $PSBoundParameters['Asset'] -and -not $PSBoundParameters['IPAddress']) {
+    $segmentedAssetsJson = Get-Content "C:\Program Files\Zero Networks\Breakglass\segmentedAssets.json" | ConvertFrom-Json
+    $segmentedAssets = $segmentedAssetsJson.segmentedAssets
+    if ($null -eq $segmentedAssets) {
+        Write-Host "segmentedAssets.json not found."
+        exit
+    }
 }
 
 $filteredClusterId = $null
@@ -449,6 +494,8 @@ if ($PSBoundParameters.ContainsKey('DeploymentClusterName')) {
 
 
 if ($PSBoundParameters['Linux'] -or $PSBoundParameters['WindowsAndLinux']) {
+    $global:linuxSSHKey = $null
+
     if (!$PSBoundParameters['LinuxUseSSHKey']) {
         if ($PSBoundParameters['LinuxUserName']) {
             $linuxUsername = $LinuxUserName
@@ -623,8 +670,11 @@ if ($PSBoundParameters['Linux'] -or $PSBoundParameters['WindowsAndLinux'] -and !
     if ($members.count -eq 0) {
         Write-Host "No Linux Assets found in the segmented assets list"
     } else {
-        # LinuxCredential is set here, outside the parallel loop. It will be passed using $using:
-        # $global:linuxSSHKey is also set earlier and will be accessed using $using:global:
+
+        foreach ($member in $members) {
+            $firewallType = [LinuxFirewallType]$member.AppliedFirewallType
+            $member | Add-Member -NotePropertyName "AppliedFirewallTypeName" -NotePropertyValue $firewallType.ToString().ToLower() -Force
+        }
 
         $members | ForEach-Object -ThrottleLimit 100 -Parallel {
             ${function:Invoke-LinuxBreakGlass} = $($using:LinBGDefinition)
@@ -645,7 +695,7 @@ if ($PSBoundParameters['Linux'] -or $PSBoundParameters['WindowsAndLinux'] -and !
 
                 # Determine $useKeyParam based on whether $global:linuxSSHKey is set
                 $useKeyParam = if ($using:global:linuxSSHKey) { $true } else { $false }
-                Invoke-LinuxBreakGlass -AssetFQDN $AssetFQDN -Credential $($using:LinuxCredential) -useKey:$useKeyParam -LinuxSSHKey $($using:global:linuxSSHKey) -Network:$($using:Network) -Mode $($using:Mode) -success_list $($using:success_list) -failed_list $($using:failed_list)
+                Invoke-LinuxBreakGlass -AssetFQDN $AssetFQDN -Credential $($using:LinuxCredential) -useKey:$useKeyParam -LinuxSSHKey $($using:global:linuxSSHKey) -Network:$($using:Network) -Mode $($using:Mode) -AppliedFirewallType $_.AppliedFirewallTypeName -success_list $($using:success_list) -failed_list $($using:failed_list)
             }
             else {
                 Write-Output "Asset $AssetFQDN is not segmented. Skipping"
@@ -660,7 +710,14 @@ if ($PSBoundParameters['Asset'] -or $PSBoundParameters['IPAddress'] -and $PSBoun
    
     # Determine $useKey based on whether $global:linuxSSHKey is set
     $useKey = if ($global:linuxSSHKey) { $true } else { $false }
-    Invoke-LinuxBreakGlass  -AssetFQDN $AssetFQDN -Credential $LinuxCredential -useKey:$useKey -LinuxSSHKey $($global:linuxSSHKey) -Network:$PSBoundParameters['Network'] -Mode $PSBoundParameters['Mode'] -success_list $success_list -failed_list $failed_list
+
+    foreach ($firewallType in @("iptables", "nftables")) {
+        try {
+            Invoke-LinuxBreakGlass  -AssetFQDN $AssetFQDN -Credential $LinuxCredential -useKey:$useKey -LinuxSSHKey $($global:linuxSSHKey) -Network:$PSBoundParameters['Network'] -Mode $PSBoundParameters['Mode'] -AppliedFirewallType $firewallType -success_list $success_list -failed_list $failed_list
+        } catch {
+            Write-Host "Break glass attempt for firewall type $firewallType on $AssetFQDN did not complete: $_"
+        }
+    }
     
 }
 
@@ -674,332 +731,3 @@ $WinRMSecretPassword = $null
 $LinuxSecretPassword = $null
 $global:linuxSSHKey = $null
  
-# SIG # Begin signature block
-# MII9MwYJKoZIhvcNAQcCoII9JDCCPSACAQExDzANBglghkgBZQMEAgEFADB5Bgor
-# BgEEAYI3AgEEoGswaTA0BgorBgEEAYI3AgEeMCYCAwEAAAQQH8w7YFlLCE63JNLG
-# KX7zUQIBAAIBAAIBAAIBAAIBADAxMA0GCWCGSAFlAwQCAQUABCDlUPQTUmXF417f
-# 5rQ9UXrWBLuxMQchJqw5Ma8e7NBEL6CCIfgwggXMMIIDtKADAgECAhBUmNLR1FsZ
-# lUgTecgRwIeZMA0GCSqGSIb3DQEBDAUAMHcxCzAJBgNVBAYTAlVTMR4wHAYDVQQK
-# ExVNaWNyb3NvZnQgQ29ycG9yYXRpb24xSDBGBgNVBAMTP01pY3Jvc29mdCBJZGVu
-# dGl0eSBWZXJpZmljYXRpb24gUm9vdCBDZXJ0aWZpY2F0ZSBBdXRob3JpdHkgMjAy
-# MDAeFw0yMDA0MTYxODM2MTZaFw00NTA0MTYxODQ0NDBaMHcxCzAJBgNVBAYTAlVT
-# MR4wHAYDVQQKExVNaWNyb3NvZnQgQ29ycG9yYXRpb24xSDBGBgNVBAMTP01pY3Jv
-# c29mdCBJZGVudGl0eSBWZXJpZmljYXRpb24gUm9vdCBDZXJ0aWZpY2F0ZSBBdXRo
-# b3JpdHkgMjAyMDCCAiIwDQYJKoZIhvcNAQEBBQADggIPADCCAgoCggIBALORKgeD
-# Bmf9np3gx8C3pOZCBH8Ppttf+9Va10Wg+3cL8IDzpm1aTXlT2KCGhFdFIMeiVPvH
-# or+Kx24186IVxC9O40qFlkkN/76Z2BT2vCcH7kKbK/ULkgbk/WkTZaiRcvKYhOuD
-# PQ7k13ESSCHLDe32R0m3m/nJxxe2hE//uKya13NnSYXjhr03QNAlhtTetcJtYmrV
-# qXi8LW9J+eVsFBT9FMfTZRY33stuvF4pjf1imxUs1gXmuYkyM6Nix9fWUmcIxC70
-# ViueC4fM7Ke0pqrrBc0ZV6U6CwQnHJFnni1iLS8evtrAIMsEGcoz+4m+mOJyoHI1
-# vnnhnINv5G0Xb5DzPQCGdTiO0OBJmrvb0/gwytVXiGhNctO/bX9x2P29Da6SZEi3
-# W295JrXNm5UhhNHvDzI9e1eM80UHTHzgXhgONXaLbZ7LNnSrBfjgc10yVpRnlyUK
-# xjU9lJfnwUSLgP3B+PR0GeUw9gb7IVc+BhyLaxWGJ0l7gpPKWeh1R+g/OPTHU3mg
-# trTiXFHvvV84wRPmeAyVWi7FQFkozA8kwOy6CXcjmTimthzax7ogttc32H83rwjj
-# O3HbbnMbfZlysOSGM1l0tRYAe1BtxoYT2v3EOYI9JACaYNq6lMAFUSw0rFCZE4e7
-# swWAsk0wAly4JoNdtGNz764jlU9gKL431VulAgMBAAGjVDBSMA4GA1UdDwEB/wQE
-# AwIBhjAPBgNVHRMBAf8EBTADAQH/MB0GA1UdDgQWBBTIftJqhSobyhmYBAcnz1AQ
-# T2ioojAQBgkrBgEEAYI3FQEEAwIBADANBgkqhkiG9w0BAQwFAAOCAgEAr2rd5hnn
-# LZRDGU7L6VCVZKUDkQKL4jaAOxWiUsIWGbZqWl10QzD0m/9gdAmxIR6QFm3FJI9c
-# Zohj9E/MffISTEAQiwGf2qnIrvKVG8+dBetJPnSgaFvlVixlHIJ+U9pW2UYXeZJF
-# xBA2CFIpF8svpvJ+1Gkkih6PsHMNzBxKq7Kq7aeRYwFkIqgyuH4yKLNncy2RtNwx
-# AQv3Rwqm8ddK7VZgxCwIo3tAsLx0J1KH1r6I3TeKiW5niB31yV2g/rarOoDXGpc8
-# FzYiQR6sTdWD5jw4vU8w6VSp07YEwzJ2YbuwGMUrGLPAgNW3lbBeUU0i/OxYqujY
-# lLSlLu2S3ucYfCFX3VVj979tzR/SpncocMfiWzpbCNJbTsgAlrPhgzavhgplXHT2
-# 6ux6anSg8Evu75SjrFDyh+3XOjCDyft9V77l4/hByuVkrrOj7FjshZrM77nq81YY
-# uVxzmq/FdxeDWds3GhhyVKVB0rYjdaNDmuV3fJZ5t0GNv+zcgKCf0Xd1WF81E+Al
-# GmcLfc4l+gcK5GEh2NQc5QfGNpn0ltDGFf5Ozdeui53bFv0ExpK91IjmqaOqu/dk
-# ODtfzAzQNb50GQOmxapMomE2gj4d8yu8l13bS3g7LfU772Aj6PXsCyM2la+YZr9T
-# 03u4aUoqlmZpxJTG9F9urJh4iIAGXKKy7aIwggapMIIEkaADAgECAhMzAAF5CVV4
-# lxQzu/ipAAAAAXkJMA0GCSqGSIb3DQEBDAUAMFoxCzAJBgNVBAYTAlVTMR4wHAYD
-# VQQKExVNaWNyb3NvZnQgQ29ycG9yYXRpb24xKzApBgNVBAMTIk1pY3Jvc29mdCBJ
-# RCBWZXJpZmllZCBDUyBFT0MgQ0EgMDQwHhcNMjYwNTI3MTgxMTQ2WhcNMjYwNTMw
-# MTgxMTQ2WjBrMQswCQYDVQQGEwJJTDERMA8GA1UECBMIVGVsIEF2aXYxETAPBgNV
-# BAcTCFRlbCBBdml2MRowGAYDVQQKExFaZXJvIE5ldHdvcmtzIEx0ZDEaMBgGA1UE
-# AxMRWmVybyBOZXR3b3JrcyBMdGQwggGiMA0GCSqGSIb3DQEBAQUAA4IBjwAwggGK
-# AoIBgQCbQid4cGnIXFuk+u6okLR89Zcmq3Z72sk2oeDiNBgqib1rP82v56/46w2C
-# EkT30XJs1PwPPVlC0u64cBLI3vFPPY4KzOY3SEhoRS8rrwYocjSX3VwI8BWgwmZP
-# qo9nVC4v0n3lOPq3sy0io8DHLC9cRh1lsA7bXRgwYvgx9s5XtF3MwOHenFrE7dsT
-# dtygG5oFJ86eafV2T9N3T/Uj0m+PGlJ8/Vdvdf3GBDMWRYLdbSoOO7YKqaaV27n7
-# KZguXmuLGZOu0mZczi63mIXicBhda/ohNKHleNA6mLZb7I0uZEan8zSGZzmHh2Xx
-# BC6CDVVK0vHXLFL2H886S1xlWrvWzn3Uay0/KWismIwgM9b2PZmS7CHtYSIVcbuV
-# KMD1HUZReMa6kIYVubig81hNkp7HAZ45Al1FWaTEV1Pp2Euc1u/KMs9beQQP1Suo
-# HmixSSvi7EsARr1Btxfc7kw/VU2cueMyo2M455D0uzi6W/K+h2rK4QFsOENEFzrV
-# CZwQ15cCAwEAAaOCAdUwggHRMAwGA1UdEwEB/wQCMAAwDgYDVR0PAQH/BAQDAgeA
-# MDwGA1UdJQQ1MDMGCisGAQQBgjdhAQAGCCsGAQUFBwMDBhsrBgEEAYI3YYGwosY4
-# g9jRjh+BtaSjBsGi+2swHQYDVR0OBBYEFJwF2lKPw0lXlVWXXJ5Jc4WSlk3dMB8G
-# A1UdIwQYMBaAFJrxVHd1DIcWN0agrN55+fR/wXjpMGcGA1UdHwRgMF4wXKBaoFiG
-# Vmh0dHA6Ly93d3cubWljcm9zb2Z0LmNvbS9wa2lvcHMvY3JsL01pY3Jvc29mdCUy
-# MElEJTIwVmVyaWZpZWQlMjBDUyUyMEVPQyUyMENBJTIwMDQuY3JsMHQGCCsGAQUF
-# BwEBBGgwZjBkBggrBgEFBQcwAoZYaHR0cDovL3d3dy5taWNyb3NvZnQuY29tL3Br
-# aW9wcy9jZXJ0cy9NaWNyb3NvZnQlMjBJRCUyMFZlcmlmaWVkJTIwQ1MlMjBFT0Ml
-# MjBDQSUyMDA0LmNydDBUBgNVHSAETTBLMEkGBFUdIAAwQTA/BggrBgEFBQcCARYz
-# aHR0cDovL3d3dy5taWNyb3NvZnQuY29tL3BraW9wcy9Eb2NzL1JlcG9zaXRvcnku
-# aHRtMA0GCSqGSIb3DQEBDAUAA4ICAQBdjL66HLDy6angzB6L3Dmo24J9Wqw1bby0
-# Devr9otwGL4O8EV1Ydsx1BjclVdTdh6o0d/SHxQjFB2QEyVawq4YqYPsBX9qtOOG
-# fs7W8seXi06JahuaGyeOf4gxBwk15+hwPszVXsqL6yocUKsLVjyCKZpG0YET83Un
-# a2g5p9Lwd8EDlqsVb59Emm2YxdO5wfnYRveMOuNtWW5Qe/XoYuRDpS/f0NiW196l
-# KTrcklw8zLgsOlbWMCT/JI/Nn9mYCS7xNnpjPZW86arW9wxoqyce/UTlxv6KEzdY
-# /gFw66+yITUW6d02QDG6CZYiCUeWFpaRItijPIocPwcll+rkIQZ7ONQcT0hlc/CZ
-# oHgB1MF+JCu2FXZLI1qqMEoLxoGi/sNzG2y1wDIevZov+Ygm6Feqr/rQcutNK/SS
-# b8GBTCnKgtgEhCN3yN2M/k1SJFXTaEilZuuA7XkcACweqhZEEg/44yOKJifzwIqR
-# dIIvViMdVRIylkbAKUNxmQJq78TuK9/hfNM3fvpkgScQb6HOZDGYfsohgFA+NLUi
-# 7WKsZ2BNVSzqjVlXQBa8MaloNgPCrbOSYlObSUTwB+XO0WHJdUDf4E+DWo+jcXhD
-# N2ouRGY0+Jx1bwZAshq+nB+OY7VTxiiq7pB5hVbDI9ahd2/9V3FuH62+mo7QJQe8
-# qEdJN7WQdzCCBqkwggSRoAMCAQICEzMAAXkJVXiXFDO7+KkAAAABeQkwDQYJKoZI
-# hvcNAQEMBQAwWjELMAkGA1UEBhMCVVMxHjAcBgNVBAoTFU1pY3Jvc29mdCBDb3Jw
-# b3JhdGlvbjErMCkGA1UEAxMiTWljcm9zb2Z0IElEIFZlcmlmaWVkIENTIEVPQyBD
-# QSAwNDAeFw0yNjA1MjcxODExNDZaFw0yNjA1MzAxODExNDZaMGsxCzAJBgNVBAYT
-# AklMMREwDwYDVQQIEwhUZWwgQXZpdjERMA8GA1UEBxMIVGVsIEF2aXYxGjAYBgNV
-# BAoTEVplcm8gTmV0d29ya3MgTHRkMRowGAYDVQQDExFaZXJvIE5ldHdvcmtzIEx0
-# ZDCCAaIwDQYJKoZIhvcNAQEBBQADggGPADCCAYoCggGBAJtCJ3hwachcW6T67qiQ
-# tHz1lyardnvayTah4OI0GCqJvWs/za/nr/jrDYISRPfRcmzU/A89WULS7rhwEsje
-# 8U89jgrM5jdISGhFLyuvBihyNJfdXAjwFaDCZk+qj2dULi/SfeU4+rezLSKjwMcs
-# L1xGHWWwDttdGDBi+DH2zle0XczA4d6cWsTt2xN23KAbmgUnzp5p9XZP03dP9SPS
-# b48aUnz9V291/cYEMxZFgt1tKg47tgqpppXbufspmC5ea4sZk67SZlzOLreYheJw
-# GF1r+iE0oeV40DqYtlvsjS5kRqfzNIZnOYeHZfEELoINVUrS8dcsUvYfzzpLXGVa
-# u9bOfdRrLT8paKyYjCAz1vY9mZLsIe1hIhVxu5UowPUdRlF4xrqQhhW5uKDzWE2S
-# nscBnjkCXUVZpMRXU+nYS5zW78oyz1t5BA/VK6geaLFJK+LsSwBGvUG3F9zuTD9V
-# TZy54zKjYzjnkPS7OLpb8r6HasrhAWw4Q0QXOtUJnBDXlwIDAQABo4IB1TCCAdEw
-# DAYDVR0TAQH/BAIwADAOBgNVHQ8BAf8EBAMCB4AwPAYDVR0lBDUwMwYKKwYBBAGC
-# N2EBAAYIKwYBBQUHAwMGGysGAQQBgjdhgbCixjiD2NGOH4G1pKMGwaL7azAdBgNV
-# HQ4EFgQUnAXaUo/DSVeVVZdcnklzhZKWTd0wHwYDVR0jBBgwFoAUmvFUd3UMhxY3
-# RqCs3nn59H/BeOkwZwYDVR0fBGAwXjBcoFqgWIZWaHR0cDovL3d3dy5taWNyb3Nv
-# ZnQuY29tL3BraW9wcy9jcmwvTWljcm9zb2Z0JTIwSUQlMjBWZXJpZmllZCUyMENT
-# JTIwRU9DJTIwQ0ElMjAwNC5jcmwwdAYIKwYBBQUHAQEEaDBmMGQGCCsGAQUFBzAC
-# hlhodHRwOi8vd3d3Lm1pY3Jvc29mdC5jb20vcGtpb3BzL2NlcnRzL01pY3Jvc29m
-# dCUyMElEJTIwVmVyaWZpZWQlMjBDUyUyMEVPQyUyMENBJTIwMDQuY3J0MFQGA1Ud
-# IARNMEswSQYEVR0gADBBMD8GCCsGAQUFBwIBFjNodHRwOi8vd3d3Lm1pY3Jvc29m
-# dC5jb20vcGtpb3BzL0RvY3MvUmVwb3NpdG9yeS5odG0wDQYJKoZIhvcNAQEMBQAD
-# ggIBAF2MvrocsPLpqeDMHovcOajbgn1arDVtvLQN6+v2i3AYvg7wRXVh2zHUGNyV
-# V1N2HqjR39IfFCMUHZATJVrCrhipg+wFf2q044Z+ztbyx5eLTolqG5obJ45/iDEH
-# CTXn6HA+zNVeyovrKhxQqwtWPIIpmkbRgRPzdSdraDmn0vB3wQOWqxVvn0SabZjF
-# 07nB+dhG94w6421ZblB79ehi5EOlL9/Q2JbX3qUpOtySXDzMuCw6VtYwJP8kj82f
-# 2ZgJLvE2emM9lbzpqtb3DGirJx79ROXG/ooTN1j+AXDrr7IhNRbp3TZAMboJliIJ
-# R5YWlpEi2KM8ihw/ByWX6uQhBns41BxPSGVz8JmgeAHUwX4kK7YVdksjWqowSgvG
-# gaL+w3MbbLXAMh69mi/5iCboV6qv+tBy600r9JJvwYFMKcqC2ASEI3fI3Yz+TVIk
-# VdNoSKVm64DteRwALB6qFkQSD/jjI4omJ/PAipF0gi9WIx1VEjKWRsApQ3GZAmrv
-# xO4r3+F80zd++mSBJxBvoc5kMZh+yiGAUD40tSLtYqxnYE1VLOqNWVdAFrwxqWg2
-# A8Kts5JiU5tJRPAH5c7RYcl1QN/gT4Naj6NxeEM3ai5EZjT4nHVvBkCyGr6cH45j
-# tVPGKKrukHmFVsMj1qF3b/1XcW4frb6ajtAlB7yoR0k3tZB3MIIHKDCCBRCgAwIB
-# AgITMwAAABcnRQkLi4evxgAAAAAAFzANBgkqhkiG9w0BAQwFADBjMQswCQYDVQQG
-# EwJVUzEeMBwGA1UEChMVTWljcm9zb2Z0IENvcnBvcmF0aW9uMTQwMgYDVQQDEytN
-# aWNyb3NvZnQgSUQgVmVyaWZpZWQgQ29kZSBTaWduaW5nIFBDQSAyMDIxMB4XDTI2
-# MDMyNjE4MTEzMVoXDTMxMDMyNjE4MTEzMVowWjELMAkGA1UEBhMCVVMxHjAcBgNV
-# BAoTFU1pY3Jvc29mdCBDb3Jwb3JhdGlvbjErMCkGA1UEAxMiTWljcm9zb2Z0IElE
-# IFZlcmlmaWVkIENTIEVPQyBDQSAwNDCCAiIwDQYJKoZIhvcNAQEBBQADggIPADCC
-# AgoCggIBAILHZP4DD2YqAZXMn5OrQ8yfj0beK0ixilvHsKUtJEcV7VEQt09xnWwi
-# pY6GxJ/LrLKoRqkKUYf0l70VcDVxCBm++lBuSD5AidUuv/QQ+tUELCsz3qVtEjY/
-# E14LBcb0uzJbaEbopCCKe0OY0IGjjOkMivfvumVV1KWJmbpQHusfCa8GdHTZBPq2
-# euparaKHMHqVElVMTO6HQ5p/Mgx4ydgzT7H697kQ4sd1+Kr4deIx/0lvtgse1iDI
-# ciIkDttNYuoVIsZpOHtmVvFuwtcD3U46ugSm/s6PMW67e2SkL0V+UDgOnYS6rj6o
-# +bFSp8an5NfSAtEmn00k7PMguNxMPeuQUUVvFS/XHKDpq+K8UMu2goGEzZN3Xfy6
-# YTWk05pxqe5Ji08ch5AeYHqFoWLrhq8sEvBNMCb9FuK3zrRwVdHvbCr7lCHiFKZ7
-# MeopcRFY+lUF74A+sngipz5o94yYiSgJZlA7bYecs0VQVJeOLDIhuC+Uf8sgAkSp
-# Np9PPENmAqGUtTvOvqDCyrdY2lxhAjo27FafCHdVUMPIXuidCoqzkuXtuV5U3Rjx
-# W+qATjmmnIFu/Co39G6fl8wIJHPdpgxjSRmEo73Z4/u3jMepnltAwCBnS0TY/P+N
-# vTCLKRQX89yg6qqTe9UuJENiy3q93cYQw3MylRS9By8Ebjr4I4hvAgMBAAGjggHc
-# MIIB2DAOBgNVHQ8BAf8EBAMCAYYwEAYJKwYBBAGCNxUBBAMCAQAwHQYDVR0OBBYE
-# FJrxVHd1DIcWN0agrN55+fR/wXjpMFQGA1UdIARNMEswSQYEVR0gADBBMD8GCCsG
-# AQUFBwIBFjNodHRwOi8vd3d3Lm1pY3Jvc29mdC5jb20vcGtpb3BzL0RvY3MvUmVw
-# b3NpdG9yeS5odG0wGQYJKwYBBAGCNxQCBAweCgBTAHUAYgBDAEEwEgYDVR0TAQH/
-# BAgwBgEB/wIBADAfBgNVHSMEGDAWgBTZQSmwDw9jbO9p1/XNKZ6kSGow5jBwBgNV
-# HR8EaTBnMGWgY6Bhhl9odHRwOi8vd3d3Lm1pY3Jvc29mdC5jb20vcGtpb3BzL2Ny
-# bC9NaWNyb3NvZnQlMjBJRCUyMFZlcmlmaWVkJTIwQ29kZSUyMFNpZ25pbmclMjBQ
-# Q0ElMjAyMDIxLmNybDB9BggrBgEFBQcBAQRxMG8wbQYIKwYBBQUHMAKGYWh0dHA6
-# Ly93d3cubWljcm9zb2Z0LmNvbS9wa2lvcHMvY2VydHMvTWljcm9zb2Z0JTIwSUQl
-# MjBWZXJpZmllZCUyMENvZGUlMjBTaWduaW5nJTIwUENBJTIwMjAyMS5jcnQwDQYJ
-# KoZIhvcNAQEMBQADggIBAJB1Whn9TSbfyXaIppkWWzFq+m2mg4vJpHVr1krZNIXW
-# Q6cUmEwOx7oqQKCy96iISNdNVzpe3zogoefvo2TmpkHQFe/aIxFDaCIAmZi9lyay
-# 2hmp8HYzcp3nCcmFQk60X9voeypJ6VjqeGsXTrOivWUOYNCLEFlwsH3NHX5EpCyj
-# WN6Q3Fi5ST4do3eTVLnuqTQ7/9huTBTSYQsJbTg3m8gIxnHlPlzs2r/u4u9tWEJ0
-# Pt/ZtmkDhTu86QHWigHgBoRHemOgnQxp3ksXKLo1r2n1m7+Gst46NTkUi1LljGyq
-# +V9fEBOEnXvoKaRiy0pGbK1IdnsmEpF9Xp71l+2T84Nv8IrikZUBWqw5/jffttAa
-# s4ccJDci832CadS4OHwl29uF6hY8fEg3UYHmxSJjnzi1c3vF0PwsJKxGom9Dx7tr
-# eBlZOBWK6BGzVBar43Qb02N7okeU3UKMl6GB74fk8aS0mNr6O4YSvQ/66RKRwvqp
-# pnEVBOHdIMjvWW9b77duX8TN3pI7w31R3D6t6jK9EcLJOJKymVlBIFNUl0+ajeoK
-# ka7IcW0+jkIGff8U9OKol3cz0Eeiop3Qb0qaDp8ZwC8XCcs1cDaSi/vbvBGWMvfK
-# l+ovuIBP9ienG6XpHAdGVw5/10MaDVFG+v3Y0/8JZVchvryB5Hau9T82x+a2MXXA
-# MIIHnjCCBYagAwIBAgITMwAAAAeHozSje6WOHAAAAAAABzANBgkqhkiG9w0BAQwF
-# ADB3MQswCQYDVQQGEwJVUzEeMBwGA1UEChMVTWljcm9zb2Z0IENvcnBvcmF0aW9u
-# MUgwRgYDVQQDEz9NaWNyb3NvZnQgSWRlbnRpdHkgVmVyaWZpY2F0aW9uIFJvb3Qg
-# Q2VydGlmaWNhdGUgQXV0aG9yaXR5IDIwMjAwHhcNMjEwNDAxMjAwNTIwWhcNMzYw
-# NDAxMjAxNTIwWjBjMQswCQYDVQQGEwJVUzEeMBwGA1UEChMVTWljcm9zb2Z0IENv
-# cnBvcmF0aW9uMTQwMgYDVQQDEytNaWNyb3NvZnQgSUQgVmVyaWZpZWQgQ29kZSBT
-# aWduaW5nIFBDQSAyMDIxMIICIjANBgkqhkiG9w0BAQEFAAOCAg8AMIICCgKCAgEA
-# svDArxmIKOLdVHpMSWxpCFUJtFL/ekr4weslKPdnF3cpTeuV8veqtmKVgok2rO0D
-# 05BpyvUDCg1wdsoEtuxACEGcgHfjPF/nZsOkg7c0mV8hpMT/GvB4uhDvWXMIeQPs
-# DgCzUGzTvoi76YDpxDOxhgf8JuXWJzBDoLrmtThX01CE1TCCvH2sZD/+Hz3RDwl2
-# MsvDSdX5rJDYVuR3bjaj2QfzZFmwfccTKqMAHlrz4B7ac8g9zyxlTpkTuJGtFnLB
-# GasoOnn5NyYlf0xF9/bjVRo4Gzg2Yc7KR7yhTVNiuTGH5h4eB9ajm1OCShIyhrKq
-# gOkc4smz6obxO+HxKeJ9bYmPf6KLXVNLz8UaeARo0BatvJ82sLr2gqlFBdj1sYfq
-# Of00Qm/3B4XGFPDK/H04kteZEZsBRc3VT2d/iVd7OTLpSH9yCORV3oIZQB/Qr4nD
-# 4YT/lWkhVtw2v2s0TnRJubL/hFMIQa86rcaGMhNsJrhysLNNMeBhiMezU1s5zpus
-# f54qlYu2v5sZ5zL0KvBDLHtL8F9gn6jOy3v7Jm0bbBHjrW5yQW7S36ALAt03QDpw
-# W1JG1Hxu/FUXJbBO2AwwVG4Fre+ZQ5Od8ouwt59FpBxVOBGfN4vN2m3fZx1gqn52
-# GvaiBz6ozorgIEjn+PhUXILhAV5Q/ZgCJ0u2+ldFGjcCAwEAAaOCAjUwggIxMA4G
-# A1UdDwEB/wQEAwIBhjAQBgkrBgEEAYI3FQEEAwIBADAdBgNVHQ4EFgQU2UEpsA8P
-# Y2zvadf1zSmepEhqMOYwVAYDVR0gBE0wSzBJBgRVHSAAMEEwPwYIKwYBBQUHAgEW
-# M2h0dHA6Ly93d3cubWljcm9zb2Z0LmNvbS9wa2lvcHMvRG9jcy9SZXBvc2l0b3J5
-# Lmh0bTAZBgkrBgEEAYI3FAIEDB4KAFMAdQBiAEMAQTAPBgNVHRMBAf8EBTADAQH/
-# MB8GA1UdIwQYMBaAFMh+0mqFKhvKGZgEByfPUBBPaKiiMIGEBgNVHR8EfTB7MHmg
-# d6B1hnNodHRwOi8vd3d3Lm1pY3Jvc29mdC5jb20vcGtpb3BzL2NybC9NaWNyb3Nv
-# ZnQlMjBJZGVudGl0eSUyMFZlcmlmaWNhdGlvbiUyMFJvb3QlMjBDZXJ0aWZpY2F0
-# ZSUyMEF1dGhvcml0eSUyMDIwMjAuY3JsMIHDBggrBgEFBQcBAQSBtjCBszCBgQYI
-# KwYBBQUHMAKGdWh0dHA6Ly93d3cubWljcm9zb2Z0LmNvbS9wa2lvcHMvY2VydHMv
-# TWljcm9zb2Z0JTIwSWRlbnRpdHklMjBWZXJpZmljYXRpb24lMjBSb290JTIwQ2Vy
-# dGlmaWNhdGUlMjBBdXRob3JpdHklMjAyMDIwLmNydDAtBggrBgEFBQcwAYYhaHR0
-# cDovL29uZW9jc3AubWljcm9zb2Z0LmNvbS9vY3NwMA0GCSqGSIb3DQEBDAUAA4IC
-# AQB/JSqe/tSr6t1mCttXI0y6XmyQ41uGWzl9xw+WYhvOL47BV09Dgfnm/tU4ieeZ
-# 7NAR5bguorTCNr58HOcA1tcsHQqt0wJsdClsu8bpQD9e/al+lUgTUJEV80Xhco7x
-# dgRrehbyhUf4pkeAhBEjABvIUpD2LKPho5Z4DPCT5/0TlK02nlPwUbv9URREhVYC
-# tsDM+31OFU3fDV8BmQXv5hT2RurVsJHZgP4y26dJDVF+3pcbtvh7R6NEDuYHYihf
-# mE2HdQRq5jRvLE1Eb59PYwISFCX2DaLZ+zpU4bX0I16ntKq4poGOFaaKtjIA1vRE
-# lItaOKcwtc04CBrXSfyL2Op6mvNIxTk4OaswIkTXbFL81ZKGD+24uMCwo/pLNhn7
-# VHLfnxlMVzHQVL+bHa9KhTyzwdG/L6uderJQn0cGpLQMStUuNDArxW2wF16QGZ1N
-# tBWgKA8Kqv48M8HfFqNifN6+zt6J0GwzvU8g0rYGgTZR8zDEIJfeZxwWDHpSxB5F
-# J1VVU1LIAtB7o9PXbjXzGifaIMYTzU4YKt4vMNwwBmetQDHhdAtTPplOXrnI9SI6
-# HeTtjDD3iUN/7ygbahmYOHk7VB7fwT4ze+ErCbMh6gHV1UuXPiLciloNxH6K4aMf
-# ZN1oLVk6YFeIJEokuPgNPa6EnTiOL60cPqfny+Fq8UiuZzGCGpEwghqNAgEBMHEw
-# WjELMAkGA1UEBhMCVVMxHjAcBgNVBAoTFU1pY3Jvc29mdCBDb3Jwb3JhdGlvbjEr
-# MCkGA1UEAxMiTWljcm9zb2Z0IElEIFZlcmlmaWVkIENTIEVPQyBDQSAwNAITMwAB
-# eQlVeJcUM7v4qQAAAAF5CTANBglghkgBZQMEAgEFAKBeMBAGCisGAQQBgjcCAQwx
-# AjAAMBkGCSqGSIb3DQEJAzEMBgorBgEEAYI3AgEEMC8GCSqGSIb3DQEJBDEiBCAG
-# 2UKM7DH3+lkRZGNeXtcfbbLLSrboLSTDcga4yflU3TANBgkqhkiG9w0BAQEFAASC
-# AYBUknig4MrAxsOT2tTOA9D/hh6Y3KkXfDnlHS/csr21BPCA96wfhGbKFDHMCFXa
-# HbBmqfjv1M1B/VdpwZm9an7Wzt+qd0vuKuqdYTyZUTfjZ6/zvQP5sVjwPew1Q2Bw
-# rkbqgvJQjLq8dxpNe+J/XuqpQBGSwYoOKqaNUeQCI4apOtQTbcx6PR0yVXwNhCJT
-# OjJQjQk2LEcHzMEybFPPzLhHwPE3pxT1aH+iKiZkiM4OdAU2oxx8Om2K+yIsXht0
-# /0S7ddAIb1XVGKGc17CvXZ5qK7+aSNGBlrNq52Lghyl9lyiNVQQO4K7r51OXm/sO
-# 4tooynFj0iLGwsK2LzBVUu9qDrLIaYGvsMvOrvT9dENA4ZBnKYyl0sVeMgGTtuIW
-# 6+DFakNjtAiaQM+t9hQ35fF5aSu1cjfROrKPRwyNuFnd+ndyqTaPXv440wCMRd/E
-# AIdcKlXLEfyQbZfhUkqAxZeW8TZxVJXcyzaeI44c+9QPZe1tIpgdFRzCw2s90A3H
-# Mu2hghgRMIIYDQYKKwYBBAGCNwMDATGCF/0wghf5BgkqhkiG9w0BBwKgghfqMIIX
-# 5gIBAzEPMA0GCWCGSAFlAwQCAQUAMIIBYgYLKoZIhvcNAQkQAQSgggFRBIIBTTCC
-# AUkCAQEGCisGAQQBhFkKAwEwMTANBglghkgBZQMEAgEFAAQgaIKsgDpLas1TinBO
-# uKdAKzdqxFIKpEZnWb1i/SXuG3wCBmoXYmEiZBgTMjAyNjA1MjgxMDU5MzUuODg5
-# WjAEgAIB9KCB4aSB3jCB2zELMAkGA1UEBhMCVVMxEzARBgNVBAgTCldhc2hpbmd0
-# b24xEDAOBgNVBAcTB1JlZG1vbmQxHjAcBgNVBAoTFU1pY3Jvc29mdCBDb3Jwb3Jh
-# dGlvbjElMCMGA1UECxMcTWljcm9zb2Z0IEFtZXJpY2EgT3BlcmF0aW9uczEnMCUG
-# A1UECxMeblNoaWVsZCBUU1MgRVNOOkE1MDAtMDVFMC1EOTQ3MTUwMwYDVQQDEyxN
-# aWNyb3NvZnQgUHVibGljIFJTQSBUaW1lIFN0YW1waW5nIEF1dGhvcml0eaCCDyEw
-# ggeCMIIFaqADAgECAhMzAAAABeXPD/9mLsmHAAAAAAAFMA0GCSqGSIb3DQEBDAUA
-# MHcxCzAJBgNVBAYTAlVTMR4wHAYDVQQKExVNaWNyb3NvZnQgQ29ycG9yYXRpb24x
-# SDBGBgNVBAMTP01pY3Jvc29mdCBJZGVudGl0eSBWZXJpZmljYXRpb24gUm9vdCBD
-# ZXJ0aWZpY2F0ZSBBdXRob3JpdHkgMjAyMDAeFw0yMDExMTkyMDMyMzFaFw0zNTEx
-# MTkyMDQyMzFaMGExCzAJBgNVBAYTAlVTMR4wHAYDVQQKExVNaWNyb3NvZnQgQ29y
-# cG9yYXRpb24xMjAwBgNVBAMTKU1pY3Jvc29mdCBQdWJsaWMgUlNBIFRpbWVzdGFt
-# cGluZyBDQSAyMDIwMIICIjANBgkqhkiG9w0BAQEFAAOCAg8AMIICCgKCAgEAnnzn
-# UmP94MWfBX1jtQYioxwe1+eXM9ETBb1lRkd3kcFdcG9/sqtDlwxKoVIcaqDb+omF
-# io5DHC4RBcbyQHjXCwMk/l3TOYtgoBjxnG/eViS4sOx8y4gSq8Zg49REAf5huXhI
-# kQRKe3Qxs8Sgp02KHAznEa/Ssah8nWo5hJM1xznkRsFPu6rfDHeZeG1Wa1wISvlk
-# pOQooTULFm809Z0ZYlQ8Lp7i5F9YciFlyAKwn6yjN/kR4fkquUWfGmMopNq/B8U/
-# pdoZkZZQbxNlqJOiBGgCWpx69uKqKhTPVi3gVErnc/qi+dR8A2MiAz0kN0nh7SqI
-# NGbmw5OIRC0EsZ31WF3Uxp3GgZwetEKxLms73KG/Z+MkeuaVDQQheangOEMGJ4pQ
-# ZH55ngI0Tdy1bi69INBV5Kn2HVJo9XxRYR/JPGAaM6xGl57Ei95HUw9NV/uC3yFj
-# rhc087qLJQawSC3xzY/EXzsT4I7sDbxOmM2rl4uKK6eEpurRduOQ2hTkmG1hSuWY
-# BunFGNv21Kt4N20AKmbeuSnGnsBCd2cjRKG79+TX+sTehawOoxfeOO/jR7wo3liw
-# kGdzPJYHgnJ54UxbckF914AqHOiEV7xTnD1a69w/UTxwjEugpIPMIIE67SFZ2PMo
-# 27xjlLAHWW3l1CEAFjLNHd3EQ79PUr8FUXetXr0CAwEAAaOCAhswggIXMA4GA1Ud
-# DwEB/wQEAwIBhjAQBgkrBgEEAYI3FQEEAwIBADAdBgNVHQ4EFgQUa2koOjUvSGNA
-# z3vYr0npPtk92yEwVAYDVR0gBE0wSzBJBgRVHSAAMEEwPwYIKwYBBQUHAgEWM2h0
-# dHA6Ly93d3cubWljcm9zb2Z0LmNvbS9wa2lvcHMvRG9jcy9SZXBvc2l0b3J5Lmh0
-# bTATBgNVHSUEDDAKBggrBgEFBQcDCDAZBgkrBgEEAYI3FAIEDB4KAFMAdQBiAEMA
-# QTAPBgNVHRMBAf8EBTADAQH/MB8GA1UdIwQYMBaAFMh+0mqFKhvKGZgEByfPUBBP
-# aKiiMIGEBgNVHR8EfTB7MHmgd6B1hnNodHRwOi8vd3d3Lm1pY3Jvc29mdC5jb20v
-# cGtpb3BzL2NybC9NaWNyb3NvZnQlMjBJZGVudGl0eSUyMFZlcmlmaWNhdGlvbiUy
-# MFJvb3QlMjBDZXJ0aWZpY2F0ZSUyMEF1dGhvcml0eSUyMDIwMjAuY3JsMIGUBggr
-# BgEFBQcBAQSBhzCBhDCBgQYIKwYBBQUHMAKGdWh0dHA6Ly93d3cubWljcm9zb2Z0
-# LmNvbS9wa2lvcHMvY2VydHMvTWljcm9zb2Z0JTIwSWRlbnRpdHklMjBWZXJpZmlj
-# YXRpb24lMjBSb290JTIwQ2VydGlmaWNhdGUlMjBBdXRob3JpdHklMjAyMDIwLmNy
-# dDANBgkqhkiG9w0BAQwFAAOCAgEAX4h2x35ttVoVdedMeGj6TuHYRJklFaW4sTQ5
-# r+k77iB79cSLNe+GzRjv4pVjJviceW6AF6ycWoEYR0LYhaa0ozJLU5Yi+LCmcrdo
-# vkl53DNt4EXs87KDogYb9eGEndSpZ5ZM74LNvVzY0/nPISHz0Xva71QjD4h+8z2X
-# MOZzY7YQ0Psw+etyNZ1CesufU211rLslLKsO8F2aBs2cIo1k+aHOhrw9xw6JCWON
-# NboZ497mwYW5EfN0W3zL5s3ad4Xtm7yFM7Ujrhc0aqy3xL7D5FR2J7x9cLWMq7eb
-# 0oYioXhqV2tgFqbKHeDick+P8tHYIFovIP7YG4ZkJWag1H91KlELGWi3SLv10o4K
-# Gag42pswjybTi4toQcC/irAodDW8HNtX+cbz0sMptFJK+KObAnDFHEsukxD+7jFf
-# EV9Hh/+CSxKRsmnuiovCWIOb+H7DRon9TlxydiFhvu88o0w35JkNbJxTk4MhF/Kg
-# aXn0GxdH8elEa2Imq45gaa8D+mTm8LWVydt4ytxYP/bqjN49D9NZ81coE6aQWm88
-# TwIf4R4YZbOpMKN0CyejaPNN41LGXHeCUMYmBx3PkP8ADHD1J2Cr/6tjuOOCztfp
-# +o9Nc+ZoIAkpUcA/X2gSMkgHAPUvIdtoSAHEUKiBhI6JQivRepyvWcl+JYbYbBh7
-# pmgAXVswggeXMIIFf6ADAgECAhMzAAAAVn6PnVgIjulgAAAAAABWMA0GCSqGSIb3
-# DQEBDAUAMGExCzAJBgNVBAYTAlVTMR4wHAYDVQQKExVNaWNyb3NvZnQgQ29ycG9y
-# YXRpb24xMjAwBgNVBAMTKU1pY3Jvc29mdCBQdWJsaWMgUlNBIFRpbWVzdGFtcGlu
-# ZyBDQSAyMDIwMB4XDTI1MTAyMzIwNDY1MVoXDTI2MTAyMjIwNDY1MVowgdsxCzAJ
-# BgNVBAYTAlVTMRMwEQYDVQQIEwpXYXNoaW5ndG9uMRAwDgYDVQQHEwdSZWRtb25k
-# MR4wHAYDVQQKExVNaWNyb3NvZnQgQ29ycG9yYXRpb24xJTAjBgNVBAsTHE1pY3Jv
-# c29mdCBBbWVyaWNhIE9wZXJhdGlvbnMxJzAlBgNVBAsTHm5TaGllbGQgVFNTIEVT
-# TjpBNTAwLTA1RTAtRDk0NzE1MDMGA1UEAxMsTWljcm9zb2Z0IFB1YmxpYyBSU0Eg
-# VGltZSBTdGFtcGluZyBBdXRob3JpdHkwggIiMA0GCSqGSIb3DQEBAQUAA4ICDwAw
-# ggIKAoICAQC0pZ+b+6XTbv93xGVvwyf+DRBS+8upjZWzLe0jxTa0VKylNmiZk4Pc
-# EdPwuRH5GuEwmBvVWMAoU3Kxor1wtJeJ88ZIgGs8KCz0/jLbiWskSatXpDnPgGao
-# yEg+tmES9mdakJLgc7uNhJ6L+fGYLv/USv6XkuDc+ZLFvx3YhVwBHFLDUHibEHpc
-# jSeR6X3BrV1hvbB8amh+toWbFk7FP142G3gsfREFJW55trpk2mNL/SC1+buqIiLI
-# /qno9HNNNsydWqwedX93+tbTMfH5D5A1nnBSoqZNkkH2FTznf7alfmsN8rfa41j3
-# 9YE4CbNuqCkR1CRuIxq9QzJQNKGbJwi+Ad1CdLbTuxOPwz6Qkve051qE+4+ozCxo
-# IKB1/DBDHQ71Mp7sVK9sARizUCeV0KX8ocZkI5W9Q2qPIvXQkt7T/4YP3/KepcZY
-# Wlc6Nq6e9n9wpE6GM3gzl7rHHRvaaKpw+KLj+KLZmF4pqWUkRPsIqWkVKGzfDKDo
-# X9+iNDFC8+dtYPg3LHqWGNaPCagtzHrDUVIK1q8sKXLfcEtFKVNTiopTFprx3tg3
-# sSqmf1c7RJjS6Y68oVetYfuvGX72JqJyK12dNOSwCdGO96R0pPeWDuVEx+Z9lTy9
-# c2I3RRgnNP0SOqNGbS43+HShfE+E189ip4VvI9cYbHNphTPrPHepNwIDAQABo4IB
-# yzCCAccwHQYDVR0OBBYEFL62M/K7q1n+HkazIu/LPUf4U0haMB8GA1UdIwQYMBaA
-# FGtpKDo1L0hjQM972K9J6T7ZPdshMGwGA1UdHwRlMGMwYaBfoF2GW2h0dHA6Ly93
-# d3cubWljcm9zb2Z0LmNvbS9wa2lvcHMvY3JsL01pY3Jvc29mdCUyMFB1YmxpYyUy
-# MFJTQSUyMFRpbWVzdGFtcGluZyUyMENBJTIwMjAyMC5jcmwweQYIKwYBBQUHAQEE
-# bTBrMGkGCCsGAQUFBzAChl1odHRwOi8vd3d3Lm1pY3Jvc29mdC5jb20vcGtpb3Bz
-# L2NlcnRzL01pY3Jvc29mdCUyMFB1YmxpYyUyMFJTQSUyMFRpbWVzdGFtcGluZyUy
-# MENBJTIwMjAyMC5jcnQwDAYDVR0TAQH/BAIwADAWBgNVHSUBAf8EDDAKBggrBgEF
-# BQcDCDAOBgNVHQ8BAf8EBAMCB4AwZgYDVR0gBF8wXTBRBgwrBgEEAYI3TIN9AQEw
-# QTA/BggrBgEFBQcCARYzaHR0cDovL3d3dy5taWNyb3NvZnQuY29tL3BraW9wcy9E
-# b2NzL1JlcG9zaXRvcnkuaHRtMAgGBmeBDAEEAjANBgkqhkiG9w0BAQwFAAOCAgEA
-# DgOoBcSw7bqP8trsWCf9CJ+K3zG5l6Spnnv5h76wf+FFNsQSMZitmCyrBH+VRR8o
-# IWltkXyaxpk9Ak5HhhhQRTxfKMuufxjWMJKajGH2Xu1aJKhz8kUHDfnokCbMYbF4
-# EDYRZLFG5OvUC5l7qdho3z/C0WSIdyzyAxp3FcGzoPFWHK7lieEs9CR+6YqbeUV+
-# 3ATumJ5Xt/WWySaWCwLoB5IYLMY9lSAK9wflO/9B73PtsgiZIPdK7OE4jBo/54pB
-# Nh/rtOJ/IkqRZBJ0Z9MDopy7jWTwsHqg8r4wuTWNvHErnA+otIvrbGMrThIFccQl
-# ISewW3TPFaTE/+WB6PUPGpSeatgR2TG/MpIcgCoVZJm6X/mEj68nG8U+Gw1AESTh
-# xK6UOQlClx1WL+CZ/+YcU5iEMGOxrXmzgv7awGKXddX9PxGJHrpDzFi9MtFbF3Z1
-# Wys6gLCexThYh6ILQmKcK/VYscSHtDLOv1FKviQoktZ2k1guGCOSiNOYSQCMU7vv
-# i3fEHt6du8gXQY6xXX3GcJTOr0QYrK3SAy5qmEqU2Mn5pOmNYxkMaj4Y4qyen3ce
-# Z+2aXRLKncX34zfL7LpYkZRmghkmrbbuMOOMSd22lSuH0F091Uh9UkP8C7zVHOHT
-# lQcCK+itDc6zw8QsciCI531NbNt2CYbNwgu3911VARExggdDMIIHPwIBATB4MGEx
-# CzAJBgNVBAYTAlVTMR4wHAYDVQQKExVNaWNyb3NvZnQgQ29ycG9yYXRpb24xMjAw
-# BgNVBAMTKU1pY3Jvc29mdCBQdWJsaWMgUlNBIFRpbWVzdGFtcGluZyBDQSAyMDIw
-# AhMzAAAAVn6PnVgIjulgAAAAAABWMA0GCWCGSAFlAwQCAQUAoIIEnDARBgsqhkiG
-# 9w0BCRACDzECBQAwGgYJKoZIhvcNAQkDMQ0GCyqGSIb3DQEJEAEEMBwGCSqGSIb3
-# DQEJBTEPFw0yNjA1MjgxMDU5MzVaMC8GCSqGSIb3DQEJBDEiBCC4OeUkGXRa4N31
-# cV90lkuFeaJBimeOxitCldsDEeRyzzCBuQYLKoZIhvcNAQkQAi8xgakwgaYwgaMw
-# gaAEILYMMyVNpOPwlXeJODleel7gJIfrTXjdn5f2jk0GAwyoMHwwZaRjMGExCzAJ
-# BgNVBAYTAlVTMR4wHAYDVQQKExVNaWNyb3NvZnQgQ29ycG9yYXRpb24xMjAwBgNV
-# BAMTKU1pY3Jvc29mdCBQdWJsaWMgUlNBIFRpbWVzdGFtcGluZyBDQSAyMDIwAhMz
-# AAAAVn6PnVgIjulgAAAAAABWMIIDXgYLKoZIhvcNAQkQAhIxggNNMIIDSaGCA0Uw
-# ggNBMIICKQIBATCCAQmhgeGkgd4wgdsxCzAJBgNVBAYTAlVTMRMwEQYDVQQIEwpX
-# YXNoaW5ndG9uMRAwDgYDVQQHEwdSZWRtb25kMR4wHAYDVQQKExVNaWNyb3NvZnQg
-# Q29ycG9yYXRpb24xJTAjBgNVBAsTHE1pY3Jvc29mdCBBbWVyaWNhIE9wZXJhdGlv
-# bnMxJzAlBgNVBAsTHm5TaGllbGQgVFNTIEVTTjpBNTAwLTA1RTAtRDk0NzE1MDMG
-# A1UEAxMsTWljcm9zb2Z0IFB1YmxpYyBSU0EgVGltZSBTdGFtcGluZyBBdXRob3Jp
-# dHmiIwoBATAHBgUrDgMCGgMVAP9z9ykVKpBZgF5eCDJEnZlu9gQRoGcwZaRjMGEx
-# CzAJBgNVBAYTAlVTMR4wHAYDVQQKExVNaWNyb3NvZnQgQ29ycG9yYXRpb24xMjAw
-# BgNVBAMTKU1pY3Jvc29mdCBQdWJsaWMgUlNBIFRpbWVzdGFtcGluZyBDQSAyMDIw
-# MA0GCSqGSIb3DQEBCwUAAgUA7cKJpjAiGA8yMDI2MDUyODA5MzAxNFoYDzIwMjYw
-# NTI5MDkzMDE0WjB0MDoGCisGAQQBhFkKBAExLDAqMAoCBQDtwommAgEAMAcCAQAC
-# AhxoMAcCAQACAhJ9MAoCBQDtw9smAgEAMDYGCisGAQQBhFkKBAIxKDAmMAwGCisG
-# AQQBhFkKAwKgCjAIAgEAAgMHoSChCjAIAgEAAgMBhqAwDQYJKoZIhvcNAQELBQAD
-# ggEBAAVCbzFVq+OiNJJaUDkbGUFIn4fWwe/ZSAaOkVL9cGGqkS8FEkV+L9U1wQ+r
-# u+Th15DlcAz8xxon5WuOQYCn79mn3+cxOhVANbSHme+o/cG4cyfT3N0ab+0Hqo+X
-# bq/gNqk5jDrYtOgrL4pvzJOlbzHtEnz+vVES1GLP/kCEuxoLKoq4ymkV8rddogIr
-# UcwrTshFXqVgj5fQhda5rZBsR+uED3hWSDoxwYkYBRHAaTi54ahPLYH+BpfHRwGK
-# BjOhzFs6BP007YZVuZiKPlftZ/u2SwcrOdi9psOQQFQnGWmSQCaFgd1n8+W9TyOF
-# /o4G5QrCNCbWMol++Nh4VaXGqtowDQYJKoZIhvcNAQEBBQAEggIAC94Qijlobao7
-# Hu4GP92T8aCm9GIcPZ2/OzUSJOsqvZIhLFJUEchjsCCO4EhLNuzqU04U6j2SzUyg
-# lQ48K8YHcbwxZoMCC1nO1Pvo85dJWyvQooK3jqLV0VadGIHgiRaQGek1HMoKHuTe
-# mqHUJcXQM9fLA1rBpiX1KqPHuAMSYE0DTZewnsNhlOi3Wq8GQZBFzzhNXGJKtJW5
-# XdjS2gGZsW0jXvNtplzXOJZv2QWvBFxpdTklc0HEwsmVV+rzbLrK6i89io8P+iHw
-# 2Sb2PiVofUmjp2NfuNj94kzPFlVFlHVsV2AX+Yw2v/C1s0MUfimIopFgkB9FOxZq
-# jFzJSpf6LRjf0YIUHIk+l5c6HEU4CmBbRjT78Y7IwP0fSHylbysdfkl93f/MqaSB
-# yQ0SJIlf9TEjPgFGOEkyRGiIniXYHu4hj7RdXh9enMgPvj6HaKGckeTbwtwt9xA1
-# Hi+u5NVhHXuM4R0s8vQP3ngBsvF815ValDuVgoHEp3opb3yIaV3LPno0PIpRLv2S
-# cfqo8ZnukKDonWL4T5WKoNI7QBi6ZjMLAHkEXRaNPo8T8K8xS1KB5jHj3W/HJSzv
-# KubCs3EKJMStqGGaQXJ9YJj45+3nY+FBNmB2mDnMCqE6CCPsdNfYzyR5rbdqZMfg
-# /v73eZXcgRqesj8iUj3j+MJLWm3ei44=
-# SIG # End signature block
