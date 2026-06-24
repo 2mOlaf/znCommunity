@@ -733,7 +733,7 @@
   <h2 id="notes">Notes</h2>
   <ul style="line-height: 2.1; margin-left: 1.5rem;">
     <li>Rules and filters added by the break glass scripts are <strong>persistent</strong> across reboots. They must be manually removed or will be cleaned up when the Zero Networks agent next synchronises policy.</li>
-    <li>For Windows assets the script uses <strong>PowerShell Remoting (WinRM)</strong> with Kerberos authentication. Ensure WinRM is enabled and accessible on targets.</li>
+    <li>For Windows assets the script uses <strong>PowerShell Remoting (WinRM)</strong> with Negotiate authentication. Ensure WinRM is enabled and accessible on targets.</li>
     <li>Interactive credential collection uses <code>Get-Credential</code>. On Windows GUI sessions this shows a credential dialog; on headless or console sessions it falls back to a text prompt. The username is pre-filled from <code>ForestsConfig</code> (Windows) or <code>-LinuxUserName</code> (Linux) when available.</li>
     <li>For Linux assets the script connects via <strong>SSH</strong> using the POSH-SSH module, escalates to root with <code>sudo su</code>, and manipulates the firewall through a Zero Networks Python virtual environment bundled on the asset. Both <strong>iptables</strong> and <strong>nftables</strong> backends are supported; the backend is selected from <code>AppliedFirewallType</code> for bulk operations, or both are tried for single-asset runs.</li>
     <li>Both scripts create <code>success_list.txt</code> and <code>failed_list.txt</code> in the working directory.</li>
