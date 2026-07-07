@@ -85,8 +85,29 @@
   </div>
 
   <h2 id="quickstart">Quick start</h2>
-  <div class="syntax-block">
-<span class="cmd">Import-Module</span> <span class="param">.\ZNTools\ZNTools.psd1</span>
+  <div class="example">
+    <div class="example-header">
+      <span class="ex-label">Install</span>
+      <span class="ex-title">Directly from GitHub (PowerShell 7+)</span>
+    </div>
+    <pre><span class="ps-prompt">PS&gt; </span><span class="ps-fn">irm</span> <span class="ps-value">https://raw.githubusercontent.com/2mOlaf/znCommunity/feature/zntools/Segment/Tools/ZNTools/install.ps1</span> <span class="ps-switch">|</span> <span class="ps-fn">iex</span>
+<span class="ps-prompt">PS&gt; </span><span class="ps-fn">Import-Module</span> <span class="ps-value">ZNTools</span></pre>
+    <div class="example-desc">Downloads and installs the module into your user PowerShell Modules path, then loads it.</div>
+  </div>
+  <div class="example">
+    <div class="example-header">
+      <span class="ex-label">Install</span>
+      <span class="ex-title">From a local clone</span>
+    </div>
+    <pre><span class="ps-prompt">PS&gt; </span><span class="ps-fn">Import-Module</span> <span class="ps-value">.\ZNTools\ZNTools.psd1</span></pre>
+  </div>
+  <div class="example">
+    <div class="example-header">
+      <span class="ex-label">Install</span>
+      <span class="ex-title">From a different fork/branch</span>
+    </div>
+    <pre><span class="ps-prompt">PS&gt; </span><span class="ps-fn">&amp; ([scriptblock]::Create((irm https://raw.githubusercontent.com/2mOlaf/znCommunity/feature/zntools/Segment/Tools/ZNTools/install.ps1)))</span> <span class="ps-param">-Repo</span> <span class="ps-value">zeronetworks/Community</span> <span class="ps-param">-Branch</span> <span class="ps-value">master</span></pre>
+    <div class="example-desc">Useful once the module has merged upstream, or to test against another fork.</div>
   </div>
 
   <div class="callout info">
