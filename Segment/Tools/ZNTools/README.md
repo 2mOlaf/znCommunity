@@ -3,8 +3,21 @@
 Unified Zero Networks tooling module — health, clusters, Linux profiles, networking, security event rates and log analysis, asset browser, service management, and AD-to-ZN identity sync.
 
 ## Quick start
+
+Install directly from GitHub (PowerShell 7+):
+```powershell
+irm https://raw.githubusercontent.com/2mOlaf/znCommunity/feature/zntools/Segment/Tools/ZNTools/install.ps1 | iex
+Import-Module ZNTools
+```
+
+Or from a local clone:
 ```powershell
 Import-Module .\ZNTools\ZNTools.psd1
+```
+
+To install from a different fork/branch (e.g. the upstream repo once merged):
+```powershell
+& ([scriptblock]::Create((irm https://raw.githubusercontent.com/2mOlaf/znCommunity/feature/zntools/Segment/Tools/ZNTools/install.ps1))) -Repo zeronetworks/Community -Branch master
 ```
 
 ## Authentication
