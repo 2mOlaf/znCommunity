@@ -1,16 +1,17 @@
 @{
     RootModule = 'ZNTools.psm1'
-    ModuleVersion = '1.3.0'
+    ModuleVersion = '1.5.0'
     GUID = '1b2c56a5-5f1c-4bf1-9e6f-0b2a3b0e0f52'
     Author = 'Olaf Gradin'
     CompanyName = 'Zero Networks'
-    Description = 'Unified Zero Networks tooling module (health, clusters, Linux profiles, networking, security event rates, asset browser, service management, identity sync).'
+    Description = 'Unified Zero Networks tooling module (health, clusters, Linux profiles, networking, security event rates and log analysis, asset browser, service management, identity sync).'
     PowerShellVersion = '7.0'
     FunctionsToExport = @(
         # API-backed commands
         'Test-Port', 'Get-LinuxProfile', 'Get-SegmentCluster', 'Show-HealthDashboard',
+        'Get-DisconnectedAssetMetric',
         # Security event log
-        'Get-SecurityEventRate',
+        'Get-SecurityEventRate', 'Get-SecurityLogAnalysis',
         # Service management
         'Invoke-Services',
         # Identity sync

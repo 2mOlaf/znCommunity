@@ -61,35 +61,6 @@ function Show-HealthDashboard {
         }
     }
 
-    function Get-AllAssets {
-        param([string]$BaseUrl, [hashtable]$Headers)
-        Write-Log "Retrieving all assets..."
-        $allAssets = [System.Collections.Generic.List[object]]::new()
-        $offset    = 0
-        $limit     = 400
-
-        do {
-            try {
-                $uri      = "$BaseUrl/assets?_limit=$limit&_offset=$offset"
-                $response = Invoke-RestMethod -Uri $uri -Headers $Headers -Method Get
-
-                if ($response.items -and $response.items.Count -gt 0) {
-                    foreach ($item in $response.items) { $allAssets.Add($item) }
-                    $offset += $response.items.Count
-                    if ($response.items.Count -lt $limit) { break }
-                }
-                else { break }
-            }
-            catch {
-                Write-Log "Error fetching assets at offset $offset`: $($_.Exception.Message)" -Level Error
-                throw
-            }
-        } while ($true)
-
-        Write-Log "Total assets retrieved: $($allAssets.Count)"
-        return $allAssets
-    }
-
     function Get-AssetHealthState {
         param([string]$BaseUrl, [hashtable]$Headers, [string]$AssetId)
         try {
@@ -220,7 +191,9 @@ function Show-HealthDashboard {
         Write-Log "Fetching system health..."
         $systemIssues = Get-SystemHealth -BaseUrl $baseUrl -Headers $headers
 
-        $allAssets = Get-AllAssets -BaseUrl $baseUrl -Headers $headers
+        Write-Log "Retrieving all assets..."
+        $allAssets = Get-ZNAllAssets -BaseUrl $baseUrl -Headers $headers
+        Write-Log "Total assets retrieved: $($allAssets.Count)"
 
         $excludeStatuses = if ($IncludeNA) { @(1) } else { @(1, 4) }
         $candidates = $allAssets | Where-Object {
@@ -279,40 +252,26 @@ function Show-HealthDashboard {
         $disconnectedAssets = [System.Collections.Generic.List[object]]::new()
         if ($IncludeDisconnected) {
             Write-Log "Identifying disconnected assets..."
-            $minDisconnectedAt = if ($IncludeDisconnectedDays -gt 0) {
-                (Get-Date).ToUniversalTime().AddDays(-$IncludeDisconnectedDays)
-            } else { $null }
-            $disconnectedCandidates = $allAssets | Where-Object { $_.state -and $_.state.isAssetConnected -eq $false -and $_.state.lastDisconnectedAt }
-            foreach ($asset in $disconnectedCandidates) {
-                $displayName = $asset.name ?? $asset.fqdn ?? $asset.id
-                $statusCode  = $asset.healthState.healthStatus
-                $lastDisc    = if ($asset.state.lastDisconnectedAt) {
-                    try {
-                        [datetime]::new(1970, 1, 1, 0, 0, 0, [DateTimeKind]::Utc).AddMilliseconds($asset.state.lastDisconnectedAt)
-                    } catch { $null }
-                }
-                else { $null }
-                if ($lastDisc -and (-not $minDisconnectedAt -or $lastDisc -le $minDisconnectedAt)) {
-                    $lastDiscDisplay = $lastDisc.ToString("yyyy-MM-dd HH:mm UTC")
-                    $disconnectedAssets.Add([PSCustomObject]@{
-                        Id                 = $asset.id
-                        DisplayName        = $displayName
-                        FQDN               = $asset.fqdn
-                        Domain             = $asset.domain
-                        HealthStatus       = $statusCode
-                        LastDisconnectedAt = $lastDiscDisplay
+            foreach ($asset in (Get-ZNDisconnectedAsset -Assets $allAssets -MinDisconnectedDays $IncludeDisconnectedDays)) {
+                $lastDiscDisplay = $asset.LastDisconnectedAt.ToString("yyyy-MM-dd HH:mm UTC")
+                $disconnectedAssets.Add([PSCustomObject]@{
+                    Id                 = $asset.Id
+                    DisplayName        = $asset.DisplayName
+                    FQDN               = $asset.FQDN
+                    Domain             = $asset.Domain
+                    HealthStatus       = $asset.HealthStatus
+                    LastDisconnectedAt = $lastDiscDisplay
+                })
+                if ($ExportCsv) {
+                    $csvRows.Add([PSCustomObject]@{
+                        AssetName    = $asset.DisplayName
+                        FQDN         = $asset.FQDN
+                        Domain       = $asset.Domain
+                        HealthStatus = $script:HealthStatus[$asset.HealthStatus] ?? 'Unknown'
+                        IssueCode    = ''
+                        IssueName    = 'Disconnected'
+                        IssueDetails = "Since $lastDiscDisplay"
                     })
-                    if ($ExportCsv) {
-                        $csvRows.Add([PSCustomObject]@{
-                            AssetName    = $displayName
-                            FQDN         = $asset.fqdn
-                            Domain       = $asset.domain
-                            HealthStatus = $script:HealthStatus[$statusCode] ?? 'Unknown'
-                            IssueCode    = ''
-                            IssueName    = 'Disconnected'
-                            IssueDetails = "Since $lastDiscDisplay"
-                        })
-                    }
                 }
             }
             Write-Log "Found $($disconnectedAssets.Count) disconnected asset(s)."

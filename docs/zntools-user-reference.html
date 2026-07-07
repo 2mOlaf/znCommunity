@@ -27,12 +27,14 @@
   <a href="#cmd-linux-profile">Get-ZNLinuxProfile</a>
   <a href="#cmd-segment-cluster">Get-ZNSegmentCluster</a>
   <a href="#cmd-health-dashboard">Show-ZNHealthDashboard</a>
+  <a href="#cmd-disconnected-asset-metric">Get-ZNDisconnectedAssetMetric</a>
 
   <div class="sidebar-section">Service Management</div>
   <a href="#cmd-invoke-services">Invoke-ZNServices</a>
 
   <div class="sidebar-section">Security Events</div>
   <a href="#cmd-security-event-rate">Get-ZNSecurityEventRate</a>
+  <a href="#cmd-security-log-analysis">Get-ZNSecurityLogAnalysis</a>
 
   <div class="sidebar-section">Identity Sync</div>
   <a href="#cmd-sync-ad-user-status">Sync-ZNADUserStatus</a>
@@ -66,13 +68,13 @@
       <span class="tag">PowerShell 7+</span>
       <span class="tag purple">Module</span>
       <span class="tag green">User Reference</span>
-      <span class="tag">v1.3</span>
+      <span class="tag">v1.5</span>
     </div>
     <p class="lead">
       ZNTools is a PowerShell module for Zero Networks operators. It provides network
       connectivity checks, Linux configuration profiles, segment server clusters, environment
-      health data, WFP security event rate analysis, asset browser queries against local JSON
-      snapshots, ZN service lifecycle management, and AD-to-ZN identity status sync.
+      health data, security event rate and log-volume analysis, asset browser queries against
+      local JSON snapshots, ZN service lifecycle management, and AD-to-ZN identity status sync.
     </p>
   </div>
 
@@ -293,6 +295,121 @@
   </div>
 
   <!-- ════════════════════════════════════════
+       Get-ZNDisconnectedAssetMetric
+  ═════════════════════════════════════════ -->
+  <div class="script-separator">
+    <div class="page-header" style="margin-bottom:1rem; border-bottom:none; padding-bottom:0.5rem;">
+      <h1 id="cmd-disconnected-asset-metric">Get-ZNDisconnectedAssetMetric</h1>
+      <div class="tags">
+        <span class="tag">Health</span>
+        <span class="tag green">Read-only</span>
+        <span class="tag purple">Quiet / Scriptable</span>
+      </div>
+    </div>
+  </div>
+
+  <h2>Synopsis</h2>
+  <p>
+    Reports disconnected ZN asset counts — overall and per deployment cluster — as metric
+    objects suitable for feeding a time-series dashboard. It's the quiet, scriptable
+    counterpart to <a href="#cmd-health-dashboard">Show-ZNHealthDashboard</a>'s
+    <code>-IncludeDisconnected</code> section, sharing the same detection logic under the hood.
+  </p>
+
+  <div class="callout info">
+    <strong>No banner, by design</strong>
+    Unlike every other entry-point command in this module, this command does <em>not</em>
+    display the ASCII banner or progress log lines. It's meant to run unattended on a schedule
+    and feed a metrics pipeline — banner output would just be noise (or worse, get mixed into
+    captured stdout) in that context. See the
+    <a href="zntools-author-reference.html#pattern-banner">Banner guidance</a> table for details.
+  </div>
+
+  <h2>Syntax</h2>
+  <div class="syntax-block">
+<span class="cmd">Get-ZNDisconnectedAssetMetric</span>
+ [<span class="param">-ApiKey</span> &lt;string&gt;]
+ [<span class="param">-ApiUrl</span> &lt;string&gt;]
+ [<span class="param">-IncludeDisconnectedDays</span> &lt;int&gt;]
+  </div>
+
+  <h2>Parameters</h2>
+  <div class="param-entry">
+    <div class="param-name">-IncludeDisconnectedDays</div>
+    <div class="param-body">
+      <p class="param-desc">
+        Only count assets disconnected for at least this many days. Default: <code>0</code> —
+        any asset currently disconnected counts, regardless of how long. Same semantics as
+        <code>Show-ZNHealthDashboard -IncludeDisconnectedDays</code> — tune this to match what
+        the customer considers "disconnected" for their dashboard (e.g. filter out brief blips).
+      </p>
+    </div>
+  </div>
+
+  <h2>Output</h2>
+  <p>
+    One <code>PSCustomObject</code> per deployment cluster (including <code>Unclustered</code>
+    for assets with no cluster assigned), plus a final <code>TOTAL</code> row summing all
+    clusters. Every known cluster gets a row on every run — even at count <code>0</code> — so a
+    cluster's time series stays continuous rather than dropping out when it briefly has nothing
+    disconnected.
+  </p>
+  <table class="fn-table">
+    <thead>
+      <tr><th>Property</th><th>Description</th></tr>
+    </thead>
+    <tbody>
+      <tr><td>Timestamp</td><td>Capture time for this batch — the same value across every row in a single run, so cluster rows and the TOTAL row correlate as one measurement.</td></tr>
+      <tr><td>ClusterId</td><td>Deployment cluster ID, or <code>$null</code> on the TOTAL row.</td></tr>
+      <tr><td>ClusterName</td><td>Deployment cluster name, <code>Unclustered</code>, or <code>TOTAL</code>.</td></tr>
+      <tr><td>DisconnectedCount</td><td>Number of disconnected assets matching <code>-IncludeDisconnectedDays</code>.</td></tr>
+      <tr><td>DaysThreshold</td><td>Echo of the <code>-IncludeDisconnectedDays</code> value used for this run.</td></tr>
+    </tbody>
+  </table>
+
+  <div class="callout">
+    <strong>On failure, expect nothing — not a zero</strong>
+    If the API call fails, this command writes a terminating error and returns no objects at
+    all, rather than a fabricated zero-count result. Treat a missing/empty result as "no data
+    point this run" in your metrics pipeline, not as "zero disconnected assets" — otherwise a
+    real outage could silently render as a healthy flat line on the dashboard.
+  </div>
+
+  <h2>Examples</h2>
+  <div class="example">
+    <div class="example-header">
+      <span class="ex-label">Example 1</span>
+      <span class="ex-title">All clusters plus total</span>
+    </div>
+    <pre><span class="ps-prompt">PS&gt; </span><span class="ps-fn">Get-ZNDisconnectedAssetMetric</span></pre>
+    <div class="example-desc">Returns one object per cluster plus a TOTAL row for all currently-disconnected assets.</div>
+  </div>
+  <div class="example">
+    <div class="example-header">
+      <span class="ex-label">Example 2</span>
+      <span class="ex-title">Filter out brief blips</span>
+    </div>
+    <pre><span class="ps-prompt">PS&gt; </span><span class="ps-fn">Get-ZNDisconnectedAssetMetric</span> <span class="ps-param">-IncludeDisconnectedDays</span> <span class="ps-value">3</span></pre>
+    <div class="example-desc">Only counts assets disconnected for 3+ days.</div>
+  </div>
+  <div class="example">
+    <div class="example-header">
+      <span class="ex-label">Example 3</span>
+      <span class="ex-title">Aggregate count only</span>
+    </div>
+    <pre><span class="ps-prompt">PS&gt; </span><span class="ps-fn">Get-ZNDisconnectedAssetMetric</span> | <span class="ps-fn">Where-Object</span> ClusterName <span class="ps-value">-eq</span> <span class="ps-value">'TOTAL'</span> | <span class="ps-fn">Select-Object</span> -ExpandProperty DisconnectedCount</pre>
+    <div class="example-desc">Extracts just the aggregate count, e.g. for a simple single-value metric push.</div>
+  </div>
+  <div class="example">
+    <div class="example-header">
+      <span class="ex-label">Example 4</span>
+      <span class="ex-title">JSON for a metrics endpoint</span>
+    </div>
+    <pre><span class="ps-prompt">PS&gt; </span><span class="ps-fn">Get-ZNDisconnectedAssetMetric</span> <span class="ps-param">-IncludeDisconnectedDays</span> <span class="ps-value">1</span> | <span class="ps-fn">ConvertTo-Json</span></pre>
+    <div class="example-desc">Produces one JSON metric point per cluster (plus TOTAL) for a scheduled task to POST somewhere.</div>
+  </div>
+
+  <!-- ════════════════════════════════════════
        Invoke-ZNServices
   ═════════════════════════════════════════ -->
   <div class="script-separator">
@@ -410,22 +527,26 @@
 
   <h2>Synopsis</h2>
   <p>
-    Shows average and peak rates per second for Windows Filtering Platform security events
-    <strong>5156</strong> (permitted connection) and <strong>5157</strong> (blocked connection)
-    over a specified time period.
+    Shows average and peak rates per second for one or more Security-log Event IDs over a
+    specified time period. Defaults to Windows Filtering Platform security events
+    <strong>5156</strong> (permitted connection) and <strong>5157</strong> (blocked connection) —
+    the original purpose of this command — but <code>-EventId</code> can target any other
+    Event ID(s), including the Top N Event IDs surfaced by
+    <a href="#cmd-security-log-analysis">Get-ZNSecurityLogAnalysis</a>.
   </p>
 
   <div class="callout info">
     <strong>Audit policy requirement</strong>
-    Events 5156 and 5157 are only logged when the <em>Filtering Platform Connection</em> subcategory
-    is enabled in the local audit policy. If no events are found, verify with:<br/>
-    <code>auditpol /get /subcategory:"Filtering Platform Connection"</code>
+    Events are only logged when the matching audit subcategory is enabled in the local audit
+    policy. If no events are found, check current policy with:<br/>
+    <code>auditpol /get /category:*</code>
   </div>
 
   <h2>Syntax</h2>
   <div class="syntax-block">
 <span class="cmd">Get-ZNSecurityEventRate</span>
   <span class="param">-Period</span> &lt;string&gt;
+ [<span class="param">-EventId</span> &lt;int[]&gt;]
  [<span class="param">-ComputerName</span> &lt;string&gt;]
  [<span class="param">-Credential</span> &lt;PSCredential&gt;]
   </div>
@@ -442,6 +563,16 @@
       <p class="param-desc">
         Peak rate is computed from 1-second buckets for periods up to 1 hour and from 1-minute buckets
         (normalized to per-second) for longer periods.
+      </p>
+    </div>
+  </div>
+  <div class="param-entry">
+    <div class="param-name">-EventId</div>
+    <div class="param-body">
+      <p class="param-desc">
+        One or more Security-log Event IDs to measure. Default: <code>5156, 5157</code>.
+        Event IDs that Zero Networks segmentation depends on (see <code>$script:ZNRequiredEventIds</code>)
+        are marked with <code>*</code> in the output table.
       </p>
     </div>
   </div>
@@ -468,8 +599,9 @@
 
   <h2>Output</h2>
   <p>
-    Displays a table with six columns for each of the two event IDs and a combined total row:
-    event count, average events/sec, average KB/s, peak events/sec, and peak KB/s.
+    Displays a table with one row per requested Event ID plus a combined total row: event count,
+    average events/sec, average KB/s, peak events/sec, and peak KB/s. Rows for Event IDs required
+    by Zero Networks are suffixed with <code>*</code>, with a legend line below the table.
   </p>
   <div class="callout info">
     <strong>What KB/s measures</strong>
@@ -521,6 +653,163 @@
     <pre><span class="ps-prompt">PS&gt; </span>$cred = <span class="ps-fn">Get-Credential</span>
 <span class="ps-prompt">PS&gt; </span><span class="ps-fn">Get-ZNSecurityEventRate</span> <span class="ps-param">-Period</span> <span class="ps-value">1d</span> <span class="ps-param">-ComputerName</span> <span class="ps-value">segment01.zero.local</span> <span class="ps-param">-Credential</span> $cred</pre>
     <div class="example-desc">Same as above but authenticates with explicit credentials — useful when the local session identity doesn't have remote access.</div>
+  </div>
+  <div class="example">
+    <div class="example-header">
+      <span class="ex-label">Example 6</span>
+      <span class="ex-title">Other Event IDs</span>
+    </div>
+    <pre><span class="ps-prompt">PS&gt; </span><span class="ps-fn">Get-ZNSecurityEventRate</span> <span class="ps-param">-Period</span> <span class="ps-value">1h</span> <span class="ps-param">-EventId</span> <span class="ps-value">4688, 4689</span></pre>
+    <div class="example-desc">Measures process creation/exit rates instead of the default WFP connection events.</div>
+  </div>
+
+  <!-- ════════════════════════════════════════
+       Get-ZNSecurityLogAnalysis
+  ═════════════════════════════════════════ -->
+  <div class="script-separator">
+    <div class="page-header" style="margin-bottom:1rem; border-bottom:none; padding-bottom:0.5rem;">
+      <h1 id="cmd-security-log-analysis">Get-ZNSecurityLogAnalysis</h1>
+      <div class="tags">
+        <span class="tag">Security Events</span>
+        <span class="tag green">Read-only</span>
+        <span class="tag">Local / Remote / Offline</span>
+      </div>
+    </div>
+  </div>
+
+  <h2>Synopsis</h2>
+  <p>
+    Analyzes the Windows Security event log (live, remote, or an offline <code>.evtx</code>
+    archive) and ranks Event IDs by count and by estimated storage size — useful for
+    understanding why a log is filling up or wrapping quickly.
+  </p>
+
+  <div class="callout info">
+    <strong>Rate calculation</strong>
+    Each ranked row includes an average and peak events-per-second figure, computed with the
+    same bucket math as <a href="#cmd-security-event-rate">Get-ZNSecurityEventRate</a>
+    (<code>Get-ZNBucketedRate</code>), from timestamps collected during the same single read
+    pass — no second query against the log is needed, and it works against offline
+    <code>.evtx</code> files too. Peak is reported at 1-minute granularity.
+  </div>
+
+  <div class="callout">
+    <strong>Zero Networks-required Event IDs</strong>
+    Event IDs that Zero Networks segmentation depends on for enforcement, discovery, or audit
+    evidence are marked with <code>*</code> in both tables and in the CSV export (column
+    <code>ZNRequired</code>) — those audit subcategories must stay enabled even if this
+    analysis shows them as high-volume. The list is maintained in
+    <code>$script:ZNRequiredEventIds</code> (see the
+    <a href="zntools-author-reference.html">Author Reference</a>).
+  </div>
+
+  <h2>Syntax</h2>
+  <div class="syntax-block">
+    <span class="set-label">Live local log (default)</span><span class="cmd">Get-ZNSecurityLogAnalysis</span>
+ [<span class="param">-TopN</span> &lt;int&gt;]
+ [<span class="param">-MaxEvents</span> &lt;long&gt;]
+ [<span class="param">-SampleSize</span> &lt;int&gt;]
+ [<span class="param">-Hours</span> &lt;int&gt;]
+ [<span class="param">-ExportCsv</span> &lt;string&gt;]
+  </div>
+  <div class="syntax-block">
+    <span class="set-label">Offline archive</span><span class="cmd">Get-ZNSecurityLogAnalysis</span>
+  <span class="param">-LogPath</span> &lt;string&gt;
+ [<span class="param">-TopN</span> &lt;int&gt;]
+ [<span class="param">-MaxEvents</span> &lt;long&gt;]
+ [<span class="param">-SampleSize</span> &lt;int&gt;]
+ [<span class="param">-ExportCsv</span> &lt;string&gt;]
+  </div>
+  <div class="syntax-block">
+    <span class="set-label">Remote live log</span><span class="cmd">Get-ZNSecurityLogAnalysis</span>
+  <span class="param">-ComputerName</span> &lt;string&gt;
+ [<span class="param">-TopN</span> &lt;int&gt;]
+ [<span class="param">-MaxEvents</span> &lt;long&gt;]
+ [<span class="param">-SampleSize</span> &lt;int&gt;]
+ [<span class="param">-Hours</span> &lt;int&gt;]
+ [<span class="param">-ExportCsv</span> &lt;string&gt;]
+  </div>
+
+  <h2>Parameters</h2>
+  <div class="param-entry">
+    <div class="param-name">-LogPath</div>
+    <div class="param-body"><p class="param-desc">Path to an offline <code>.evtx</code> archive. Mutually exclusive with <code>-ComputerName</code>. Not limited to the Security log — any <code>.evtx</code> is accepted, and IDs from the System log and the Windows Firewall With Advanced Security log are already recognized in the description/required-ID tables.</p></div>
+  </div>
+  <div class="param-entry">
+    <div class="param-name">-TopN</div>
+    <div class="param-body"><p class="param-desc">Number of top Event IDs to display per table. Default: <code>25</code>. Range: <code>1–100</code>.</p></div>
+  </div>
+  <div class="param-entry">
+    <div class="param-name">-MaxEvents</div>
+    <div class="param-body"><p class="param-desc">Maximum events to read. Default: <code>500000</code>. Use <code>0</code> to read the entire log — slow on large files. Rate, count, and size figures are only as accurate as the events actually read.</p></div>
+  </div>
+  <div class="param-entry">
+    <div class="param-name">-SampleSize</div>
+    <div class="param-body"><p class="param-desc">Number of events per Event ID to XML-sample for size estimation. Default: <code>100</code>. Range: <code>5–1000</code>.</p></div>
+  </div>
+  <div class="param-entry">
+    <div class="param-name">-Hours</div>
+    <div class="param-body"><p class="param-desc">Restrict to events from the last N hours. Live log only (local or <code>-ComputerName</code>). Default: <code>0</code> (all events currently in the log).</p></div>
+  </div>
+  <div class="param-entry">
+    <div class="param-name">-ComputerName</div>
+    <div class="param-body"><p class="param-desc">Remote computer whose live Security log to query. Requires WinRM/RPC access. Mutually exclusive with <code>-LogPath</code>.</p></div>
+  </div>
+  <div class="param-entry">
+    <div class="param-name">-ExportCsv</div>
+    <div class="param-body"><p class="param-desc">Writes the full result set (all Event IDs, not just Top N) to this CSV path, including <code>AvgPerSec</code>, <code>PeakPerSec</code>, and <code>ZNRequired</code> columns.</p></div>
+  </div>
+
+  <h2>Output</h2>
+  <p>
+    Two console tables — Top N by count (with rate columns) and Top N by estimated size — plus
+    a cumulative-coverage breakdown (how many Event IDs account for 50/80/95% of all events)
+    and general audit policy guidance. With <code>-ExportCsv</code>, every observed Event ID
+    (not just the displayed Top N) is written to CSV.
+  </p>
+
+  <h2>Examples</h2>
+  <div class="example">
+    <div class="example-header">
+      <span class="ex-label">Example 1</span>
+      <span class="ex-title">Local live log, defaults</span>
+    </div>
+    <pre><span class="ps-prompt">PS&gt; </span><span class="ps-fn">Get-ZNSecurityLogAnalysis</span></pre>
+    <div class="example-desc">Analyzes the local live Security log with default settings (Top 25, 500k event cap).</div>
+  </div>
+  <div class="example">
+    <div class="example-header">
+      <span class="ex-label">Example 2</span>
+      <span class="ex-title">Offline archive</span>
+    </div>
+    <pre><span class="ps-prompt">PS&gt; </span><span class="ps-fn">Get-ZNSecurityLogAnalysis</span> <span class="ps-param">-LogPath</span> <span class="ps-value">"E:\Logs\Archive-Security-2026-07-05.evtx"</span></pre>
+    <div class="example-desc">Analyzes an offline archive exported from another machine.</div>
+  </div>
+  <div class="example">
+    <div class="example-header">
+      <span class="ex-label">Example 3</span>
+      <span class="ex-title">Full 24-hour analysis</span>
+    </div>
+    <pre><span class="ps-prompt">PS&gt; </span><span class="ps-fn">Get-ZNSecurityLogAnalysis</span> <span class="ps-param">-Hours</span> <span class="ps-value">24</span> <span class="ps-param">-MaxEvents</span> <span class="ps-value">0</span> <span class="ps-param">-TopN</span> <span class="ps-value">30</span></pre>
+    <div class="example-desc">No event cap, last 24 hours, showing the top 30 Event IDs per table.</div>
+  </div>
+  <div class="example">
+    <div class="example-header">
+      <span class="ex-label">Example 4</span>
+      <span class="ex-title">Remote DC with CSV export</span>
+    </div>
+    <pre><span class="ps-prompt">PS&gt; </span><span class="ps-fn">Get-ZNSecurityLogAnalysis</span> <span class="ps-param">-ComputerName</span> <span class="ps-value">"DC01.corp.local"</span> <span class="ps-param">-ExportCsv</span> <span class="ps-value">"C:\Temp\DC01.csv"</span></pre>
+    <div class="example-desc">Queries a remote DC and writes the full result set to CSV.</div>
+  </div>
+  <div class="example">
+    <div class="example-header">
+      <span class="ex-label">Example 5</span>
+      <span class="ex-title">Batch multiple archives</span>
+    </div>
+    <pre><span class="ps-prompt">PS&gt; </span><span class="ps-fn">Get-ChildItem</span> *.evtx | <span class="ps-fn">ForEach-Object</span> {
+    <span class="ps-fn">Get-ZNSecurityLogAnalysis</span> <span class="ps-param">-LogPath</span> $_.FullName <span class="ps-param">-ExportCsv</span> "$($_.BaseName).csv"
+}</pre>
+    <div class="example-desc">Runs the analysis against every <code>.evtx</code> file in the current directory.</div>
   </div>
 
   <!-- ════════════════════════════════════════

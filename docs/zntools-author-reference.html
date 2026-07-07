@@ -33,6 +33,8 @@
   <a href="#private-api-helpers">API helpers</a>
   <a href="#private-health-maps">Health maps</a>
   <a href="#private-asset-data">Asset data</a>
+  <a href="#private-security-event-shared">Security event shared</a>
+  <a href="#private-disconnected-assets">Disconnected assets</a>
   <a href="#private-banner">Banner</a>
 
   <div class="sidebar-section">See Also</div>
@@ -187,6 +189,11 @@ function Get-MyAssetQuery {
         <td>None</td>
         <td>Called repeatedly in pipelines; banner output would be disruptive.</td>
       </tr>
+      <tr>
+        <td>Scheduled / metric commands</td>
+        <td>None (by design)</td>
+        <td>E.g. <code>Get-DisconnectedAssetMetric</code>. Meant to run unattended on a schedule and feed a metrics/dashboard pipeline — ASCII art and timestamped log lines in that output are pure noise, and risk getting mixed into captured stdout. On error, these commands should <code>Write-Error</code> and return nothing rather than a fabricated zero-value result, so a real failure can't silently read as "zero" on a dashboard.</td>
+      </tr>
     </tbody>
   </table>
 
@@ -326,6 +333,70 @@ function Get-MyAssetQuery {
         <td>ConvertTo-EnrichedAsset</td>
         <td>Function</td>
         <td>Pipeline function that converts raw asset objects to enriched PSCustomObjects using the lookup maps above.</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <h2 id="private-security-event-shared">Security event shared helpers</h2>
+  <p>
+    Defined in <code>Private/50-SecurityEventShared.ps1</code>. Shared by
+    <code>Get-SecurityEventRate</code> and <code>Get-SecurityLogAnalysis</code> so both commands
+    agree on Event ID descriptions, which IDs Zero Networks requires, and how "events per second"
+    is computed.
+  </p>
+  <table class="fn-table">
+    <thead>
+      <tr><th>Symbol</th><th>Type</th><th>Description</th></tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td>$script:ZNRequiredEventIds</td>
+        <td>State</td>
+        <td>Flat array of Event IDs that Zero Networks segmentation depends on. Update this single array as requirements change — callers flag membership with <code>$id -in $script:ZNRequiredEventIds</code>.</td>
+      </tr>
+      <tr>
+        <td>$script:ZNSecurityEventDescriptions</td>
+        <td>Lookup</td>
+        <td>Event ID → friendly description. Covers common Security-log events plus every ID referenced by <code>$script:ZNRequiredEventIds</code>, including ones from the System log and the Windows Firewall With Advanced Security log (relevant when <code>-LogPath</code> points at a non-Security <code>.evtx</code>).</td>
+      </tr>
+      <tr>
+        <td>Get-ZNBucketedRate</td>
+        <td>Function</td>
+        <td>Computes average/peak events-per-second from a bucket-index → count dictionary. Takes <code>-Buckets</code>, <code>-Count</code>, <code>-TotalSeconds</code>, <code>-BucketSeconds</code>. Both rate-reporting commands call this so "events/sec" means the same thing everywhere in the module.</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <div class="callout info">
+    <strong>Why Get-SecurityLogAnalysis doesn't call Get-SecurityEventRate directly</strong>
+    Get-SecurityEventRate only queries live/remote logs via <code>Get-WinEvent -FilterHashtable</code>,
+    and has no offline <code>-LogPath</code> mode. Get-SecurityLogAnalysis needs rates for every
+    Event ID it encounters (including in offline archives) without a second, expensive pass over
+    the log — so it accumulates its own per-ID rate buckets during the single read pass it already
+    does, then calls the shared <code>Get-ZNBucketedRate</code> helper directly. That keeps the
+    rate math identical between the two commands without re-querying the log.
+  </div>
+
+  <h2 id="private-disconnected-assets">Disconnected asset helpers</h2>
+  <p>
+    Defined in <code>Private/60-DisconnectedAssets.ps1</code>. Shared by
+    <code>Show-HealthDashboard</code> (<code>-IncludeDisconnected</code> section) and
+    <code>Get-DisconnectedAssetMetric</code>, so both commands fetch and filter assets identically.
+  </p>
+  <table class="fn-table">
+    <thead>
+      <tr><th>Function</th><th>Description</th><th>Notes</th></tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td>Get-ZNAllAssets</td>
+        <td>Pages through <code>GET /assets</code> and returns every asset.</td>
+        <td>No internal logging — callers wrap it with their own <code>Write-Log</code>/<code>Write-Host</code> as appropriate for their context (interactive vs. quiet/scheduled).</td>
+      </tr>
+      <tr>
+        <td>Get-ZNDisconnectedAsset</td>
+        <td>Filters an asset list down to currently-disconnected assets, optionally requiring a minimum number of days disconnected.</td>
+        <td>Reads deployment cluster directly off each asset's <code>deploymentsClusterId</code> / <code>deploymentsCluster.name</code> fields (returned by the live <code>/assets</code> API) — no separate cluster lookup call needed.</td>
       </tr>
     </tbody>
   </table>

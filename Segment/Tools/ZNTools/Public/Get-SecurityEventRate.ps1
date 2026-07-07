@@ -1,14 +1,17 @@
 function Get-SecurityEventRate {
     <#
     .SYNOPSIS
-        Shows average and peak rates per second for WFP security events 5156 (allowed) and 5157 (blocked).
+        Shows average and peak rates per second for one or more Security-log Event IDs.
     .AUTHOR
         Olaf Gradin
     .DESCRIPTION
-        Queries the Security event log for Windows Filtering Platform connection events
-        (EventId 5156 — permitted, EventId 5157 — blocked) over a specified period and reports
-        average and peak events-per-second rates for each event type and combined, plus
-        estimated event log write throughput in KB/s or MB/s derived by sampling event XML sizes.
+        Queries the Security event log for the specified Event ID(s) over a specified period and
+        reports average and peak events-per-second rates per ID and combined, plus estimated event
+        log write throughput in KB/s or MB/s derived by sampling event XML sizes.
+
+        Defaults to EventId 5156 (WFP connection allowed) and 5157 (WFP connection blocked) — the
+        original purpose of this command. Pass -EventId to measure the rate of any other Event
+        ID(s), e.g. the Top N Event IDs surfaced by Get-SecurityLogAnalysis.
 
         Peak rate is computed from 1-second buckets for periods up to 1 hour, and from 1-minute
         buckets (normalized to per-second) for longer periods.
@@ -18,6 +21,8 @@ function Get-SecurityEventRate {
     .PARAMETER Period
         Time period to analyze. Suffix with 'h' for hours (e.g. '1h', '4h', '24h') or 'd' for days
         (e.g. '1d', '7d'). Must be a positive integer followed by 'h' or 'd'.
+    .PARAMETER EventId
+        One or more Security-log Event IDs to measure. Default: 5156, 5157 (WFP connections).
     .PARAMETER ComputerName
         Optional. Run the query against a remote machine via WinRM (PSRemoting). Requires the
         Windows Remote Management service to be running and accessible on the target.
@@ -30,6 +35,9 @@ function Get-SecurityEventRate {
         Get-ZNSecurityEventRate -Period 4h -ComputerName segment01.zero.local
         Shows WFP event rates on segment01 for the last 4 hours using the current session identity.
     .EXAMPLE
+        Get-ZNSecurityEventRate -Period 1h -EventId 4688, 4689
+        Shows process creation/exit rates for the last hour.
+    .EXAMPLE
         $cred = Get-Credential
         Get-ZNSecurityEventRate -Period 1d -ComputerName segment01.zero.local -Credential $cred
         Shows WFP event rates on segment01 for the last day, authenticating with explicit credentials.
@@ -39,6 +47,8 @@ function Get-SecurityEventRate {
         [Parameter(Mandatory)]
         [ValidatePattern('^\d+(h|d)$')]
         [string]$Period,
+
+        [int[]]$EventId = @(5156, 5157),
 
         [string]$ComputerName,
 
@@ -62,17 +72,19 @@ function Get-SecurityEventRate {
     $bucketSec    = if ($totalSeconds -le 3600) { 1 } else { 60 }
 
     $target = if ($ComputerName) { $ComputerName } else { 'localhost' }
+    $idList = $EventId -join ', '
 
     Write-Host ""
-    Write-Host "  WFP Security Event Rate Analysis" -ForegroundColor Cyan
-    Write-Host "  Target : $target" -ForegroundColor DarkGray
-    Write-Host "  Period : Last $periodLabel" -ForegroundColor DarkGray
-    Write-Host "  From   : $($startTime.ToString('yyyy-MM-dd HH:mm:ss'))" -ForegroundColor DarkGray
-    Write-Host "  To     : $($endTime.ToString('yyyy-MM-dd HH:mm:ss'))" -ForegroundColor DarkGray
+    Write-Host "  Security Event Rate Analysis" -ForegroundColor Cyan
+    Write-Host "  Target   : $target" -ForegroundColor DarkGray
+    Write-Host "  Event ID : $idList" -ForegroundColor DarkGray
+    Write-Host "  Period   : Last $periodLabel" -ForegroundColor DarkGray
+    Write-Host "  From     : $($startTime.ToString('yyyy-MM-dd HH:mm:ss'))" -ForegroundColor DarkGray
+    Write-Host "  To       : $($endTime.ToString('yyyy-MM-dd HH:mm:ss'))" -ForegroundColor DarkGray
     Write-Host ""
 
-    $queryMsg = if ($ComputerName) { "  Querying Security event log on $ComputerName for EventId 5156 / 5157..." }
-                else               { "  Querying Security event log for EventId 5156 / 5157..." }
+    $queryMsg = if ($ComputerName) { "  Querying Security event log on $ComputerName for EventId $idList..." }
+                else               { "  Querying Security event log for EventId $idList..." }
     Write-Host $queryMsg -ForegroundColor Yellow
 
     # All heavy work runs inside this block — locally via & or remotely via Invoke-Command.
@@ -81,7 +93,7 @@ function Get-SecurityEventRate {
     # Time window is computed inside the block so the filter always uses the target machine's
     # local clock — passing DateTime objects across WinRM boundaries causes timezone shifts.
     $computeBlock = {
-        param($TotalSeconds, $BucketSec)
+        param($TotalSeconds, $BucketSec, $EventIds)
 
         $isAdmin = ([Security.Principal.WindowsPrincipal][Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole(
             [Security.Principal.WindowsBuiltInRole]::Administrator)
@@ -91,7 +103,7 @@ function Get-SecurityEventRate {
 
         $filterHash = @{
             LogName   = 'Security'
-            Id        = 5156, 5157
+            Id        = $EventIds
             StartTime = $startTime
             EndTime   = $endTime
         }
@@ -108,27 +120,22 @@ function Get-SecurityEventRate {
             }
         }
 
-        $events5156 = @($events | Where-Object Id -eq 5156)
-        $events5157 = @($events | Where-Object Id -eq 5157)
+        # Per-ID counts and rate buckets, plus a combined "all IDs" bucket set for the total row.
+        $countsById  = @{}
+        $bucketsById = @{}
+        foreach ($id in $EventIds) { $countsById[$id] = 0L; $bucketsById[$id] = @{} }
+        $bucketsAll = @{}
 
-        $avg5156 = [math]::Round($events5156.Count / $TotalSeconds, 4)
-        $avg5157 = [math]::Round($events5157.Count / $TotalSeconds, 4)
-        $avgAll  = [math]::Round($events.Count     / $TotalSeconds, 4)
-
-        $buckets5156 = @{}; $buckets5157 = @{}; $bucketsAll = @{}
         foreach ($evt in $events) {
+            $id = $evt.Id
+            if (-not $countsById.ContainsKey($id)) { $countsById[$id] = 0L; $bucketsById[$id] = @{} }
+            $countsById[$id]++
+
             $slot = [long][math]::Floor(($evt.TimeCreated - $startTime).TotalSeconds / $BucketSec)
-            if ($evt.Id -eq 5156) {
-                if ($buckets5156.ContainsKey($slot)) { $buckets5156[$slot]++ } else { $buckets5156[$slot] = 1 }
-            } else {
-                if ($buckets5157.ContainsKey($slot)) { $buckets5157[$slot]++ } else { $buckets5157[$slot] = 1 }
-            }
+            $idBuckets = $bucketsById[$id]
+            if ($idBuckets.ContainsKey($slot)) { $idBuckets[$slot]++ } else { $idBuckets[$slot] = 1 }
             if ($bucketsAll.ContainsKey($slot)) { $bucketsAll[$slot]++ } else { $bucketsAll[$slot] = 1 }
         }
-
-        $peak5156 = if ($buckets5156.Count) { [math]::Round(($buckets5156.Values | Measure-Object -Maximum).Maximum / $BucketSec, 4) } else { 0 }
-        $peak5157 = if ($buckets5157.Count) { [math]::Round(($buckets5157.Values | Measure-Object -Maximum).Maximum / $BucketSec, 4) } else { 0 }
-        $peakAll  = if ($bucketsAll.Count)  { [math]::Round(($bucketsAll.Values  | Measure-Object -Maximum).Maximum / $BucketSec, 4) } else { 0 }
 
         $sampleMax = [math]::Min(100, $events.Count)
         $step = [math]::Max(1, [int][math]::Floor($events.Count / [math]::Max(1, $sampleMax)))
@@ -143,14 +150,9 @@ function Get-SecurityEventRate {
             AccessDenied = $false
             IsAdmin      = $isAdmin
             Total        = $events.Count
-            Count5156    = $events5156.Count
-            Count5157    = $events5157.Count
-            Avg5156      = $avg5156
-            Avg5157      = $avg5157
-            AvgAll       = $avgAll
-            Peak5156     = $peak5156
-            Peak5157     = $peak5157
-            PeakAll      = $peakAll
+            CountsById   = $countsById
+            BucketsById  = $bucketsById
+            BucketsAll   = $bucketsAll
             AvgEvtBytes  = $avgEvtBytes
             SampleCount  = $sampleCount
         }
@@ -160,7 +162,7 @@ function Get-SecurityEventRate {
         $invokeParams = @{
             ComputerName = $ComputerName
             ScriptBlock  = $computeBlock
-            ArgumentList = $totalSeconds, $bucketSec
+            ArgumentList = $totalSeconds, $bucketSec, $EventId
             ErrorAction  = 'Stop'
         }
         if ($Credential) { $invokeParams.Credential = $Credential }
@@ -173,7 +175,7 @@ function Get-SecurityEventRate {
         }
     } else {
         try {
-            $result = & $computeBlock $totalSeconds $bucketSec
+            $result = & $computeBlock $totalSeconds $bucketSec $EventId
         } catch {
             Write-Error "Failed to query Security event log: $($_.Exception.Message)"
             return
@@ -201,7 +203,7 @@ function Get-SecurityEventRate {
             Write-Host ""
         }
 
-        Write-Host "  Verify audit policy:  auditpol /get /subcategory:'Filtering Platform Connection'" -ForegroundColor DarkGray
+        Write-Host "  Verify audit policy:  auditpol /get /category:*" -ForegroundColor DarkGray
         Write-Host ""
         return
     }
@@ -212,23 +214,48 @@ function Get-SecurityEventRate {
         else               { "$([math]::Round($Bps / 1KB, 2)) KB/s" }
     }
 
-    $avgBps5156  = $result.Avg5156  * $result.AvgEvtBytes
-    $avgBps5157  = $result.Avg5157  * $result.AvgEvtBytes
-    $avgBpsAll   = $result.AvgAll   * $result.AvgEvtBytes
-    $peakBps5156 = $result.Peak5156 * $result.AvgEvtBytes
-    $peakBps5157 = $result.Peak5157 * $result.AvgEvtBytes
-    $peakBpsAll  = $result.PeakAll  * $result.AvgEvtBytes
+    # Per-ID rate stats share the same bucket math Get-SecurityLogAnalysis uses, so "events/sec"
+    # means the same thing everywhere in this module.
+    $perEvent = foreach ($id in $EventId) {
+        $rate = Get-ZNBucketedRate -Buckets $result.BucketsById[$id] -Count $result.CountsById[$id] `
+            -TotalSeconds $totalSeconds -BucketSeconds $bucketSec
+        [PSCustomObject]@{
+            EventID     = $id
+            Description = $script:ZNSecurityEventDescriptions[$id] ?? "EventID $id"
+            ZNRequired  = $id -in $script:ZNRequiredEventIds
+            Count       = $rate.Count
+            Avg         = $rate.Avg
+            Peak        = $rate.Peak
+        }
+    }
+    $totalRate = Get-ZNBucketedRate -Buckets $result.BucketsAll -Count $result.Total `
+        -TotalSeconds $totalSeconds -BucketSeconds $bucketSec
 
-    $fmt = "  {0,-30} {1,7} {2,10} {3,10} {4,10} {5,10}"
-    $sep = "-" * 30
+    $fmt = "  {0,-34} {1,7} {2,10} {3,10} {4,10} {5,10}"
+    $sep = "-" * 34
 
     Write-Host ($fmt -f "Event", "Count", "Avg /sec", "Avg KB/s", "Peak /sec", "Peak KB/s") -ForegroundColor Cyan
     Write-Host ($fmt -f $sep, "-------", "----------", "----------", "----------", "----------") -ForegroundColor DarkGray
-    Write-Host ($fmt -f "5156  WFP Permitted Connection", $result.Count5156, $result.Avg5156, (Format-DataRate $avgBps5156),  $result.Peak5156, (Format-DataRate $peakBps5156)) -ForegroundColor White
-    Write-Host ($fmt -f "5157  WFP Blocked Connection",   $result.Count5157, $result.Avg5157, (Format-DataRate $avgBps5157),  $result.Peak5157, (Format-DataRate $peakBps5157)) -ForegroundColor White
+
+    $anyRequired = $false
+    foreach ($row in $perEvent) {
+        $avgBps  = $row.Avg  * $result.AvgEvtBytes
+        $peakBps = $row.Peak * $result.AvgEvtBytes
+        $marker  = if ($row.ZNRequired) { $anyRequired = $true; ' *' } else { '' }
+        $label   = "$($row.EventID)  $($row.Description)$marker"
+        Write-Host ($fmt -f $label, $row.Count, $row.Avg, (Format-DataRate $avgBps), $row.Peak, (Format-DataRate $peakBps)) -ForegroundColor White
+    }
+
     Write-Host ($fmt -f $sep, "-------", "----------", "----------", "----------", "----------") -ForegroundColor DarkGray
-    Write-Host ($fmt -f "Total", $result.Total, $result.AvgAll, (Format-DataRate $avgBpsAll), $result.PeakAll, (Format-DataRate $peakBpsAll)) -ForegroundColor Green
+    $totalAvgBps  = $totalRate.Avg  * $result.AvgEvtBytes
+    $totalPeakBps = $totalRate.Peak * $result.AvgEvtBytes
+    Write-Host ($fmt -f "Total", $totalRate.Count, $totalRate.Avg, (Format-DataRate $totalAvgBps), $totalRate.Peak, (Format-DataRate $totalPeakBps)) -ForegroundColor Green
     Write-Host ""
+
+    if ($anyRequired) {
+        Write-Host "  * Required for Zero Networks segmentation — this audit subcategory must remain enabled." -ForegroundColor DarkYellow
+    }
+
     Write-Host "  KB/s = Security event log write rate  (avg event size: $([math]::Round($result.AvgEvtBytes / 1KB, 1)) KB, sampled $($result.SampleCount) of $($result.Total) events)" -ForegroundColor DarkGray
     Write-Host ""
 

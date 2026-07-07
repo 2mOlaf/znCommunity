@@ -1,6 +1,6 @@
 # ZNTools
 
-Unified Zero Networks tooling module — health, clusters, Linux profiles, networking, asset browser, service management, and AD-to-ZN identity sync.
+Unified Zero Networks tooling module — health, clusters, Linux profiles, networking, security event rates and log analysis, asset browser, service management, and AD-to-ZN identity sync.
 
 ## Quick start
 ```powershell
@@ -28,14 +28,43 @@ API-backed commands require a valid key. Asset browser commands work offline fro
 ### Health Dashboard
 - `Show-ZNHealthDashboard [-IncludeDisconnected] [-ExportCsv <path>]`
 
+### Disconnected Asset Metric
+Quiet, scriptable counterpart to `-IncludeDisconnected` above — no banner, no progress logging —
+meant to run unattended on a schedule and feed a time-series dashboard.
+- `Get-ZNDisconnectedAssetMetric` — one row per deployment cluster (plus a `TOTAL` row), each with
+  `Timestamp`, `ClusterId`, `ClusterName`, `DisconnectedCount`, `DaysThreshold`
+- `Get-ZNDisconnectedAssetMetric -IncludeDisconnectedDays 3` — only count assets disconnected 3+ days
+- `Get-ZNDisconnectedAssetMetric | ConvertTo-Json` — one JSON metric point per cluster, for a
+  scheduled task to push to a metrics endpoint
+
+Every known cluster gets a row every run, even at count `0`, so a cluster's series stays
+continuous instead of dropping out. On API failure it writes an error and returns nothing rather
+than a fabricated zero — treat a missing result as "no data point this run", not "zero disconnected".
+
 ### Security Events
-Queries the Security event log for Windows Filtering Platform (WFP) events, locally or on a remote Segment Server.
+Queries the Security event log for one or more Event IDs, locally or on a remote Segment Server.
+Defaults to Windows Filtering Platform (WFP) connection events 5156/5157.
 - `Get-ZNSecurityEventRate -Period <period>` — local machine
+- `Get-ZNSecurityEventRate -Period <period> -EventId 4688, 4689` — measure other Event ID(s)
 - `Get-ZNSecurityEventRate -Period <period> -ComputerName <host>` — remote via WinRM (current identity)
 - `Get-ZNSecurityEventRate -Period <period> -ComputerName <host> -Credential $cred` — remote with explicit credential
 
 Period format: a positive integer followed by `h` (hours) or `d` (days) — e.g. `1h`, `4h`, `1d`, `7d`.
 All computation runs on the target machine; only the final numbers are returned across the wire.
+
+### Security Log Analysis
+Reads the Security log (live, remote, or an offline `.evtx` archive) and ranks Event IDs by count
+and by estimated storage size, to understand why a log is filling up or wrapping quickly.
+- `Get-ZNSecurityLogAnalysis` — analyze the local live Security log
+- `Get-ZNSecurityLogAnalysis -LogPath archive.evtx` — analyze an offline archive
+- `Get-ZNSecurityLogAnalysis -ComputerName <host> -ExportCsv report.csv` — query a remote DC and export
+- `Get-ZNSecurityLogAnalysis -Hours 24 -MaxEvents 0 -TopN 30` — full 24-hour analysis, no event cap
+
+Each Top N row includes an average/peak events-per-second rate (same bucket math as
+`Get-ZNSecurityEventRate`, computed from the same read pass — no second log query). Event IDs that
+Zero Networks segmentation depends on are flagged with `*` in the tables and CSV export and must
+stay enabled even if flagged as high-volume — see `$script:ZNRequiredEventIds` in
+`Private/50-SecurityEventShared.ps1` to update that list over time.
 
 ### Service Management
 Manages all `zn*` services as a group.
