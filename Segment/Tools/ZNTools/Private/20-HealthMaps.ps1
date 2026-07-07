@@ -19,6 +19,21 @@ $script:SeverityColor = @{
     4 = 'DarkGray'
 }
 
+$script:AssetMonitorType = @{
+    1  = 'Not Monitored'
+    2  = 'Segment Server'
+    4  = 'Unsupported OS'
+    5  = 'Unmonitorable'
+    6  = 'Unmonitorable'
+    7  = 'Cloud Connector'
+    8  = 'Not Monitored (Ansible Unreachable)'
+    9  = 'Not Monitored (Cloud Connector Uninstalled)'
+    10 = 'Not Monitored (Cloud Connector Required)'
+    12 = 'Inactive Entity'
+    13 = 'Stalked Externally'
+    14 = 'Lightweight Agent'
+}
+
 $script:IssueCodeNames = @{
     0    = 'Unspecified'
     1    = 'Access Denied'

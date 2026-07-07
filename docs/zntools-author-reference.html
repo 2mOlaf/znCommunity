@@ -394,9 +394,14 @@ function Get-MyAssetQuery {
         <td>No internal logging — callers wrap it with their own <code>Write-Log</code>/<code>Write-Host</code> as appropriate for their context (interactive vs. quiet/scheduled).</td>
       </tr>
       <tr>
+        <td>Get-ZNAssetClusterLabel</td>
+        <td>Resolves the deployment-cluster display label for a single asset.</td>
+        <td>Returns <code>deploymentsCluster.name</code> when present. Otherwise the asset has no Segment Server deployment cluster — per the <code>assetStatus</code> enum, that includes <code>7</code> (Cloud Connector) and <code>14</code> (Lightweight Agent), which are monitored directly rather than routed through a customer-run Segment Server — so the label becomes <code>Unclustered (&lt;monitor type&gt;)</code> via the <code>$script:AssetMonitorType</code> map in <code>Private/20-HealthMaps.ps1</code>, instead of one flat <code>Unclustered</code> bucket. Used by both <code>Get-ZNDisconnectedAsset</code> and <code>Get-DisconnectedAssetMetric</code> so they bucket identically.</td>
+      </tr>
+      <tr>
         <td>Get-ZNDisconnectedAsset</td>
         <td>Filters an asset list down to currently-disconnected assets, optionally requiring a minimum number of days disconnected.</td>
-        <td>Reads deployment cluster directly off each asset's <code>deploymentsClusterId</code> / <code>deploymentsCluster.name</code> fields (returned by the live <code>/assets</code> API) — no separate cluster lookup call needed.</td>
+        <td>Deployment cluster (<code>ClusterId</code>/<code>ClusterName</code>) comes from <code>Get-ZNAssetClusterLabel</code> — no separate cluster lookup call needed. Also returns the asset's raw <code>AssetStatus</code> and its mapped <code>MonitorType</code> label.</td>
       </tr>
     </tbody>
   </table>

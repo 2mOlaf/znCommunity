@@ -10,10 +10,13 @@ function Get-DisconnectedAssetMetric {
         plain data instead of a console report — no banner, no progress logging — so scheduled/
         unattended runs produce clean output for a metrics pipeline to consume.
 
-        Emits one row per deployment cluster (including "Unclustered" for assets with no cluster
-        assigned) plus a final TOTAL row. Every known cluster gets a row on every run, even when
-        its count is 0 — so a cluster's time series stays continuous instead of dropping out when
-        it briefly has nothing disconnected.
+        Emits one row per deployment cluster plus a final TOTAL row. Assets with no Segment Server
+        deployment cluster (e.g. Cloud Connector- or Lightweight Agent-monitored assets, which are
+        never routed through a customer-run Segment Server) get their own "Unclustered (<monitor
+        type>)" row per monitoring mechanism — see Get-ZNAssetClusterLabel — rather than a single
+        opaque "Unclustered" bucket that hides which mechanism is actually disconnecting. Every
+        known cluster/monitor-type combination gets a row on every run, even when its count is 0 —
+        so a series stays continuous instead of dropping out when it briefly has nothing disconnected.
 
     .PARAMETER ApiUrl
         Optional API base URL override.
@@ -78,22 +81,24 @@ function Get-DisconnectedAssetMetric {
     $disconnected = @(Get-ZNDisconnectedAsset -Assets $allAssets -MinDisconnectedDays $IncludeDisconnectedDays)
 
     $countByCluster = @{}
-    foreach ($group in ($disconnected | Group-Object ClusterId)) {
+    foreach ($group in ($disconnected | Group-Object ClusterName)) {
         $countByCluster[$group.Name] = $group.Count
     }
 
-    $clusters = $allAssets | Group-Object deploymentsClusterId | ForEach-Object {
-        $sample = $_.Group[0]
+    $clusters = $allAssets | ForEach-Object {
         [PSCustomObject]@{
-            ClusterId   = $_.Name
-            ClusterName = if ($sample.deploymentsCluster -and $sample.deploymentsCluster.name) {
-                $sample.deploymentsCluster.name
-            } else { 'Unclustered' }
+            ClusterId   = $_.deploymentsClusterId
+            ClusterName = Get-ZNAssetClusterLabel -Asset $_
+        }
+    } | Group-Object ClusterName | ForEach-Object {
+        [PSCustomObject]@{
+            ClusterId   = $_.Group[0].ClusterId
+            ClusterName = $_.Name
         }
     }
 
     $rows = foreach ($cluster in ($clusters | Sort-Object ClusterName)) {
-        $count = if ($countByCluster.ContainsKey($cluster.ClusterId)) { $countByCluster[$cluster.ClusterId] } else { 0 }
+        $count = if ($countByCluster.ContainsKey($cluster.ClusterName)) { $countByCluster[$cluster.ClusterName] } else { 0 }
         [PSCustomObject]@{
             Timestamp         = $timestamp
             ClusterId         = $cluster.ClusterId

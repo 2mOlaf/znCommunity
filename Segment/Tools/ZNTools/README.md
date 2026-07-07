@@ -54,6 +54,10 @@ Every known cluster gets a row every run, even at count `0`, so a cluster's seri
 continuous instead of dropping out. On API failure it writes an error and returns nothing rather
 than a fabricated zero — treat a missing result as "no data point this run", not "zero disconnected".
 
+Assets with no Segment Server deployment cluster (Cloud Connector- or Lightweight Agent-monitored
+assets never get a `deploymentsClusterId`) get their own `Unclustered (<monitor type>)` row per
+monitoring mechanism, e.g. `Unclustered (Cloud Connector)`, instead of one flat `Unclustered` bucket.
+
 ### Security Events
 Queries the Security event log for one or more Event IDs, locally or on a remote Segment Server.
 Defaults to Windows Filtering Platform (WFP) connection events 5156/5157.

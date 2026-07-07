@@ -348,11 +348,14 @@
 
   <h2>Output</h2>
   <p>
-    One <code>PSCustomObject</code> per deployment cluster (including <code>Unclustered</code>
-    for assets with no cluster assigned), plus a final <code>TOTAL</code> row summing all
-    clusters. Every known cluster gets a row on every run — even at count <code>0</code> — so a
-    cluster's time series stays continuous rather than dropping out when it briefly has nothing
-    disconnected.
+    One <code>PSCustomObject</code> per deployment cluster, plus a final <code>TOTAL</code> row
+    summing all clusters. Assets with no Segment Server deployment cluster — e.g. Cloud Connector-
+    or Lightweight Agent-monitored assets, which never get a <code>deploymentsClusterId</code> —
+    get their own <code>Unclustered (&lt;monitor type&gt;)</code> row per monitoring mechanism
+    (e.g. <code>Unclustered (Cloud Connector)</code>) instead of one flat <code>Unclustered</code>
+    bucket. Every known cluster/monitor-type combination gets a row on every run — even at count
+    <code>0</code> — so a series stays continuous rather than dropping out when it briefly has
+    nothing disconnected.
   </p>
   <table class="fn-table">
     <thead>
@@ -360,8 +363,8 @@
     </thead>
     <tbody>
       <tr><td>Timestamp</td><td>Capture time for this batch — the same value across every row in a single run, so cluster rows and the TOTAL row correlate as one measurement.</td></tr>
-      <tr><td>ClusterId</td><td>Deployment cluster ID, or <code>$null</code> on the TOTAL row.</td></tr>
-      <tr><td>ClusterName</td><td>Deployment cluster name, <code>Unclustered</code>, or <code>TOTAL</code>.</td></tr>
+      <tr><td>ClusterId</td><td>Deployment cluster ID, or <code>$null</code> on <code>Unclustered</code> and <code>TOTAL</code> rows.</td></tr>
+      <tr><td>ClusterName</td><td>Deployment cluster name, <code>Unclustered (&lt;monitor type&gt;)</code>, or <code>TOTAL</code>.</td></tr>
       <tr><td>DisconnectedCount</td><td>Number of disconnected assets matching <code>-IncludeDisconnectedDays</code>.</td></tr>
       <tr><td>DaysThreshold</td><td>Echo of the <code>-IncludeDisconnectedDays</code> value used for this run.</td></tr>
     </tbody>
