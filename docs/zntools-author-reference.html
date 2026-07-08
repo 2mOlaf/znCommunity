@@ -280,7 +280,19 @@ function Get-MyAssetQuery {
     <li><code>$script:SeverityOrder</code></li>
     <li><code>$script:SeverityColor</code></li>
     <li><code>$script:IssueCodeNames</code></li>
+    <li><code>$script:AssetMonitorType</code></li>
   </ul>
+  <div class="callout info">
+    <strong>Keep these traceable to the OpenAPI spec, not guessed</strong>
+    <code>$script:IssueCodeNames</code> and <code>$script:AssetMonitorType</code> are transcribed
+    verbatim from the <code>healthIssue.issueCode</code> and <code>assetStatus</code> enum
+    descriptions in the ZN OpenAPI spec (including the spec's own typos, e.g. "Unexpted GPO
+    Rules") — an earlier version of <code>$script:IssueCodeNames</code> had plausible-looking but
+    entirely fabricated names for every single code (e.g. code 26 shown as "Hardware
+    Incompatibility" when the real API meaning is "SSH Password Incorrect"). If you add a new
+    code, copy its description straight from the spec rather than inferring one from the code
+    number or name.
+  </div>
 
   <h2 id="private-asset-data">Asset data helpers</h2>
   <p>Defined in <code>Private/40-AssetData.ps1</code>. Used by the asset browser commands.</p>
@@ -380,8 +392,10 @@ function Get-MyAssetQuery {
   <h2 id="private-disconnected-assets">Disconnected asset helpers</h2>
   <p>
     Defined in <code>Private/60-DisconnectedAssets.ps1</code>. Shared by
-    <code>Show-HealthDashboard</code> (<code>-IncludeDisconnected</code> section) and
-    <code>Get-DisconnectedAssetMetric</code>, so both commands fetch and filter assets identically.
+    <code>Show-HealthDashboard</code> and <code>Get-DisconnectedAssetMetric</code> so both
+    commands page assets and detect disconnection identically — but the two commands
+    deliberately fetch from <em>different</em> endpoints. See the callout below before adding a
+    new caller.
   </p>
   <table class="fn-table">
     <thead>
@@ -389,9 +403,19 @@ function Get-MyAssetQuery {
     </thead>
     <tbody>
       <tr>
+        <td>Get-ZNPagedAssets</td>
+        <td>Cursor-pages through any assets-shaped list endpoint (<code>searchAssetsResponse</code>), with an optional <code>-Filters</code> array.</td>
+        <td>Shared plumbing behind <code>Get-ZNAllAssets</code> and <code>Get-ZNMonitoredAssets</code> — implement new asset-fetch variants on top of this rather than duplicating the pagination loop. Uses <code>_cursor</code>/<code>nextCursor</code>, not <code>_offset</code>: offset paging drifts when the asset list changes mid-fetch, which produced ~9% duplicate entries on a 7.7k-asset tenant before this was fixed. <code>-Filters</code> takes an array of <code>@{ id; includeValues; excludeValues }</code> hashtables — this is the same <code>_filters</code> JSON contract the portal UI sends, confirmed against the live API but not documented with a concrete schema in the OpenAPI spec. Enum-typed filter values (e.g. <code>healthStatus</code>) must be passed as strings ("2", not 2) or the API rejects them.</td>
+      </tr>
+      <tr>
         <td>Get-ZNAllAssets</td>
-        <td>Pages through <code>GET /assets</code> and returns every asset.</td>
-        <td>No internal logging — callers wrap it with their own <code>Write-Log</code>/<code>Write-Host</code> as appropriate for their context (interactive vs. quiet/scheduled).</td>
+        <td>Fetches every asset (monitored or not) from <code>GET /assets</code>, optionally scoped to one cluster via <code>-DeploymentsClusterId</code>.</td>
+        <td>Use this where the full population is genuinely required — e.g. <code>Show-HealthDashboard</code> always uses this, and its <code>-IncludeNA</code> path specifically needs the Not-Monitored assets that <code>Get-ZNMonitoredAssets</code> excludes. No internal logging — callers wrap it with their own <code>Write-Log</code>/<code>Write-Host</code> as appropriate for their context.</td>
+      </tr>
+      <tr>
+        <td>Get-ZNMonitoredAssets</td>
+        <td>Fetches every asset from <code>GET /assets/monitored</code> (no filter parameters).</td>
+        <td>Used only by <code>Get-DisconnectedAssetMetric</code>. Excludes <code>assetStatus 1</code> (Not Monitored) and similar unmonitorable statuses — roughly halves the fetch, and every cluster/monitor-type bucket the metric reports is still represented among monitored assets, so nothing drops out of the per-cluster breakdown. Deliberately has no health-status/disconnected/cluster filter parameters — see the callout below for why.</td>
       </tr>
       <tr>
         <td>Get-ZNAssetClusterLabel</td>
@@ -405,6 +429,37 @@ function Get-MyAssetQuery {
       </tr>
     </tbody>
   </table>
+
+  <div class="callout">
+    <strong>/assets/monitored looks like a safe shortcut. It isn't, for everything.</strong>
+    <p>
+      <code>/assets/monitored</code> and its server-side <code>_filters</code> (healthStatus,
+      assetDisconnectedSince, deploymentsClusterId, ...) are real and documented via
+      <code>GET /assets/monitored/filters</code> — and they're tempting, because they avoid
+      pulling the full tenant just to filter it client-side. An earlier version of
+      <code>Show-HealthDashboard</code> used the <code>healthStatus</code> filter for exactly
+      that reason, verified against a 7.7k-asset tenant to return the identical non-healthy set
+      as the full fetch.
+    </p>
+    <p>
+      A second tenant broke that assumption: an asset with <code>assetStatus 1</code>
+      (Not Monitored) had a real, non-N/A <code>healthState.healthStatus</code> — stale from
+      before it stopped being monitored. <code>/assets/monitored</code> excludes
+      <code>assetStatus 1</code> unconditionally, by definition of the endpoint, regardless of
+      what filter you pass — so the dashboard silently reported "All assets are healthy" while
+      hiding a real error. The same gap applies to <code>assetDisconnectedSince</code>: ~0.7% of
+      disconnected assets on a test tenant had unmonitorable statuses that endpoint excludes.
+    </p>
+    <p>
+      <em>Rule of thumb:</em> <code>Get-ZNMonitoredAssets</code>/<code>/assets/monitored</code>
+      is fine for a metric where "an asset ZN isn't monitoring isn't actionable anyway" is an
+      acceptable framing (that's why <code>Get-DisconnectedAssetMetric</code> uses it). It is
+      <em>not</em> fine for anything whose job is to surface real problems to a human — use
+      <code>Get-ZNAllAssets</code> (full <code>/assets</code>) there, even though it's slower.
+      Don't reintroduce filter parameters on <code>Get-ZNMonitoredAssets</code> without redoing
+      this verification against more than one tenant.
+    </p>
+  </div>
 
   <h2 id="private-banner">Banner</h2>
   <p>Defined in <code>Private/30-Show-Banner.ps1</code>.</p>

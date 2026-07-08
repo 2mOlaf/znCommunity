@@ -39,7 +39,13 @@ API-backed commands require a valid key. Asset browser commands work offline fro
 - `Get-ZNSegmentCluster`
 
 ### Health Dashboard
-- `Show-ZNHealthDashboard [-IncludeDisconnected] [-ExportCsv <path>]`
+- `Show-ZNHealthDashboard [-IncludeNA] [-IncludeDisconnected] [-IncludeDisconnectedDays <int>] [-ExportCsv <path>] [-ThrottleLimit <int>] [-DeploymentsClusterId <id>]`
+
+Per-asset health-issue detail is fetched in parallel (`-ThrottleLimit`, default `20`) instead of
+one call at a time — this matters once a tenant has thousands of non-healthy assets, since that
+detail isn't available from the bulk asset list (see the Author Guide's disconnected-asset-helpers
+section for why). `-DeploymentsClusterId` scopes the whole report to one deployment cluster instead
+of the full tenant — look up a cluster's ID with `Get-ZNSegmentCluster`.
 
 ### Disconnected Asset Metric
 Quiet, scriptable counterpart to `-IncludeDisconnected` above — no banner, no progress logging —
@@ -57,6 +63,10 @@ than a fabricated zero — treat a missing result as "no data point this run", n
 Assets with no Segment Server deployment cluster (Cloud Connector- or Lightweight Agent-monitored
 assets never get a `deploymentsClusterId`) get their own `Unclustered (<monitor type>)` row per
 monitoring mechanism, e.g. `Unclustered (Cloud Connector)`, instead of one flat `Unclustered` bucket.
+
+This command has no cluster-scoping parameter — it always reports every cluster, since a single
+run producing the full per-cluster breakdown (plus TOTAL) is the entire point of the command. To
+isolate one cluster, filter its output instead: `Get-ZNDisconnectedAssetMetric | Where-Object ClusterId -eq '<id>'`.
 
 ### Security Events
 Queries the Security event log for one or more Event IDs, locally or on a remote Segment Server.

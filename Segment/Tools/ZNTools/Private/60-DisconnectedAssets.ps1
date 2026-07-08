@@ -1,10 +1,118 @@
+function Get-ZNPagedAssets {
+    <#
+    .SYNOPSIS
+        Cursor-pages through any ZN assets-shaped list endpoint, with optional server-side filters.
+    .DESCRIPTION
+        Shared plumbing behind Get-ZNAllAssets and Get-ZNMonitoredAssets.
+
+        Uses cursor-based paging (_cursor/nextCursor) rather than _offset. Offset paging drifts
+        when the asset list is added to or removed from between page fetches — on a tenant with
+        thousands of assets that drift produced duplicate entries across pages (observed ~9%
+        duplication on a 7.7k-asset tenant). The cursor is stable against concurrent list changes.
+
+        Filters use the same _filters JSON contract the portal UI sends (confirmed against the
+        live API, not documented with a concrete schema in the OpenAPI spec beyond "JSON string
+        URI encoded set of filters"): an array of { id, includeValues, excludeValues }. Selection
+        values for enum-typed filters (e.g. healthStatus) must be strings, not raw numbers — the
+        API rejects numeric values with a "not supported in filter" error.
+    .AUTHOR
+        Olaf Gradin
+    #>
+    param(
+        [Parameter(Mandatory)]
+        [string]$BaseUrl,
+
+        [Parameter(Mandatory)]
+        [hashtable]$Headers,
+
+        [Parameter(Mandatory)]
+        [string]$Path,
+
+        [array]$Filters
+    )
+
+    $filterQuery = ''
+    if ($Filters -and $Filters.Count -gt 0) {
+        # -AsArray double-wraps a List[hashtable] (it's not the bare single-element PS array the
+        # switch is meant for), and the default -Depth 2 silently flattens includeValues/
+        # excludeValues into space-joined strings instead of JSON arrays. Neither shows up as an
+        # error — the API just replies "filter id: undefined is not supported".
+        $filterJson = ConvertTo-Json -InputObject $Filters -Compress -Depth 5
+        $filterQuery = "&_filters=" + [System.Uri]::EscapeDataString($filterJson)
+    }
+
+    $results = [System.Collections.Generic.List[object]]::new()
+    $limit   = 400
+    $cursor  = $null
+
+    do {
+        $uri = "$BaseUrl/$Path`?_limit=$limit$filterQuery"
+        if ($cursor) { $uri += "&_cursor=$cursor" }
+        $response = Invoke-RestMethod -Uri $uri -Headers $Headers -Method Get
+
+        if (-not $response.items -or $response.items.Count -eq 0) { break }
+
+        foreach ($item in $response.items) { $results.Add($item) }
+
+        if ($response.items.Count -lt $limit -or -not $response.nextCursor) { break }
+        $cursor = $response.nextCursor
+    } while ($true)
+
+    return $results
+}
+
 function Get-ZNAllAssets {
     <#
     .SYNOPSIS
-        Fetches every asset from the ZN API, paging through results.
+        Fetches every asset (monitored or not) from the ZN API, optionally scoped to one cluster.
     .DESCRIPTION
-        Shared by Show-HealthDashboard and Get-DisconnectedAssetMetric so both commands fetch
-        the asset list the same way.
+        Used where the full asset population is genuinely required — e.g. Show-HealthDashboard's
+        -IncludeNA path, which needs to see Not-Monitored assets that /assets/monitored excludes
+        by definition.
+    .PARAMETER DeploymentsClusterId
+        Optional. Scope to a single deployment cluster (see Get-ZNSegmentCluster for IDs).
+    .AUTHOR
+        Olaf Gradin
+    #>
+    param(
+        [Parameter(Mandatory)]
+        [string]$BaseUrl,
+
+        [Parameter(Mandatory)]
+        [hashtable]$Headers,
+
+        [string]$DeploymentsClusterId
+    )
+
+    $filters = [System.Collections.Generic.List[hashtable]]::new()
+    if ($DeploymentsClusterId) {
+        $filters.Add(@{ id = 'deploymentsClusterId'; includeValues = @($DeploymentsClusterId); excludeValues = @() })
+    }
+
+    Get-ZNPagedAssets -BaseUrl $BaseUrl -Headers $Headers -Path 'assets' -Filters $filters
+}
+
+function Get-ZNMonitoredAssets {
+    <#
+    .SYNOPSIS
+        Fetches all actively-monitored assets from /assets/monitored.
+    .DESCRIPTION
+        Used by Get-DisconnectedAssetMetric instead of the full /assets population.
+        /assets/monitored excludes assetStatus 1 "Not Monitored" and similar unmonitorable
+        statuses, roughly halving the fetch on a typical tenant. Verified that every
+        cluster/monitor-type bucket Get-DisconnectedAssetMetric reports is still represented
+        among monitored assets, so no cluster silently drops from the per-cluster breakdown —
+        this does exclude a small number of Not-Monitored/Unmonitorable assets that still carry
+        stale connection state (~0.7% of disconnected assets on a 7.7k-asset test tenant),
+        accepted deliberately since an asset ZN isn't monitoring isn't actionable from this
+        metric anyway.
+
+        Do not reuse this for anything that needs full correctness, like Show-HealthDashboard: a
+        Not-Monitored asset can still carry a real, non-N/A health status left over from before
+        it stopped being monitored (confirmed on a live tenant), and this endpoint would silently
+        hide it. This function intentionally has no health-status/disconnected/cluster filter
+        options for that reason — it exists to fetch the full monitored-only population, not a
+        server-side-filtered subset.
     .AUTHOR
         Olaf Gradin
     #>
@@ -16,23 +124,7 @@ function Get-ZNAllAssets {
         [hashtable]$Headers
     )
 
-    $allAssets = [System.Collections.Generic.List[object]]::new()
-    $offset    = 0
-    $limit     = 400
-
-    do {
-        $uri      = "$BaseUrl/assets?_limit=$limit&_offset=$offset"
-        $response = Invoke-RestMethod -Uri $uri -Headers $Headers -Method Get
-
-        if ($response.items -and $response.items.Count -gt 0) {
-            foreach ($item in $response.items) { $allAssets.Add($item) }
-            $offset += $response.items.Count
-            if ($response.items.Count -lt $limit) { break }
-        }
-        else { break }
-    } while ($true)
-
-    return $allAssets
+    Get-ZNPagedAssets -BaseUrl $BaseUrl -Headers $Headers -Path 'assets/monitored'
 }
 
 function Get-ZNAssetClusterLabel {
@@ -63,7 +155,7 @@ function Get-ZNAssetClusterLabel {
         return $Asset.deploymentsCluster.name
     }
 
-    $monitorType = $script:AssetMonitorType[$Asset.assetStatus] ?? 'Unknown'
+    $monitorType = $script:AssetMonitorType[$Asset.assetStatus] ?? 'Connector'
     "Unclustered ($monitorType)"
 }
 

@@ -6,9 +6,16 @@ function Get-DisconnectedAssetMetric {
 
     .DESCRIPTION
         Uses the same disconnected-asset detection as Show-ZNHealthDashboard's -IncludeDisconnected
-        section (shared private helpers Get-ZNAllAssets / Get-ZNDisconnectedAsset), but returns
-        plain data instead of a console report — no banner, no progress logging — so scheduled/
-        unattended runs produce clean output for a metrics pipeline to consume.
+        section (shared private helpers Get-ZNMonitoredAssets / Get-ZNDisconnectedAsset), but
+        returns plain data instead of a console report — no banner, no progress logging — so
+        scheduled/unattended runs produce clean output for a metrics pipeline to consume.
+
+        Fetches from /assets/monitored rather than the full /assets population — verified that
+        every cluster/monitor-type bucket this command reports is already represented among
+        monitored assets, so nothing goes missing from the per-cluster breakdown. This does
+        exclude a small number of Not-Monitored/Unmonitorable assets that still carry stale
+        connection state (~0.7% of disconnected assets on a 7.7k-asset test tenant) — accepted
+        deliberately, since an asset ZN isn't monitoring isn't actionable from this metric anyway.
 
         Emits one row per deployment cluster plus a final TOTAL row. Assets with no Segment Server
         deployment cluster (e.g. Cloud Connector- or Lightweight Agent-monitored assets, which are
@@ -70,7 +77,7 @@ function Get-DisconnectedAssetMetric {
         $baseUrl = Get-ZNApiBaseUrl -ApiKey $key -ApiUrl $ApiUrl
         $headers = Get-ZNApiHeaders -ApiKey $key
 
-        $allAssets = Get-ZNAllAssets -BaseUrl $baseUrl -Headers $headers
+        $allAssets = Get-ZNMonitoredAssets -BaseUrl $baseUrl -Headers $headers
     }
     catch {
         Write-Error "Failed to retrieve assets: $($_.Exception.Message)"

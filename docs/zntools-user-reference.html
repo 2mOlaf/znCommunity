@@ -287,6 +287,55 @@
  [<span class="param">-IncludeNA</span>]
  [<span class="param">-IncludeDisconnected</span>]
  [<span class="param">-IncludeDisconnectedDays</span> &lt;int&gt;]
+ [<span class="param">-ThrottleLimit</span> &lt;int&gt;]
+ [<span class="param">-DeploymentsClusterId</span> &lt;string&gt;]
+  </div>
+
+  <h2>Parameters</h2>
+  <div class="param-entry">
+    <div class="param-name">-IncludeNA</div>
+    <div class="param-body">
+      <p class="param-desc">
+        Include assets with an <code>N/A</code> health state — this also pulls in Not-Monitored
+        and similar unmonitorable assets that a plain run leaves out. Because of that, this
+        always fetches the full tenant asset list rather than the narrower non-healthy fetch the
+        default path uses.
+      </p>
+    </div>
+  </div>
+  <div class="param-entry">
+    <div class="param-name">-IncludeDisconnected</div>
+    <div class="param-body"><p class="param-desc">Adds a disconnected-assets section to the report.</p></div>
+  </div>
+  <div class="param-entry">
+    <div class="param-name">-IncludeDisconnectedDays</div>
+    <div class="param-body"><p class="param-desc">Only include assets disconnected for at least this many days. Implies <code>-IncludeDisconnected</code>. Default: <code>0</code> — any currently-disconnected asset counts.</p></div>
+  </div>
+  <div class="param-entry">
+    <div class="param-name">-ThrottleLimit</div>
+    <div class="param-body">
+      <p class="param-desc">
+        Max concurrent per-asset health-detail lookups. Default: <code>20</code>. The bulk asset
+        list only carries a healthStatus code, not the remediation detail text (which firewall
+        profile, which port rule) — getting that requires one API call per non-healthy asset, so
+        this fans those calls out in parallel instead of one at a time. Lower this if the API
+        starts rate-limiting on very large tenants.
+      </p>
+    </div>
+  </div>
+  <div class="param-entry">
+    <div class="param-name">-DeploymentsClusterId</div>
+    <div class="param-body">
+      <p class="param-desc">
+        Scope the whole report — health section and disconnected section alike — to one
+        deployment cluster instead of the full tenant. Look up a cluster's ID with
+        <a href="#cmd-segment-cluster">Get-ZNSegmentCluster</a>.
+      </p>
+    </div>
+  </div>
+  <div class="param-entry">
+    <div class="param-name">-ExportCsv</div>
+    <div class="param-body"><p class="param-desc">Path to export the health (and, with <code>-IncludeDisconnected</code>, disconnected) rows as CSV.</p></div>
   </div>
 
   <h2>Examples</h2>
@@ -314,6 +363,22 @@
     <pre><span class="ps-prompt">PS&gt; </span><span class="ps-fn">Show-ZNHealthDashboard</span> <span class="ps-param">-ExportCsv</span> <span class="ps-value">health.csv</span></pre>
     <div class="example-desc">Exports health rows to a CSV file.</div>
   </div>
+  <div class="example">
+    <div class="example-header">
+      <span class="ex-label">Example 4</span>
+      <span class="ex-title">Scope to one cluster</span>
+    </div>
+    <pre><span class="ps-prompt">PS&gt; </span><span class="ps-fn">Show-ZNHealthDashboard</span> <span class="ps-param">-DeploymentsClusterId</span> <span class="ps-value">'C:d:00b0ceed'</span> <span class="ps-switch">-IncludeDisconnected</span></pre>
+    <div class="example-desc">Reports only the named cluster's assets — faster than a full-tenant run when you only care about one Segment Server deployment.</div>
+  </div>
+  <div class="example">
+    <div class="example-header">
+      <span class="ex-label">Example 5</span>
+      <span class="ex-title">Lower concurrency</span>
+    </div>
+    <pre><span class="ps-prompt">PS&gt; </span><span class="ps-fn">Show-ZNHealthDashboard</span> <span class="ps-param">-ThrottleLimit</span> <span class="ps-value">5</span></pre>
+    <div class="example-desc">Reduces concurrent health-detail lookups — useful if the API starts responding with rate-limit errors on a very large tenant.</div>
+  </div>
 
   <!-- ════════════════════════════════════════
        Get-ZNDisconnectedAssetMetric
@@ -334,7 +399,9 @@
     Reports disconnected ZN asset counts — overall and per deployment cluster — as metric
     objects suitable for feeding a time-series dashboard. It's the quiet, scriptable
     counterpart to <a href="#cmd-health-dashboard">Show-ZNHealthDashboard</a>'s
-    <code>-IncludeDisconnected</code> section, sharing the same detection logic under the hood.
+    <code>-IncludeDisconnected</code> section, sharing the same disconnected-asset detection
+    logic (<code>Get-ZNDisconnectedAsset</code>) under the hood — though not the same asset
+    source, see the callout below.
   </p>
 
   <div class="callout info">
@@ -344,6 +411,21 @@
     and feed a metrics pipeline — banner output would just be noise (or worse, get mixed into
     captured stdout) in that context. See the
     <a href="zntools-author-reference.html#pattern-banner">Banner guidance</a> table for details.
+  </div>
+
+  <div class="callout">
+    <strong>Fetches from /assets/monitored, not the full tenant</strong>
+    This command fetches only actively-monitored assets, excluding Not-Monitored and similar
+    unmonitorable ones — roughly halving the fetch on a typical tenant, with no cluster dropping
+    out of the per-cluster breakdown as a result. It does exclude a small number of
+    Not-Monitored/Unmonitorable assets that still carry stale connection state (observed ~0.7% of
+    disconnected assets on a test tenant) — accepted deliberately here, since an asset ZN isn't
+    monitoring isn't actionable from this metric anyway.
+    <a href="#cmd-health-dashboard">Show-ZNHealthDashboard</a>'s <code>-IncludeDisconnected</code>
+    section does <em>not</em> take this shortcut — a Not-Monitored asset can still carry a real,
+    non-N/A health status, and hiding that would defeat the point of a health dashboard. See the
+    <a href="zntools-author-reference.html#private-disconnected-assets">Author Guide</a> for the
+    full reasoning.
   </div>
 
   <h2>Syntax</h2>

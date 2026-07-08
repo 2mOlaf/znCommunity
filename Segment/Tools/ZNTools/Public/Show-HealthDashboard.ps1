@@ -14,6 +14,12 @@ function Show-HealthDashboard {
         Include a disconnected assets section.
     .PARAMETER IncludeDisconnectedDays
         Include only assets disconnected for at least this many days.
+    .PARAMETER ThrottleLimit
+        Max concurrent per-asset health-state lookups. Default 20. Lower this if the API
+        starts rate-limiting on very large tenants.
+    .PARAMETER DeploymentsClusterId
+        Optional. Scope the whole report to one deployment cluster instead of the full tenant.
+        Use Get-ZNSegmentCluster to look up a cluster's ID.
     .AUTHOR
         Olaf Gradin
     #>
@@ -25,7 +31,10 @@ function Show-HealthDashboard {
         [switch]$IncludeNA,
         [switch]$IncludeDisconnected,
         [ValidateRange(0, 3650)]
-        [int]$IncludeDisconnectedDays
+        [int]$IncludeDisconnectedDays,
+        [ValidateRange(1, 64)]
+        [int]$ThrottleLimit = 20,
+        [string]$DeploymentsClusterId
     )
 
     Ensure-ZNWelcomeShown
@@ -58,18 +67,6 @@ function Show-HealthDashboard {
         catch {
             Write-Log "Failed to retrieve system health: $($_.Exception.Message)" -Level Error
             return @()
-        }
-    }
-
-    function Get-AssetHealthState {
-        param([string]$BaseUrl, [hashtable]$Headers, [string]$AssetId)
-        try {
-            $response = Invoke-RestMethod -Uri "$BaseUrl/assets/$AssetId/health-state" -Headers $Headers -Method Get
-            return $response.healthState
-        }
-        catch {
-            Write-Log "Failed to get health state for asset $AssetId`: $($_.Exception.Message)" -Level Warning
-            return $null
         }
     }
 
@@ -191,24 +188,53 @@ function Show-HealthDashboard {
         Write-Log "Fetching system health..."
         $systemIssues = Get-SystemHealth -BaseUrl $baseUrl -Headers $headers
 
+        # /assets/monitored's healthStatus filter looked like a safe way to skip the full fetch
+        # (verified an exact match on one tenant), but a second tenant disproved it: a
+        # Not-Monitored asset (assetStatus 1) can still carry a real, non-N/A healthStatus from
+        # before it stopped being monitored, and /assets/monitored excludes assetStatus 1
+        # entirely — so the filtered fetch silently hid a real Error. A health dashboard can't
+        # risk hiding a real problem for a speed win, so this always pulls the full population.
         Write-Log "Retrieving all assets..."
-        $allAssets = Get-ZNAllAssets -BaseUrl $baseUrl -Headers $headers
+        $allAssets = Get-ZNAllAssets -BaseUrl $baseUrl -Headers $headers -DeploymentsClusterId $DeploymentsClusterId
         Write-Log "Total assets retrieved: $($allAssets.Count)"
 
         $excludeStatuses = if ($IncludeNA) { @(1) } else { @(1, 4) }
-        $candidates = $allAssets | Where-Object {
-            $status = $_.healthState.healthStatus
-            $status -notin $excludeStatuses
-        }
+        $candidates = $allAssets | Where-Object { $_.healthState.healthStatus -notin $excludeStatuses }
 
         Write-Log "Fetching detailed health state for $($candidates.Count) non-healthy asset(s)..."
+
+        # The bulk /assets list already carries healthStatus, but its healthIssuesList entries
+        # come back with an empty 'details' string — the per-asset /health-state call is the only
+        # way to get the actual remediation detail (e.g. which firewall profile, which port rule),
+        # so this still has to be an N-call fan-out. Parallelized with a throttle to keep it fast
+        # on tenants with thousands of non-healthy assets without hammering the API.
+        $healthResults = $candidates | ForEach-Object -Parallel {
+            $asset   = $_
+            $baseUrl = $using:baseUrl
+            $headers = $using:headers
+            try {
+                $response = Invoke-RestMethod -Uri "$baseUrl/assets/$($asset.id)/health-state" -Headers $headers -Method Get
+                [PSCustomObject]@{ AssetId = $asset.id; HealthState = $response.healthState; ErrorMessage = $null }
+            }
+            catch {
+                [PSCustomObject]@{ AssetId = $asset.id; HealthState = $null; ErrorMessage = $_.Exception.Message }
+            }
+        } -ThrottleLimit $ThrottleLimit
+
+        $healthByAssetId = @{}
+        foreach ($result in $healthResults) {
+            $healthByAssetId[$result.AssetId] = $result.HealthState
+            if ($result.ErrorMessage) {
+                Write-Log "Failed to get health state for asset $($result.AssetId): $($result.ErrorMessage)" -Level Warning
+            }
+        }
 
         $unhealthyAssets = [System.Collections.Generic.List[object]]::new()
         $csvRows         = [System.Collections.Generic.List[object]]::new()
 
         foreach ($asset in $candidates) {
             $displayName  = $asset.name ?? $asset.fqdn ?? $asset.id
-            $healthDetail = Get-AssetHealthState -BaseUrl $baseUrl -Headers $headers -AssetId $asset.id
+            $healthDetail = $healthByAssetId[$asset.id]
             $statusCode   = if ($healthDetail) { $healthDetail.healthStatus } else { $asset.healthState.healthStatus }
             $issues       = if ($healthDetail) { $healthDetail.healthIssuesList } else { @() }
 
@@ -251,6 +277,10 @@ function Show-HealthDashboard {
 
         $disconnectedAssets = [System.Collections.Generic.List[object]]::new()
         if ($IncludeDisconnected) {
+            # Same reasoning as above: /assets/monitored's assetDisconnectedSince filter excludes
+            # Not-Monitored/Unmonitorable assets that can still carry real connection state
+            # (confirmed ~0.7% of disconnected assets fell into that gap on a live tenant) — an
+            # acceptable trade for the metrics-only Get-DisconnectedAssetMetric, but not here.
             Write-Log "Identifying disconnected assets..."
             foreach ($asset in (Get-ZNDisconnectedAsset -Assets $allAssets -MinDisconnectedDays $IncludeDisconnectedDays)) {
                 $lastDiscDisplay = $asset.LastDisconnectedAt.ToString("yyyy-MM-dd HH:mm UTC")
