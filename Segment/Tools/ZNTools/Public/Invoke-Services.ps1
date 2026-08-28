@@ -31,8 +31,8 @@ function Invoke-Services {
         Zero Networks API key. Defaults to the ZN_API_KEY environment variable.
     .PARAMETER ApiUrl
         Override the API base URL.
-    .AUTHOR
-        Olaf Gradin
+    .NOTES
+        Author: Olaf Gradin
     .EXAMPLE
         Invoke-ZNServices -Action Restart
         Restarts ZN services on the local machine. Requires Administrator.

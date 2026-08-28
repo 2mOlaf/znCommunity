@@ -165,8 +165,8 @@ function Get-ZNBucketedRate {
         Shared rate math used by both Get-SecurityEventRate and Get-SecurityLogAnalysis so the
         two commands compute "events per second" identically. Average is Count over the full
         analysis window; peak is the busiest single bucket, normalized back to a per-second rate.
-    .AUTHOR
-        Olaf Gradin
+    .NOTES
+        Author: Olaf Gradin
     #>
     param(
         [System.Collections.IDictionary]$Buckets,

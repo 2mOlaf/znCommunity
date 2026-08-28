@@ -7,8 +7,8 @@ function Get-BGAssetCluster {
         which queries the Zero Networks API for Segment Server infrastructure clusters.
 
         Requires BreakGlass asset data to be loaded with Import-ZNBGAssetData.
-    .AUTHOR
-        Olaf Gradin
+    .NOTES
+        Author: Olaf Gradin
     .EXAMPLE
         Get-ZNBGAssetCluster | Sort-Object TotalAssets -Descending
     #>
@@ -39,8 +39,8 @@ function Get-BGClusterMemberAsset {
         Cluster name to match (partial, case-insensitive).
     .DESCRIPTION
         Requires BreakGlass asset data to be loaded with Import-ZNBGAssetData.
-    .AUTHOR
-        Olaf Gradin
+    .NOTES
+        Author: Olaf Gradin
     .EXAMPLE
         Get-ZNBGClusterMemberAsset "zero.local"
     .EXAMPLE

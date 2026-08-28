@@ -59,8 +59,8 @@ function Sync-ADUserStatus {
     .EXAMPLE
         Sync-ZNADUserStatus -PassThru | Where-Object Action -eq 'Inactivated' | Export-Csv offboarded.csv -NoTypeInformation
         Run the sync and export inactivated users to CSV.
-    .AUTHOR
-        Olaf Gradin
+    .NOTES
+        Author: Olaf Gradin
     #>
     [CmdletBinding(SupportsShouldProcess, ConfirmImpact = 'High')]
     param(

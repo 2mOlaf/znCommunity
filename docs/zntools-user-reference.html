@@ -626,18 +626,18 @@
       <div class="tags">
         <span class="tag">Security Events</span>
         <span class="tag green">Read-only</span>
-        <span class="tag">Local</span>
+        <span class="tag">Local / Remote / Offline</span>
       </div>
     </div>
   </div>
 
   <h2>Synopsis</h2>
   <p>
-    Shows average and peak rates per second for one or more Security-log Event IDs over a
-    specified time period. Defaults to Windows Filtering Platform security events
-    <strong>5156</strong> (permitted connection) and <strong>5157</strong> (blocked connection) —
-    the original purpose of this command — but <code>-EventId</code> can target any other
-    Event ID(s), including the Top N Event IDs surfaced by
+    Shows average and peak rates per second for one or more Security-log Event IDs — live,
+    remote, or from an offline <code>.evtx</code> archive. Defaults to Windows Filtering Platform
+    security events <strong>5156</strong> (permitted connection) and <strong>5157</strong>
+    (blocked connection) — the original purpose of this command — but <code>-EventId</code> can
+    target any other Event ID(s), including the Top N Event IDs surfaced by
     <a href="#cmd-security-log-analysis">Get-ZNSecurityLogAnalysis</a>.
   </p>
 
@@ -648,13 +648,32 @@
     <code>auditpol /get /category:*</code>
   </div>
 
+  <div class="callout">
+    <strong>Offline files and -Period</strong>
+    An archived <code>.evtx</code> has no meaningful "now". With <code>-LogPath</code>,
+    <code>-Period</code> is optional: omit it to compute rates over the entire span of matching
+    events observed in the file, or supply it to look back from the <em>newest matching event in
+    the file</em> rather than the current time.
+  </div>
+
   <h2>Syntax</h2>
   <div class="syntax-block">
-<span class="cmd">Get-ZNSecurityEventRate</span>
+    <span class="set-label">Live local log</span><span class="cmd">Get-ZNSecurityEventRate</span>
   <span class="param">-Period</span> &lt;string&gt;
  [<span class="param">-EventId</span> &lt;int[]&gt;]
- [<span class="param">-ComputerName</span> &lt;string&gt;]
+  </div>
+  <div class="syntax-block">
+    <span class="set-label">Remote live log</span><span class="cmd">Get-ZNSecurityEventRate</span>
+  <span class="param">-Period</span> &lt;string&gt;
+ [<span class="param">-EventId</span> &lt;int[]&gt;]
+  <span class="param">-ComputerName</span> &lt;string&gt;
  [<span class="param">-Credential</span> &lt;PSCredential&gt;]
+  </div>
+  <div class="syntax-block">
+    <span class="set-label">Offline archive</span><span class="cmd">Get-ZNSecurityEventRate</span>
+  <span class="param">-LogPath</span> &lt;string&gt;
+ [<span class="param">-Period</span> &lt;string&gt;]
+ [<span class="param">-EventId</span> &lt;int[]&gt;]
   </div>
 
   <h2>Parameters</h2>
@@ -662,13 +681,19 @@
     <div class="param-name">-Period</div>
     <div class="param-body">
       <p class="param-desc">
-        Required. Time window to analyze. A positive integer followed by <code>h</code> (hours) or
+        Time window to analyze. A positive integer followed by <code>h</code> (hours) or
         <code>d</code> (days) — for example: <code>1h</code>, <code>4h</code>, <code>24h</code>,
         <code>1d</code>, <code>7d</code>.
       </p>
       <p class="param-desc">
-        Peak rate is computed from 1-second buckets for periods up to 1 hour and from 1-minute buckets
-        (normalized to per-second) for longer periods.
+        Required for live/remote queries. Optional with <code>-LogPath</code>: when supplied, the
+        window is measured backward from the most recent matching event in the file; when
+        omitted, the entire observed span of matching events in the file is used.
+      </p>
+      <p class="param-desc">
+        Peak rate is computed from 1-second buckets for periods up to 1 hour, and from 1-minute
+        buckets (normalized to per-second) for longer periods or whenever <code>-LogPath</code>
+        is used without <code>-Period</code>.
       </p>
     </div>
   </div>
@@ -683,13 +708,23 @@
     </div>
   </div>
   <div class="param-entry">
+    <div class="param-name">-LogPath</div>
+    <div class="param-body">
+      <p class="param-desc">
+        Path to an offline <code>.evtx</code> archive to analyze instead of a live log. Mutually
+        exclusive with <code>-ComputerName</code>. See <code>-Period</code> above for how the
+        analysis window is determined in this mode.
+      </p>
+    </div>
+  </div>
+  <div class="param-entry">
     <div class="param-name">-ComputerName</div>
     <div class="param-body">
       <p class="param-desc">
         Optional. Query a remote machine via WinRM (PSRemoting). The entire computation runs on the
         remote host — only the final numbers are returned across the wire, so no raw event objects
         are serialized. Requires the Windows Remote Management service to be running and reachable
-        on the target.
+        on the target. Mutually exclusive with <code>-LogPath</code>.
       </p>
     </div>
   </div>
@@ -767,6 +802,22 @@
     </div>
     <pre><span class="ps-prompt">PS&gt; </span><span class="ps-fn">Get-ZNSecurityEventRate</span> <span class="ps-param">-Period</span> <span class="ps-value">1h</span> <span class="ps-param">-EventId</span> <span class="ps-value">4688, 4689</span></pre>
     <div class="example-desc">Measures process creation/exit rates instead of the default WFP connection events.</div>
+  </div>
+  <div class="example">
+    <div class="example-header">
+      <span class="ex-label">Example 7</span>
+      <span class="ex-title">Offline archive, entire span</span>
+    </div>
+    <pre><span class="ps-prompt">PS&gt; </span><span class="ps-fn">Get-ZNSecurityEventRate</span> <span class="ps-param">-LogPath</span> <span class="ps-value">"E:\Logs\Archive-Security-2026-07-05.evtx"</span></pre>
+    <div class="example-desc">Reports WFP event rates over the entire span of matching events found in the archive.</div>
+  </div>
+  <div class="example">
+    <div class="example-header">
+      <span class="ex-label">Example 8</span>
+      <span class="ex-title">Offline archive, anchored period</span>
+    </div>
+    <pre><span class="ps-prompt">PS&gt; </span><span class="ps-fn">Get-ZNSecurityEventRate</span> <span class="ps-param">-LogPath</span> <span class="ps-value">"E:\Logs\Archive-Security-2026-07-05.evtx"</span> <span class="ps-param">-Period</span> <span class="ps-value">4h</span> <span class="ps-param">-EventId</span> <span class="ps-value">4688, 4689</span></pre>
+    <div class="example-desc">Reports process creation/exit rates for the 4 hours leading up to the newest matching event in the archive — not the current time.</div>
   </div>
 
   <!-- ════════════════════════════════════════

@@ -4,8 +4,8 @@ function Get-BGAssetForest {
         Returns AD forest and domain configuration with service account info from BreakGlass data.
     .DESCRIPTION
         Requires BreakGlass asset data to be loaded with Import-ZNBGAssetData.
-    .AUTHOR
-        Olaf Gradin
+    .NOTES
+        Author: Olaf Gradin
     .EXAMPLE
         Get-ZNBGAssetForest
     #>
@@ -48,8 +48,8 @@ function Get-BGAssetSwitch {
         Returns OT switches from the BreakGlass switches.json data.
     .DESCRIPTION
         Requires BreakGlass asset data to be loaded with Import-ZNBGAssetData.
-    .AUTHOR
-        Olaf Gradin
+    .NOTES
+        Author: Olaf Gradin
     .EXAMPLE
         Get-ZNBGAssetSwitch
     #>

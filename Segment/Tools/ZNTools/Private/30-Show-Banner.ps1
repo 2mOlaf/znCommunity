@@ -2,8 +2,8 @@ function Show-Banner {
     <#
     .SYNOPSIS
         Displays the Zero Networks ASCII banner with author and script metadata.
-    .AUTHOR
-        Olaf Gradin
+    .NOTES
+        Author: Olaf Gradin
     #>
     param(
         [string]$Author = "",

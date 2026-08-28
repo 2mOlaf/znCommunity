@@ -41,6 +41,8 @@ function Get-SecurityLogAnalysis {
           4703 — Token right adjusted (verbose; often safe to suppress via audit policy)
           4776 — NTLM authentication (indicates NTLM still in use)
 
+        Author: Olaf Gradin
+
     .PARAMETER LogPath
         Path to an offline .evtx file. Mutually exclusive with -ComputerName.
 
@@ -88,9 +90,6 @@ function Get-SecurityLogAnalysis {
         Get-ChildItem *.evtx | ForEach-Object {
             Get-ZNSecurityLogAnalysis -LogPath $_.FullName -ExportCsv "$($_.BaseName).csv"
         }
-
-    .AUTHOR
-        Olaf Gradin
     #>
     [CmdletBinding()]
     param(

@@ -10,8 +10,8 @@ function Get-LinuxProfile {
         Optional API key override; defaults to ZN_API_KEY environment variable.
     .PARAMETER ApiUrl
         Optional API base URL override (e.g., https://portal.zeronetworks.com/api/v1).
-    .AUTHOR
-        Olaf Gradin
+    .NOTES
+        Author: Olaf Gradin
     #>
     [CmdletBinding()]
     param(

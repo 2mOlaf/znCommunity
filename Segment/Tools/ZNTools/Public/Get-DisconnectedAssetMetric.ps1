@@ -60,8 +60,7 @@ function Get-DisconnectedAssetMetric {
         failure it writes a terminating error and returns nothing rather than a fabricated zero —
         callers should treat a missing result as "no data point this run", not "zero disconnected".
 
-    .AUTHOR
-        Olaf Gradin
+        Author: Olaf Gradin
     #>
     [CmdletBinding()]
     param(

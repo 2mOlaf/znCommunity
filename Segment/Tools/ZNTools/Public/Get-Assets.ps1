@@ -4,8 +4,8 @@ function Get-BGAssetSummary {
         Returns high-level BreakGlass asset counts: total, OS breakdown, type, segmentation, clusters.
     .DESCRIPTION
         Requires BreakGlass asset data to be loaded with Import-ZNBGAssetData.
-    .AUTHOR
-        Olaf Gradin
+    .NOTES
+        Author: Olaf Gradin
     .EXAMPLE
         Get-ZNBGAssetSummary
     #>
@@ -33,8 +33,8 @@ function Get-BGAsset {
         Returns all BreakGlass segmented assets as objects. Pipe freely.
     .DESCRIPTION
         Requires BreakGlass asset data to be loaded with Import-ZNBGAssetData.
-    .AUTHOR
-        Olaf Gradin
+    .NOTES
+        Author: Olaf Gradin
     .EXAMPLE
         Get-ZNBGAsset | Where-Object { $_.OS -eq 'Linux' -and $_.NetworkSegmented }
     .EXAMPLE
@@ -56,8 +56,8 @@ function Find-BGAsset {
         Partial FQDN or hostname to search for.
     .DESCRIPTION
         Requires BreakGlass asset data to be loaded with Import-ZNBGAssetData.
-    .AUTHOR
-        Olaf Gradin
+    .NOTES
+        Author: Olaf Gradin
     .EXAMPLE
         Find-ZNBGAsset "dc01"
     .EXAMPLE
@@ -83,8 +83,8 @@ function Get-BGWindowsAsset {
         Returns all Windows assets from the BreakGlass asset data.
     .DESCRIPTION
         Requires BreakGlass asset data to be loaded with Import-ZNBGAssetData.
-    .AUTHOR
-        Olaf Gradin
+    .NOTES
+        Author: Olaf Gradin
     .EXAMPLE
         Get-ZNBGWindowsAsset | Where-Object Type -eq Server
     .EXAMPLE
@@ -102,8 +102,8 @@ function Get-BGLinuxAsset {
         Returns all Linux assets from the BreakGlass asset data.
     .DESCRIPTION
         Requires BreakGlass asset data to be loaded with Import-ZNBGAssetData.
-    .AUTHOR
-        Olaf Gradin
+    .NOTES
+        Author: Olaf Gradin
     .EXAMPLE
         Get-ZNBGLinuxAsset | Where-Object NetworkSegmented
     #>
@@ -119,8 +119,8 @@ function Get-BGServerAsset {
         Returns all server-type assets (Windows and Linux) from the BreakGlass asset data.
     .DESCRIPTION
         Requires BreakGlass asset data to be loaded with Import-ZNBGAssetData.
-    .AUTHOR
-        Olaf Gradin
+    .NOTES
+        Author: Olaf Gradin
     .EXAMPLE
         Get-ZNBGServerAsset | Group-Object OS | Select-Object Name, Count
     #>
@@ -136,8 +136,8 @@ function Get-BGClientAsset {
         Returns all client/workstation-type assets from the BreakGlass asset data.
     .DESCRIPTION
         Requires BreakGlass asset data to be loaded with Import-ZNBGAssetData.
-    .AUTHOR
-        Olaf Gradin
+    .NOTES
+        Author: Olaf Gradin
     .EXAMPLE
         Get-ZNBGClientAsset | Group-Object Cluster | Select-Object Name, Count
     #>
@@ -153,8 +153,8 @@ function Get-BGNetworkSegmentedAsset {
         Returns assets with network segmentation currently active from the BreakGlass asset data.
     .DESCRIPTION
         Requires BreakGlass asset data to be loaded with Import-ZNBGAssetData.
-    .AUTHOR
-        Olaf Gradin
+    .NOTES
+        Author: Olaf Gradin
     .EXAMPLE
         Get-ZNBGNetworkSegmentedAsset | Group-Object OS | Select-Object Name, Count
     #>
@@ -170,8 +170,8 @@ function Get-BGIdentitySegmentedAsset {
         Returns assets with identity segmentation currently active from the BreakGlass asset data.
     .DESCRIPTION
         Requires BreakGlass asset data to be loaded with Import-ZNBGAssetData.
-    .AUTHOR
-        Olaf Gradin
+    .NOTES
+        Author: Olaf Gradin
     .EXAMPLE
         Get-ZNBGIdentitySegmentedAsset | Format-Table -AutoSize
     #>
@@ -187,8 +187,8 @@ function Get-BGAssetBySource {
         Returns asset counts grouped by entity source (Active Directory, Ansible, Workgroup, etc.).
     .DESCRIPTION
         Requires BreakGlass asset data to be loaded with Import-ZNBGAssetData.
-    .AUTHOR
-        Olaf Gradin
+    .NOTES
+        Author: Olaf Gradin
     .EXAMPLE
         Get-ZNBGAssetBySource
     #>

@@ -53,7 +53,7 @@ function Get-ZNAuthorFromCommand {
     $author = $script:ModuleAuthor
     try {
         $definition = (Get-Command $CommandName -ErrorAction Stop).Definition
-        $match = [regex]::Match($definition, '(?im)^\s*\.AUTHOR\s+([^\r\n]+)')
+        $match = [regex]::Match($definition, '(?im)^\s*Author:\s*([^\r\n]+)')
         if ($match.Success) {
             $author = $match.Groups[1].Value.Trim()
         }

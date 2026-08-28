@@ -20,8 +20,8 @@ function Show-HealthDashboard {
     .PARAMETER DeploymentsClusterId
         Optional. Scope the whole report to one deployment cluster instead of the full tenant.
         Use Get-ZNSegmentCluster to look up a cluster's ID.
-    .AUTHOR
-        Olaf Gradin
+    .NOTES
+        Author: Olaf Gradin
     #>
     [CmdletBinding()]
     param(

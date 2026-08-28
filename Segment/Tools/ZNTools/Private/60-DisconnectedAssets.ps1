@@ -15,8 +15,8 @@ function Get-ZNPagedAssets {
         URI encoded set of filters"): an array of { id, includeValues, excludeValues }. Selection
         values for enum-typed filters (e.g. healthStatus) must be strings, not raw numbers — the
         API rejects numeric values with a "not supported in filter" error.
-    .AUTHOR
-        Olaf Gradin
+    .NOTES
+        Author: Olaf Gradin
     #>
     param(
         [Parameter(Mandatory)]
@@ -71,8 +71,8 @@ function Get-ZNAllAssets {
         by definition.
     .PARAMETER DeploymentsClusterId
         Optional. Scope to a single deployment cluster (see Get-ZNSegmentCluster for IDs).
-    .AUTHOR
-        Olaf Gradin
+    .NOTES
+        Author: Olaf Gradin
     #>
     param(
         [Parameter(Mandatory)]
@@ -113,8 +113,8 @@ function Get-ZNMonitoredAssets {
         hide it. This function intentionally has no health-status/disconnected/cluster filter
         options for that reason — it exists to fetch the full monitored-only population, not a
         server-side-filtered subset.
-    .AUTHOR
-        Olaf Gradin
+    .NOTES
+        Author: Olaf Gradin
     #>
     param(
         [Parameter(Mandatory)]
@@ -143,8 +143,8 @@ function Get-ZNAssetClusterLabel {
         assetStatus 14 ("Lightweight Agent") is similarly agent-direct rather than cluster-routed.
         Rather than lumping all of these into one opaque "Unclustered" bucket, the label is
         qualified with $script:AssetMonitorType so each monitoring mechanism gets its own row.
-    .AUTHOR
-        Olaf Gradin
+    .NOTES
+        Author: Olaf Gradin
     #>
     param(
         [Parameter(Mandatory)]
@@ -173,8 +173,8 @@ function Get-ZNDisconnectedAsset {
         Get-ZNAssetClusterLabel — no separate cluster lookup call is needed. ClusterName for
         assets with no Segment Server cluster is qualified by monitoring mechanism (e.g.
         "Unclustered (Cloud Connector)") rather than a single flat "Unclustered" bucket.
-    .AUTHOR
-        Olaf Gradin
+    .NOTES
+        Author: Olaf Gradin
     #>
     param(
         [Parameter(Mandatory)]

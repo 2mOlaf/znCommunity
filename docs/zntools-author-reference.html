@@ -85,17 +85,31 @@
 
   <h2 id="standard-block">Standard block</h2>
   <p>
-    Every public function must include comment-based help with <code>.SYNOPSIS</code> and <code>.AUTHOR</code>,
-    and call the banner/welcome block. The banner call pattern depends on command type — see
-    <a href="#pattern-banner">Banner guidance</a> below.
+    Every public function must include comment-based help with <code>.SYNOPSIS</code> and an
+    <code>Author:</code> line inside <code>.NOTES</code>, and call the banner/welcome block. The
+    banner call pattern depends on command type — see <a href="#pattern-banner">Banner
+    guidance</a> below.
   </p>
+
+  <div class="callout">
+    <strong>Do not use a <code>.AUTHOR</code> tag</strong>
+    <code>.AUTHOR</code> is not a recognized PowerShell comment-help keyword. Its presence
+    anywhere in the comment block silently breaks <code>Get-Help</code> parsing for the
+    <em>entire</em> block — <code>.SYNOPSIS</code>, <code>.DESCRIPTION</code>,
+    <code>.PARAMETER</code>, and <code>.EXAMPLE</code> all render blank, not just the author line.
+    Put <code>Author: &lt;name&gt;</code> inside <code>.NOTES</code> instead — this is what
+    <code>Get-ZNAuthorFromCommand</code> parses to populate the console banner. If a function
+    already has other <code>.NOTES</code> content, append the <code>Author:</code> line inside
+    that same block rather than adding a second <code>.NOTES</code> tag — a second occurrence
+    silently wins over the first instead of merging with it.
+  </div>
 
   <div class="syntax-block">
 <span class="ps-comment"># Help metadata (required in every public function)</span>
 <span class="ps-comment">.SYNOPSIS</span>
 <span class="ps-comment">    &lt;short summary&gt;</span>
-<span class="ps-comment">.AUTHOR</span>
-<span class="ps-comment">    &lt;author name&gt;</span>
+<span class="ps-comment">.NOTES</span>
+<span class="ps-comment">    Author: &lt;author name&gt;</span>
 
 <span class="ps-comment"># Full banner block — use for entry-point commands (see Banner guidance)</span>
 Ensure-ZNWelcomeShown
@@ -107,7 +121,7 @@ Show-Banner -Author $author -ScriptName $MyInvocation.MyCommand.Name
   <ol style="margin: 0.5rem 0 1rem 1.5rem; line-height: 2;">
     <li>Create a <code>.ps1</code> file in <code>ZNTools/Public</code>.</li>
     <li>Define the function without the <code>ZN</code> prefix (e.g., <code>Get-MyThing</code>).</li>
-    <li>Add comment-based help including <code>.SYNOPSIS</code>, <code>.PARAMETER</code>, and <code>.AUTHOR</code>.</li>
+    <li>Add comment-based help including <code>.SYNOPSIS</code>, <code>.PARAMETER</code>, and an <code>Author:</code> line in <code>.NOTES</code>.</li>
     <li>Include the appropriate banner block (see <a href="#pattern-banner">Banner guidance</a>).</li>
     <li>For API commands, use the API helper functions. For data-driven commands, call <code>Assert-ZNAssetDataLoaded</code>.</li>
     <li>Add the function name (without prefix) to <code>FunctionsToExport</code> in <code>ZNTools.psd1</code>.</li>
@@ -229,7 +243,7 @@ function Get-MyAssetQuery {
       </tr>
       <tr>
         <td>Get-ZNAuthorFromCommand</td>
-        <td>Extracts <code>.AUTHOR</code> from the command's help block.</td>
+        <td>Extracts the <code>Author:</code> line from the command's <code>.NOTES</code> block.</td>
         <td>Falls back to <code>$script:ModuleAuthor</code>.</td>
       </tr>
     </tbody>
@@ -381,12 +395,26 @@ function Get-MyAssetQuery {
 
   <div class="callout info">
     <strong>Why Get-SecurityLogAnalysis doesn't call Get-SecurityEventRate directly</strong>
-    Get-SecurityEventRate only queries live/remote logs via <code>Get-WinEvent -FilterHashtable</code>,
-    and has no offline <code>-LogPath</code> mode. Get-SecurityLogAnalysis needs rates for every
-    Event ID it encounters (including in offline archives) without a second, expensive pass over
-    the log — so it accumulates its own per-ID rate buckets during the single read pass it already
-    does, then calls the shared <code>Get-ZNBucketedRate</code> helper directly. That keeps the
-    rate math identical between the two commands without re-querying the log.
+    Both commands now support offline <code>-LogPath</code> archives, but Get-SecurityLogAnalysis
+    still needs rates for <em>every</em> Event ID it encounters in a single pass, not just a
+    caller-specified <code>-EventId</code> list — calling Get-SecurityEventRate once per
+    discovered ID would mean re-reading the log (or file) that many times. Instead it accumulates
+    its own per-ID rate buckets during the single read pass it already does, then calls the
+    shared <code>Get-ZNBucketedRate</code> helper directly. That keeps the rate math identical
+    between the two commands without re-querying the log.
+  </div>
+
+  <div class="callout">
+    <strong>Get-SecurityEventRate offline window: full pass vs. targeted peek</strong>
+    With <code>-LogPath</code> and no <code>-Period</code>, the analysis window is the actual
+    observed span of matching events, so every event matching <code>-EventId</code> must be read
+    to find the min/max timestamp — the same pass that already produces <code>Count</code>, so
+    it's not extra work. With <code>-LogPath -Period</code>, the command first does a cheap
+    single-event peek (<code>-MaxEvents 1</code>, relying on <code>Get-WinEvent</code>'s
+    newest-first default order for offline files) to anchor the window to the most recent
+    matching event, then filters the real query by <code>StartTime</code>/<code>EndTime</code> —
+    the same <code>FilterHashtable</code> mechanism the live-log path already uses — rather than
+    scanning the whole file.
   </div>
 
   <h2 id="private-disconnected-assets">Disconnected asset helpers</h2>

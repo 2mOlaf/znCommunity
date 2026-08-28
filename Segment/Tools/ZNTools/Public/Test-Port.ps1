@@ -4,8 +4,8 @@ function Test-Port {
         Tests TCP connectivity to a host/port.
     .PARAMETER PreferIPv4
         Prefer IPv4 when resolving and connecting.
-    .AUTHOR
-        Olaf Gradin
+    .NOTES
+        Author: Olaf Gradin
     #>
     [CmdletBinding()]
     param(

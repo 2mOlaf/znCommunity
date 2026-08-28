@@ -8,8 +8,8 @@
     Consolidates core Zero Networks helper functions into a single module with
     consistent naming, automatic banners, and shared API helpers.
 
-.AUTHOR
-    Olaf Gradin
+.NOTES
+    Author: Olaf Gradin
 #>
 
 $privatePath = Join-Path $PSScriptRoot 'Private'

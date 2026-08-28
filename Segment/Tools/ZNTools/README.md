@@ -69,15 +69,20 @@ run producing the full per-cluster breakdown (plus TOTAL) is the entire point of
 isolate one cluster, filter its output instead: `Get-ZNDisconnectedAssetMetric | Where-Object ClusterId -eq '<id>'`.
 
 ### Security Events
-Queries the Security event log for one or more Event IDs, locally or on a remote Segment Server.
-Defaults to Windows Filtering Platform (WFP) connection events 5156/5157.
+Queries the Security event log for one or more Event IDs — locally, on a remote Segment Server,
+or from an offline `.evtx` archive. Defaults to Windows Filtering Platform (WFP) connection
+events 5156/5157.
 - `Get-ZNSecurityEventRate -Period <period>` — local machine
 - `Get-ZNSecurityEventRate -Period <period> -EventId 4688, 4689` — measure other Event ID(s)
 - `Get-ZNSecurityEventRate -Period <period> -ComputerName <host>` — remote via WinRM (current identity)
 - `Get-ZNSecurityEventRate -Period <period> -ComputerName <host> -Credential $cred` — remote with explicit credential
+- `Get-ZNSecurityEventRate -LogPath archive.evtx` — offline archive, entire observed span of matching events
+- `Get-ZNSecurityEventRate -LogPath archive.evtx -Period 4h` — offline archive, last 4 hours *before the newest matching event in the file* (not wall-clock now)
 
 Period format: a positive integer followed by `h` (hours) or `d` (days) — e.g. `1h`, `4h`, `1d`, `7d`.
-All computation runs on the target machine; only the final numbers are returned across the wire.
+`-Period` is required for live/remote queries; with `-LogPath` it's optional — omit it to use the
+entire observed span of matching events in the file. All computation runs on the target machine
+(or locally against the file); only the final numbers are returned across the wire for remote runs.
 
 ### Security Log Analysis
 Reads the Security log (live, remote, or an offline `.evtx` archive) and ranks Event IDs by count

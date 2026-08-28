@@ -13,8 +13,8 @@ function Import-BGAssetData {
         Path to segmentedAssets.json. Defaults to the BreakGlass installation directory.
     .PARAMETER SwitchesPath
         Path to switches.json. Defaults to the BreakGlass installation directory.
-    .AUTHOR
-        Olaf Gradin
+    .NOTES
+        Author: Olaf Gradin
     .EXAMPLE
         Import-ZNBGAssetData
         Loads from the default BreakGlass installation path.
