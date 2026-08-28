@@ -41,6 +41,7 @@
   <a href="zntools-user-reference.html">ZNTools User Reference</a>
   <a href="zeronetworks-module-reference.html">ZeroNetworks Module (PSGallery)</a>
   <a href="breakglass-reference.html">BreakGlass Reference</a>
+  <a href="https://github.com/2mOlaf/znCommunity/tree/feature/zntools/Segment/Tools/ZNTools" target="_blank" rel="noopener">Source on GitHub</a>
   <a href="index.html">&#8592; Docs Home</a>
 </nav>
 
@@ -69,6 +70,11 @@
   </div>
 
   <h2 id="structure">Module structure</h2>
+  <p style="margin-bottom:0.75rem;">
+    Source lives in the
+    <a href="https://github.com/2mOlaf/znCommunity/tree/feature/zntools/Segment/Tools/ZNTools" target="_blank" rel="noopener">znCommunity repository</a>
+    under <code>Segment/Tools/ZNTools/</code>.
+  </p>
   <ul style="margin: 0.5rem 0 1rem 1.5rem; line-height: 2;">
     <li><code>ZNTools/ZNTools.psm1</code> dot-sources all <code>Private/*.ps1</code> (sorted by name), then all <code>Public/*.ps1</code>, then calls <code>Ensure-ZNWelcomeShown</code>.</li>
     <li><code>ZNTools/ZNTools.psd1</code> exports public functions and applies <code>DefaultCommandPrefix = 'ZN'</code>.</li>

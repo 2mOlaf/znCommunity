@@ -47,6 +47,8 @@
       font-weight: 600;
     }
     .doc-card.staged { border-style: dashed; opacity: 0.82; }
+    .doc-card .card-arrow a { color: inherit; text-decoration: none; }
+    .doc-card .card-arrow a:hover { text-decoration: underline; }
 
     .section-label {
       font-size: 0.72rem;
@@ -170,7 +172,7 @@
 
   <div class="doc-grid">
 
-    <a class="doc-card" href="zntools-user-reference.html">
+    <div class="doc-card">
       <div class="card-title">ZNTools — User Guide</div>
       <div class="card-tags">
         <span class="tag purple">Module</span>
@@ -182,11 +184,12 @@
         Segment Server cluster queries, environment health dashboard, ZN service lifecycle
         management, and the BreakGlass asset browser for offline JSON queries.
       </div>
-      <div class="card-note">irm .../ZNTools/install.ps1 | iex</div>
-      <div class="card-arrow">Read the guide &#8594;</div>
-    </a>
+      <div class="card-note">Import-Module .\ZNTools\ZNTools.psd1</div>
+      <div class="card-note"><a href="https://github.com/2mOlaf/znCommunity/tree/feature/zntools/Segment/Tools/ZNTools" target="_blank" rel="noopener">View source on GitHub &rarr;</a></div>
+      <div class="card-arrow"><a href="zntools-user-reference.html">Read the guide &#8594;</a></div>
+    </div>
 
-    <a class="doc-card" href="zntools-author-reference.html">
+    <div class="doc-card">
       <div class="card-title">ZNTools — Author Guide</div>
       <div class="card-tags">
         <span class="tag purple">Module</span>
@@ -198,8 +201,9 @@
         documentation for all private helper functions.
       </div>
       <div class="card-note">For contributors and module maintainers</div>
-      <div class="card-arrow">Read the guide &#8594;</div>
-    </a>
+      <div class="card-note"><a href="https://github.com/2mOlaf/znCommunity/tree/feature/zntools/Segment/Tools/ZNTools" target="_blank" rel="noopener">View source on GitHub &rarr;</a></div>
+      <div class="card-arrow"><a href="zntools-author-reference.html">Read the guide &#8594;</a></div>
+    </div>
 
   </div>
 
