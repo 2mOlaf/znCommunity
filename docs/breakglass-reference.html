@@ -35,6 +35,12 @@
   <a href="#ot-parameters">Parameters</a>
   <a href="#ot-examples">Examples</a>
 
+  <div class="sidebar-section">Connector-Monitored Assets</div>
+  <a href="#conn-overview">Overview</a>
+  <a href="#conn-wfp">WFP-Based (Windows)</a>
+  <a href="#conn-firewall">Windows Firewall-Based</a>
+  <a href="#conn-other-os">macOS / Linux</a>
+
   <div class="sidebar-section">Reference</div>
   <a href="#modes">Mode Reference</a>
   <a href="#param-sets">Parameter Sets</a>
@@ -67,12 +73,15 @@
       <span class="tag">Network Segment</span>
       <span class="tag">Identity Segment</span>
       <span class="tag green">OT</span>
+      <span class="tag purple">Connector Assets</span>
     </div>
     <p class="lead">
       The Zero Networks Break Glass scripts provide emergency access recovery when
-      Zero Networks Segment Server, the portal, or IdP is unavailable or blocking critical access. They directly
-      modify firewall rules, WFP filters, and (for OT) network switch ACLs on targeted
-      assets to restore connectivity.
+      Zero Networks Segment Server, the portal, or IdP is unavailable or blocking critical access.
+      They directly modify firewall rules, WFP filters, and (for OT) network switch ACLs on
+      targeted assets to restore connectivity. Assets monitored by Cloud Connector or Segment
+      Connector instead of a Segment Server aren't reachable by these scripts at all — see
+      <a href="#conn-overview">Connector-Monitored Assets</a> below.
     </p>
   </div>
 
@@ -81,7 +90,10 @@
     The scripts documented here (<code>BreakGlass.ps1</code> and <code>OTBreakGlass.ps1</code>) are
     bundled with the Zero Networks installer and are pre-installed on all Segment Servers at
     <code>C:\Program Files\Zero Networks\Breakglass\</code>. They are not distributed through the
-    ZNTools PowerShell module. This document is a reference for those pre-installed scripts.
+    ZNTools PowerShell module. This document is a reference for those pre-installed scripts, plus
+    <code>NetworkSegmentationWfpBreakglass.ps1</code> (shipped with the Windows Cloud Connector) and
+    manual procedures for connector-monitored assets — see
+    <a href="#conn-overview">Connector-Monitored Assets</a>.
   </div>
 
   <div class="callout">
@@ -96,11 +108,12 @@
     <thead><tr><th>Requirement</th><th>Details</th></tr></thead>
     <tbody>
       <tr><td>PowerShell version</td><td>7.0 or higher (<code>#Requires -Version 7</code>)</td></tr>
-      <tr><td>POSH-SSH module</td><td>Required for Linux operations. Script auto-installs from the internet or falls back to the bundled <code>posh-ssh.3.1.1.nupkg</code></td></tr>
-      <tr><td>segmentedAssets.json</td><td>Auto-generated and routinely updated by the Zero Networks Segment Server. Located at <code>C:\Program Files\Zero Networks\Breakglass\segmentedAssets.json</code> on the machine running the script. Do not edit manually.</td></tr>
-      <tr><td>Windows credentials</td><td>Account with WinRM/PSRemoting access to target asset(s). When omitted, the script reads <code>ForestsConfig</code> from <code>segmentedAssets.json</code> and prompts once per domain and once per OU that has <code>OuCredentials</code> configured. Supply <code>-ADUserName</code> / <code>-ADSvcPassword</code> to override with a single explicit credential for all targets.</td></tr>
-      <tr><td>Linux credentials</td><td>Assumed: Linux service account with an SSH key file. Supply <code>-LinuxUserName</code> / <code>-LinuxSvcPassword</code> to use password auth instead, or <code>-LinuxUseSSHKey</code> to be prompted for a key path at runtime. The account must have <code>sudo su</code> access on target assets.</td></tr>
+      <tr><td>POSH-SSH module</td><td>Required for Linux operations. Script auto-installs from the internet or falls back to the bundled <code>posh-ssh.3.1.1.nupkg</code>.</td></tr>
+      <tr><td>segmentedAssets.json</td><td>Auto-generated and routinely updated by the Zero Networks Segment Server. Located at <code>C:\Program Files\Zero Networks\Breakglass\segmentedAssets.json</code>. Required for bulk operations; not read for single-asset (<code>-Asset</code> / <code>-IPAddress</code>) runs. Do not edit manually.</td></tr>
+      <tr><td>Windows credentials</td><td>Account with WinRM/PSRemoting access to target asset(s). When omitted, the script reads <code>ForestsConfig</code> from <code>segmentedAssets.json</code> and prompts once per domain and once per OU that has <code>OuCredentials</code> configured. Supply <code>-ADUserName</code> with either <code>-ADSvcPassword</code> (plain text) or <code>-ADSvcSecurePassword</code> (SecureString) to override with a single explicit credential for all targets.</td></tr>
+      <tr><td>Linux credentials</td><td>Linux service account with <code>sudo su</code> access on target assets. Use <code>-LinuxUserName</code> / <code>-LinuxSvcPassword</code> for password auth, or <code>-LinuxUseSSHKey</code> to supply an SSH key path at runtime (or non-interactively via <code>-LinuxSSHKeyPath</code>).</td></tr>
       <tr><td>Network access</td><td>Required ports (WinRM TCP 5985/5986 for Windows; SSH TCP 22 for Linux) are automatically provisioned to Segment Servers, which is where this script is intended to run.</td></tr>
+      <tr><td>Linux firewall backend</td><td>The script supports both <strong>iptables</strong> (via python-iptables) and <strong>nftables</strong> (via python-nftables). For bulk operations, the backend is read from the <code>AppliedFirewallType</code> field in <code>segmentedAssets.json</code>. For single-asset operations, both backends are attempted automatically.</td></tr>
     </tbody>
   </table>
 
@@ -130,7 +143,8 @@
   <h2 id="bg-synopsis">Synopsis</h2>
   <p>
     Restores network and/or identity access to segmented Windows and Linux assets by remotely
-    modifying firewall rules, WFP filters, and Group Policy on each target.
+    modifying firewall rules, WFP filters, and Group Policy on each target. Linux assets are
+    handled via either iptables or nftables depending on the firewall backend in use on each host.
   </p>
 
   <h2 id="bg-syntax">Syntax</h2>
@@ -141,8 +155,9 @@
     <span class="param">-Windows</span>
     <span class="param">-Mode</span> { <span class="opt">Privileged</span> | <span class="opt">All</span> }
    [<span class="param">-Network</span>] [<span class="param">-Identity</span>]
+   [<span class="param">-PrivilegedPort</span> &lt;int[]&gt;]
    [<span class="param">-ServersOnly</span>] [<span class="param">-DisableBlockRule</span>]
-   [<span class="param">-ADUserName</span> &lt;string&gt;] [<span class="param">-ADSvcPassword</span> &lt;string&gt;]
+   [<span class="param">-ADUserName</span> &lt;string&gt;] [<span class="param">-ADSvcPassword</span> &lt;string&gt; | <span class="param">-ADSvcSecurePassword</span> &lt;SecureString&gt;]
    [<span class="param">-DeploymentClusterName</span> &lt;string&gt;]
   </div>
 
@@ -152,8 +167,9 @@
     <span class="param">-Linux</span>
     <span class="param">-Mode</span> { <span class="opt">Privileged</span> | <span class="opt">All</span> }
    [<span class="param">-Network</span>]
-   [<span class="param">-LinuxUseSSHKey</span>]
-   [<span class="param">-ServersOnly</span>]
+   [<span class="param">-PrivilegedPort</span> &lt;int[]&gt;]
+   [<span class="param">-LinuxUseSSHKey</span>] [<span class="param">-LinuxSSHKeyPath</span> &lt;string&gt;]
+   [<span class="param">-ServersOnly</span>] [<span class="param">-DisableBlockRule</span>]
    [<span class="param">-LinuxUserName</span> &lt;string&gt;] [<span class="param">-LinuxSvcPassword</span> &lt;string&gt;]
    [<span class="param">-DeploymentClusterName</span> &lt;string&gt;]
   </div>
@@ -164,8 +180,10 @@
     <span class="param">-WindowsAndLinux</span>
     <span class="param">-Mode</span> { <span class="opt">Privileged</span> | <span class="opt">All</span> }
    [<span class="param">-Network</span>] [<span class="param">-Identity</span>]
-   [<span class="param">-LinuxUseSSHKey</span>] [<span class="param">-ServersOnly</span>] [<span class="param">-DisableBlockRule</span>]
-   [<span class="param">-ADUserName</span> &lt;string&gt;] [<span class="param">-ADSvcPassword</span> &lt;string&gt;]
+   [<span class="param">-PrivilegedPort</span> &lt;int[]&gt;]
+   [<span class="param">-LinuxUseSSHKey</span>] [<span class="param">-LinuxSSHKeyPath</span> &lt;string&gt;]
+   [<span class="param">-ServersOnly</span>] [<span class="param">-DisableBlockRule</span>]
+   [<span class="param">-ADUserName</span> &lt;string&gt;] [<span class="param">-ADSvcPassword</span> &lt;string&gt; | <span class="param">-ADSvcSecurePassword</span> &lt;SecureString&gt;]
    [<span class="param">-LinuxUserName</span> &lt;string&gt;] [<span class="param">-LinuxSvcPassword</span> &lt;string&gt;]
    [<span class="param">-DeploymentClusterName</span> &lt;string&gt;]
   </div>
@@ -177,8 +195,9 @@
    { <span class="param">-Windows</span> | <span class="param">-Linux</span> }
     <span class="param">-Mode</span> { <span class="opt">Privileged</span> | <span class="opt">All</span> }
    [<span class="param">-Network</span>] [<span class="param">-Identity</span>]
-   [<span class="param">-LinuxUseSSHKey</span>]
-   [<span class="param">-ADUserName</span> &lt;string&gt;] [<span class="param">-ADSvcPassword</span> &lt;string&gt;]
+   [<span class="param">-PrivilegedPort</span> &lt;int[]&gt;] [<span class="param">-DisableBlockRule</span>]
+   [<span class="param">-LinuxUseSSHKey</span>] [<span class="param">-LinuxSSHKeyPath</span> &lt;string&gt;]
+   [<span class="param">-ADUserName</span> &lt;string&gt;] [<span class="param">-ADSvcPassword</span> &lt;string&gt; | <span class="param">-ADSvcSecurePassword</span> &lt;SecureString&gt;]
    [<span class="param">-LinuxUserName</span> &lt;string&gt;] [<span class="param">-LinuxSvcPassword</span> &lt;string&gt;]
   </div>
 
@@ -189,7 +208,10 @@
    { <span class="param">-Windows</span> | <span class="param">-Linux</span> }
     <span class="param">-Mode</span> { <span class="opt">Privileged</span> | <span class="opt">All</span> }
    [<span class="param">-Network</span>] [<span class="param">-Identity</span>]
-   [<span class="param">-ADUserName</span> &lt;string&gt;] [<span class="param">-ADSvcPassword</span> &lt;string&gt;]
+   [<span class="param">-PrivilegedPort</span> &lt;int[]&gt;]
+   [<span class="param">-LinuxUseSSHKey</span>] [<span class="param">-LinuxSSHKeyPath</span> &lt;string&gt;]
+   [<span class="param">-ADUserName</span> &lt;string&gt;] [<span class="param">-ADSvcPassword</span> &lt;string&gt; | <span class="param">-ADSvcSecurePassword</span> &lt;SecureString&gt;]
+   [<span class="param">-LinuxUserName</span> &lt;string&gt;] [<span class="param">-LinuxSvcPassword</span> &lt;string&gt;]
   </div>
 
   <h2 id="bg-parameters">Parameters</h2>
@@ -249,8 +271,16 @@
       <table style="margin:0.5rem 0;">
         <thead><tr><th>Value</th><th>Windows effect</th><th>Linux effect</th></tr></thead>
         <tbody>
-          <tr><td><code>Privileged</code></td><td>Opens inbound RDP (TCP 3389) via Windows Firewall and WFP. Outbound unrestricted.</td><td>Opens inbound SSH (TCP 22) via iptables.</td></tr>
-          <tr><td><code>All</code></td><td>Opens all inbound traffic via Windows Firewall and WFP. Outbound unrestricted.</td><td>Accepts all inbound and outbound traffic via iptables.</td></tr>
+          <tr>
+            <td><code>Privileged</code></td>
+            <td>Opens inbound TCP 3389 (RDP), 5985 (WinRM), 5986 (WinRM HTTPS), 9389 (ADWS), 445 (SMB) via Windows Firewall and WFP. All outbound allowed.</td>
+            <td>Opens inbound TCP 22 (SSH), 23 (Telnet), 445 (SMB) via iptables or nftables. All outbound allowed.</td>
+          </tr>
+          <tr>
+            <td><code>All</code></td>
+            <td>Opens all inbound and outbound traffic via Windows Firewall and WFP.</td>
+            <td>Accepts all inbound and outbound traffic via iptables or nftables.</td>
+          </tr>
         </tbody>
       </table>
       <div class="param-meta">
@@ -262,11 +292,37 @@
     </div>
   </div>
 
+  <!-- -PrivilegedPort -->
+  <div class="param-entry">
+    <div class="param-name">-PrivilegedPort</div>
+    <div class="param-body">
+      <p class="param-desc">
+        Replaces the built-in Privileged-mode port sets (<code>WindowsPrivilegedPort</code> and
+        <code>LinuxPrivilegedPort</code>) with one or more explicit TCP ports. The same list is
+        applied to both Windows and Linux targets. Use this to open a narrower — or different — set
+        of ports than the defaults during an incident.
+      </p>
+      <div class="callout" style="margin:0.5rem 0;">
+        <strong>Note</strong>
+        Only meaningful with <code>-Mode Privileged</code>. Supplying it alongside
+        <code>-Mode All</code> prints a warning and the value is ignored, since
+        <code>All</code> opens every port regardless.
+      </div>
+      <div class="param-meta">
+        <div class="param-meta-item"><span class="meta-label">Type:</span><span class="meta-value">Int32[]</span></div>
+        <div class="param-meta-item"><span class="meta-label">Required:</span><span class="meta-value optional">Optional</span></div>
+        <div class="param-meta-item"><span class="meta-label">Valid range:</span><span class="meta-value">1&#8211;65535 per port</span></div>
+        <div class="param-meta-item"><span class="meta-label">Default:</span><span class="meta-value">Windows 3389, 5985, 5986, 9389, 445 / Linux 22, 23, 445</span></div>
+        <div class="param-meta-item"><span class="meta-label">Pipeline input:</span><span class="meta-value">False</span></div>
+      </div>
+    </div>
+  </div>
+
   <!-- -Network -->
   <div class="param-entry">
     <div class="param-name">-Network</div>
     <div class="param-body">
-      <p class="param-desc">Triggers network segmentation break glass. Adds Windows Firewall and WFP allow rules (Windows) or iptables ACCEPT rules (Linux). Must be combined with <code>-Mode</code>. Only runs on assets where <code>IsNetworkSegmented</code> is <code>$true</code>.</p>
+      <p class="param-desc">Triggers network segmentation break glass. Adds Windows Firewall and WFP allow rules (Windows) or iptables/nftables ACCEPT rules (Linux). Must be combined with <code>-Mode</code>. Only runs on assets where <code>IsNetworkSegmented</code> is <code>$true</code>.</p>
       <div class="param-meta">
         <div class="param-meta-item"><span class="meta-label">Type:</span><span class="meta-value">Switch</span></div>
         <div class="param-meta-item"><span class="meta-label">Required:</span><span class="meta-value optional">Optional</span></div>
@@ -339,7 +395,7 @@
   <div class="param-entry">
     <div class="param-name">-Asset</div>
     <div class="param-body">
-      <p class="param-desc">Targets a single asset by hostname or FQDN. The value is resolved via DNS; a valid A record must exist. Mutually exclusive with <code>-IPAddress</code> and the bulk parameter sets.</p>
+      <p class="param-desc">Targets a single asset by hostname or FQDN. The value is resolved via DNS; a valid A record must exist. <code>segmentedAssets.json</code> is not read for single-asset runs. Mutually exclusive with <code>-IPAddress</code> and the bulk parameter sets.</p>
       <div class="param-meta">
         <div class="param-meta-item"><span class="meta-label">Type:</span><span class="meta-value">String</span></div>
         <div class="param-meta-item"><span class="meta-label">Required:</span><span class="meta-value required">True (in Asset set)</span></div>
@@ -353,11 +409,31 @@
   <div class="param-entry">
     <div class="param-name">-IPAddress</div>
     <div class="param-body">
-      <p class="param-desc">Targets a single asset by IP address. The IP is resolved via a DNS PTR lookup; a valid PTR record must exist. Mutually exclusive with <code>-Asset</code>.</p>
+      <p class="param-desc">Targets a single asset by IP address. The IP is resolved via a DNS PTR lookup; a valid PTR record must exist. <code>segmentedAssets.json</code> is not read for single-asset runs. Mutually exclusive with <code>-Asset</code>.</p>
       <div class="param-meta">
         <div class="param-meta-item"><span class="meta-label">Type:</span><span class="meta-value">String</span></div>
         <div class="param-meta-item"><span class="meta-label">Required:</span><span class="meta-value required">True (in IP set)</span></div>
         <div class="param-meta-item"><span class="meta-label">Position:</span><span class="meta-value">Named</span></div>
+        <div class="param-meta-item"><span class="meta-label">Pipeline input:</span><span class="meta-value">False</span></div>
+      </div>
+    </div>
+  </div>
+  <!-- -ADSvcSecurePassword -->
+  <div class="param-entry">
+    <div class="param-name">-ADSvcSecurePassword</div>
+    <div class="param-body">
+      <p class="param-desc">
+        <code>SecureString</code> password for the AD account named in <code>-ADUserName</code> — the
+        recommended alternative to passing the password as plain text. Build one with
+        <code>Read-Host -AsSecureString</code> or <code>ConvertTo-SecureString</code>. Must be paired
+        with <code>-ADUserName</code>, and cannot be combined with <code>-ADSvcPassword</code>; the
+        script rejects the run if both are supplied.
+      </p>
+      <div class="param-meta">
+        <div class="param-meta-item"><span class="meta-label">Type:</span><span class="meta-value">SecureString</span></div>
+        <div class="param-meta-item"><span class="meta-label">Required:</span><span class="meta-value optional">Optional</span></div>
+        <div class="param-meta-item"><span class="meta-label">Must pair with:</span><span class="meta-value">-ADUserName</span></div>
+        <div class="param-meta-item"><span class="meta-label">Windows only:</span><span class="meta-value">Yes</span></div>
         <div class="param-meta-item"><span class="meta-label">Pipeline input:</span><span class="meta-value">False</span></div>
       </div>
     </div>
@@ -370,7 +446,8 @@
       <p class="param-desc">
         Active Directory credential username used to connect to Windows assets via WinRM.
         Accepted formats: <code>DOMAIN\username</code> or <code>username@domain.com</code>.
-        Must be paired with <code>-ADSvcPassword</code>. If omitted, the script reads
+        Must be paired with either <code>-ADSvcPassword</code> or
+        <code>-ADSvcSecurePassword</code>. If omitted, the script reads
         <code>ForestsConfig</code> from <code>segmentedAssets.json</code> and prompts once
         per primary domain, once per secondary domain, and once per OU that has
         <code>OuCredentials</code> configured. When an asset has an
@@ -390,7 +467,7 @@
   <div class="param-entry">
     <div class="param-name">-ADSvcPassword</div>
     <div class="param-body">
-      <p class="param-desc">Plain-text password for the AD account specified in <code>-ADUserName</code>. Must be used together with <code>-ADUserName</code>. The value is converted to a <code>SecureString</code> internally before use.</p>
+      <p class="param-desc">Plain-text password for the AD account specified in <code>-ADUserName</code>. Must be used together with <code>-ADUserName</code> and cannot be combined with <code>-ADSvcSecurePassword</code>. The value is converted to a <code>SecureString</code> internally before use. Prefer <code>-ADSvcSecurePassword</code> where the calling context allows it.</p>
       <div class="param-meta">
         <div class="param-meta-item"><span class="meta-label">Type:</span><span class="meta-value">String</span></div>
         <div class="param-meta-item"><span class="meta-label">Required:</span><span class="meta-value optional">Optional</span></div>
@@ -404,11 +481,37 @@
   <div class="param-entry">
     <div class="param-name">-LinuxUseSSHKey</div>
     <div class="param-body">
-      <p class="param-desc">When present, the script uses an SSH private key file instead of a password to authenticate against Linux assets. The script will prompt interactively for the path to the key file at runtime.</p>
+      <p class="param-desc">When present, the script uses an SSH private key file instead of a password to authenticate against Linux assets. The script prompts interactively for the path to the key file at runtime unless <code>-LinuxSSHKeyPath</code> is also supplied.</p>
       <div class="param-meta">
         <div class="param-meta-item"><span class="meta-label">Type:</span><span class="meta-value">Switch</span></div>
         <div class="param-meta-item"><span class="meta-label">Required:</span><span class="meta-value optional">Optional</span></div>
         <div class="param-meta-item"><span class="meta-label">Default:</span><span class="meta-value">False (password auth)</span></div>
+        <div class="param-meta-item"><span class="meta-label">Pipeline input:</span><span class="meta-value">False</span></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- -LinuxSSHKeyPath -->
+  <div class="param-entry">
+    <div class="param-name">-LinuxSSHKeyPath</div>
+    <div class="param-body">
+      <p class="param-desc">
+        Path to the SSH private key file, supplied non-interactively. Providing it skips the
+        runtime prompt for the key path, which makes key-based Linux runs scriptable. The path is
+        validated when the script is parsed — a missing file fails the run immediately rather than
+        part-way through.
+      </p>
+      <div class="callout" style="margin:0.5rem 0;">
+        <strong>Note</strong>
+        Requires <code>-LinuxUseSSHKey</code> and cannot be combined with
+        <code>-LinuxSvcPassword</code>. The script rejects the run with an explicit error in
+        either case.
+      </div>
+      <div class="param-meta">
+        <div class="param-meta-item"><span class="meta-label">Type:</span><span class="meta-value">String</span></div>
+        <div class="param-meta-item"><span class="meta-label">Required:</span><span class="meta-value optional">Optional</span></div>
+        <div class="param-meta-item"><span class="meta-label">Requires:</span><span class="meta-value">-LinuxUseSSHKey</span></div>
+        <div class="param-meta-item"><span class="meta-label">Default:</span><span class="meta-value">None (prompted at runtime)</span></div>
         <div class="param-meta-item"><span class="meta-label">Pipeline input:</span><span class="meta-value">False</span></div>
       </div>
     </div>
@@ -431,7 +534,7 @@
   <div class="param-entry">
     <div class="param-name">-LinuxSvcPassword</div>
     <div class="param-body">
-      <p class="param-desc">Plain-text SSH password for the Linux user. Must be used together with <code>-LinuxUserName</code>. Cannot be combined with <code>-LinuxUseSSHKey</code> — if SSH key authentication is in use, this parameter is ignored.</p>
+      <p class="param-desc">Plain-text SSH password for the Linux user. Must be used together with <code>-LinuxUserName</code>. Cannot be combined with <code>-LinuxUseSSHKey</code>.</p>
       <div class="param-meta">
         <div class="param-meta-item"><span class="meta-label">Type:</span><span class="meta-value">String</span></div>
         <div class="param-meta-item"><span class="meta-label">Required:</span><span class="meta-value optional">Optional</span></div>
@@ -449,7 +552,7 @@
         Limits the asset scope to a single Zero Networks deployment cluster. The value is matched
         case-insensitively against cluster names in <code>segmentedAssets.json</code>. Tab-completion
         is supported — press <kbd>Tab</kbd> to cycle through available cluster names.
-        If omitted, all clusters are included.
+        If omitted, all clusters are included. Not available in the Asset or IP parameter sets.
       </p>
       <div class="param-meta">
         <div class="param-meta-item"><span class="meta-label">Type:</span><span class="meta-value">String</span></div>
@@ -471,9 +574,8 @@
     <pre><span class="ps-prompt">PS&gt; </span><span class="ps-cmd">.\BreakGlass.ps1</span> <span class="ps-switch">-Windows</span> <span class="ps-param">-Mode</span> <span class="ps-value">Privileged</span> <span class="ps-switch">-Network</span></pre>
     <div class="example-desc">
       Connects to every Windows asset in <code>segmentedAssets.json</code> that has network
-      segmentation active. Adds a Windows Firewall rule allowing inbound RDP (TCP 3389) and
-      a WFP filter allowing inbound RDP and all outbound traffic.
-      Credentials are prompted interactively per AD domain found in the configuration.
+      segmentation active. Opens inbound TCP 3389, 5985, 5986, 9389, and 445 via Windows Firewall
+      and WFP. Credentials are prompted interactively per AD domain (and per OU if configured).
     </div>
   </div>
 
@@ -484,9 +586,9 @@
     </div>
     <pre><span class="ps-prompt">PS&gt; </span><span class="ps-cmd">.\BreakGlass.ps1</span> <span class="ps-switch">-Linux</span> <span class="ps-switch">-LinuxUseSSHKey</span> <span class="ps-switch">-Network</span> <span class="ps-param">-Mode</span> <span class="ps-value">All</span> <span class="ps-switch">-ServersOnly</span></pre>
     <div class="example-desc">
-      Targets only Linux server-type assets. Uses an SSH key for authentication (path
-      prompted at runtime). Inserts an iptables ACCEPT rule for all inbound and outbound
-      traffic on each target.
+      Targets only Linux server-type assets. Uses an SSH key for authentication (path prompted at runtime).
+      Each asset's <code>AppliedFirewallType</code> from <code>segmentedAssets.json</code> determines
+      whether iptables or nftables is used. Inserts an ACCEPT-all rule on each target.
     </div>
   </div>
 
@@ -497,8 +599,10 @@
     </div>
     <pre><span class="ps-prompt">PS&gt; </span><span class="ps-cmd">.\BreakGlass.ps1</span> <span class="ps-param">-Asset</span> <span class="ps-value">linuxserver.contoso.local</span> <span class="ps-switch">-Linux</span> <span class="ps-switch">-LinuxUseSSHKey</span> <span class="ps-switch">-Network</span> <span class="ps-param">-Mode</span> <span class="ps-value">All</span></pre>
     <div class="example-desc">
-      Resolves <code>linuxserver.contoso.local</code> via DNS and runs the full-open iptables
-      break glass against that single host. The SSH key path is prompted interactively.
+      Resolves <code>linuxserver.contoso.local</code> via DNS and runs break glass against that single host.
+      Because the firewall type is unknown for a manually-specified asset, both iptables and nftables
+      backends are attempted. A failure on one backend does not abort the other. The SSH key path is
+      prompted interactively.
     </div>
   </div>
 
@@ -509,8 +613,8 @@
     </div>
     <pre><span class="ps-prompt">PS&gt; </span><span class="ps-cmd">.\BreakGlass.ps1</span> <span class="ps-param">-IPAddress</span> <span class="ps-value">1.1.1.1</span> <span class="ps-switch">-Windows</span> <span class="ps-switch">-Network</span> <span class="ps-param">-Mode</span> <span class="ps-value">All</span></pre>
     <div class="example-desc">
-      Resolves <code>1.1.1.1</code> via a PTR record, then prompts interactively for
-      a domain name and AD username before opening all ports on the target.
+      Resolves <code>1.1.1.1</code> via a PTR record, then prompts interactively for a domain name
+      and AD username before opening all ports on the target.
     </div>
   </div>
 
@@ -530,12 +634,54 @@
   <div class="example">
     <div class="example-header">
       <span class="ex-label">Example 6</span>
+      <span class="ex-title">Explicit credentials without a plain-text password</span>
+    </div>
+    <pre><span class="ps-prompt">PS&gt; </span><span class="ps-value">$secure</span> <span class="ps-param">=</span> <span class="ps-cmd">Read-Host</span> <span class="ps-value">'AD password'</span> <span class="ps-switch">-AsSecureString</span>
+<span class="ps-prompt">PS&gt; </span><span class="ps-cmd">.\BreakGlass.ps1</span> <span class="ps-param">-IPAddress</span> <span class="ps-value">1.1.1.1</span> <span class="ps-switch">-Windows</span> <span class="ps-switch">-Network</span> <span class="ps-param">-Mode</span> <span class="ps-value">All</span> `
+         <span class="ps-param">-ADUserName</span> <span class="ps-value">contoso.local\Administrator</span> <span class="ps-param">-ADSvcSecurePassword</span> <span class="ps-value">$secure</span></pre>
+    <div class="example-desc">
+      Same effect as Example 5, but the password never exists as a plain string in the command line
+      or in session history. Prefer this form in runbooks and anywhere the command may be logged.
+    </div>
+  </div>
+
+  <div class="example">
+    <div class="example-header">
+      <span class="ex-label">Example 7</span>
+      <span class="ex-title">Open a custom port set instead of the Privileged defaults</span>
+    </div>
+    <pre><span class="ps-prompt">PS&gt; </span><span class="ps-cmd">.\BreakGlass.ps1</span> <span class="ps-switch">-Windows</span> <span class="ps-param">-Mode</span> <span class="ps-value">Privileged</span> <span class="ps-switch">-Network</span> <span class="ps-param">-PrivilegedPort</span> <span class="ps-value">3389,5985</span></pre>
+    <div class="example-desc">
+      Opens only RDP and WinRM HTTP rather than the full default set (3389, 5985, 5986, 9389, 445).
+      Use this to keep the break glass blast radius as small as the incident allows.
+      <code>-PrivilegedPort</code> is ignored with <code>-Mode All</code>.
+    </div>
+  </div>
+
+  <div class="example">
+    <div class="example-header">
+      <span class="ex-label">Example 8</span>
+      <span class="ex-title">Fully non-interactive single Linux asset via SSH key</span>
+    </div>
+    <pre><span class="ps-prompt">PS&gt; </span><span class="ps-cmd">.\BreakGlass.ps1</span> <span class="ps-param">-Asset</span> <span class="ps-value">linuxserver.contoso.local</span> <span class="ps-switch">-Linux</span> <span class="ps-switch">-LinuxUseSSHKey</span> `
+         <span class="ps-param">-LinuxSSHKeyPath</span> <span class="ps-value">C:\keys\id_rsa</span> <span class="ps-param">-LinuxUserName</span> <span class="ps-value">root</span> <span class="ps-switch">-Network</span> <span class="ps-param">-Mode</span> <span class="ps-value">All</span></pre>
+    <div class="example-desc">
+      Supplying both <code>-LinuxSSHKeyPath</code> and <code>-LinuxUserName</code> removes every
+      runtime prompt, so the run is scriptable. Both iptables and nftables are attempted, as with
+      any single-asset Linux run.
+    </div>
+  </div>
+
+  <div class="example">
+    <div class="example-header">
+      <span class="ex-label">Example 9</span>
       <span class="ex-title">Scope to a single deployment cluster</span>
     </div>
     <pre><span class="ps-prompt">PS&gt; </span><span class="ps-cmd">.\BreakGlass.ps1</span> <span class="ps-switch">-Windows</span> <span class="ps-param">-Mode</span> <span class="ps-value">All</span> <span class="ps-switch">-Network</span> <span class="ps-param">-DeploymentClusterName</span> <span class="ps-value">"zero.local"</span></pre>
     <div class="example-desc">
       Restricts the affected asset pool to the <code>zero.local</code> deployment cluster only.
-      Assets in other clusters are skipped entirely.
+      Assets in other clusters are skipped entirely. Use <kbd>Tab</kbd> to cycle through available
+      cluster names.
     </div>
   </div>
 
@@ -650,6 +796,382 @@
   </div>
 
   <!-- ════════════════════════════════════════
+       CONNECTOR-MONITORED ASSETS
+  ═════════════════════════════════════════ -->
+  <div class="script-separator">
+    <div class="page-header" style="margin-bottom:1rem; border-bottom:none; padding-bottom:0.5rem;">
+      <h1>Connector-Monitored Assets</h1>
+      <div class="tags">
+        <span class="tag">Windows</span>
+        <span class="tag purple">macOS (Unconfirmed)</span>
+        <span class="tag purple">Linux (Unconfirmed)</span>
+        <span class="tag orange">Emergency</span>
+      </div>
+    </div>
+  </div>
+
+  <h2 id="conn-overview">Overview</h2>
+  <p>
+    <code>BreakGlass.ps1</code> above only reaches assets a Segment Server knows about — it builds
+    its target list from <code>segmentedAssets.json</code> and connects to each asset outbound over
+    WinRM or SSH <em>from the Segment Server itself</em>. Assets monitored instead by
+    <strong>Cloud Connector</strong> (<code>assetStatus</code> 7) or <strong>Segment Connector</strong>
+    / Lightweight Agent (<code>assetStatus</code> 14) are never in that inventory, and are frequently
+    not even reachable from a Segment Server — Cloud Connector in particular is commonly used for
+    assets outside the corporate network: roaming laptops, cloud workloads, and other
+    externally-hosted resources.
+  </p>
+  <p>
+    There is no bulk or remote break-glass path for these assets today. Recovery has to happen
+    <strong>locally on the asset</strong>, logged in as a local administrator (Windows) or root
+    (macOS / Linux, once a shipped script is confirmed for those platforms — see
+    <a href="#conn-other-os">macOS and Linux Connector Assets</a>).
+  </p>
+
+  <div class="callout">
+    <strong>This may extend to remote tooling — but plan for local, by hand</strong>
+    Recovery here could eventually be driven through whatever configuration-management or MDM tooling
+    manages the connector fleet (Intune, Jamf, Ansible, GPO, an RMM, etc.). In an actual incident you
+    frequently won't know which of those is in place, whether it's currently reachable, or whether the
+    incident itself is what's making it unreachable. The steps below assume none of that and are
+    written to be run by hand, logged in locally at the console.
+  </div>
+
+  <h2 id="conn-wfp">WFP-Based Windows Connector Assets</h2>
+  <p>
+    Applies when the Windows Connector agent enforces network segmentation using WFP (Windows
+    Filtering Platform) — the same underlying mechanism <code>BreakGlass.ps1</code> uses for Segment
+    Server-monitored Windows assets, just reached completely differently here.
+  </p>
+
+  <div class="callout info">
+    <strong>Script: NetworkSegmentationWfpBreakGlass.ps1</strong>
+    Shipped with the Windows Cloud Connector for exactly this purpose — confirmed against internal
+    documentation (Confluence: <em>Local Breakglass Script Execution for WFP assets</em>,
+    <em>Network Segmentation - Windows - WFP Implementation</em>). Internally it's called
+    "Standalone Breakglass (Removal)" — the offline equivalent of "Restore Default Policy." Unlike
+    <code>BreakGlass.ps1</code>'s <code>-Mode</code>-scoped, additive allow filters, this script
+    performs a full teardown: it deletes <strong>every</strong> WFP filter tagged with the Zero
+    Networks NetSeg provider key (<code>bf75ec5a-587c-43fc-b041-2f2283f45cfa</code>), regardless of
+    port or direction. There is no partial or scoped version of this action.
+  </div>
+
+  <table>
+    <thead><tr><th>Monitoring type</th><th>Local script path</th></tr></thead>
+    <tbody>
+      <tr>
+        <td>Cloud Connector</td>
+        <td><code>C:\Program Files\Zero Networks\CloudConnector\WindowsColletor\NetworkSegmentationWfpBreakGlass.ps1</code></td>
+      </tr>
+      <tr>
+        <td>Segment Server (Trust-monitored)</td>
+        <td><code>C:\Windows\System32\config\systemprofile\AppData\Local\ZeroNetworks\Dependencies\NetworkSegmentation\WfpBreakglass.ps1</code></td>
+      </tr>
+    </tbody>
+  </table>
+  <div class="callout info">
+    <strong>"WindowsColletor" is spelled that way in the actual path</strong>
+    The Cloud Connector folder name is missing a "c" (<code>WindowsColletor</code>, not
+    <code>WindowsCollector</code>) — confirmed identically across two independent internal docs, so
+    this isn't a documentation typo. Type it exactly as shown or Tab-complete it; a corrected
+    spelling will 404.
+    <br /><br />
+    The second row is a bonus, not the main subject of this section: Segment Server-monitored
+    ("Trust-monitored") Windows assets carry the <em>same</em> removal script locally too, under a
+    different path — a local fallback if WinRM to that asset is unavailable and
+    <a href="#bg-syntax">BreakGlass.ps1</a> can't reach it remotely either.
+  </div>
+
+  <h3>What it does</h3>
+  <ol style="margin: 0.5rem 0 1rem 1.5rem; line-height: 2;">
+    <li>Compiles a small embedded C# helper (<code>ZeroNetworks.Breakglass.WfpRemover</code>) in
+      memory via <code>Add-Type</code>, using the same isolated-<code>%TEMP%</code> compile pattern
+      as the Segment Server WFP break glass code.</li>
+    <li>Opens a WFP engine handle and enumerates <strong>every filter on the system</strong>,
+      regardless of which provider installed it.</li>
+    <li>Keeps only the filters whose <code>providerKey</code> matches the Zero Networks NetSeg
+      provider (<code>bf75ec5a-587c-43fc-b041-2f2283f45cfa</code>), printing each one it marks for
+      removal by name as it goes.</li>
+    <li>Deletes all matched filters inside a single WFP transaction (all-or-nothing commit).</li>
+    <li>Prints <code>Done.</code> on success, or <code>No filters to remove</code> if the asset isn't
+      currently enforcing via WFP at all (try <a href="#conn-firewall">Windows Firewall-Based
+      Connector Assets</a> instead) or is already clear.</li>
+  </ol>
+
+  <div class="callout">
+    <strong>Scope</strong>
+    This only removes filters under the NetSeg provider key above — it does not remove the Zero
+    Networks NetSeg sublayer or provider objects themselves, only the filters inside them. It also
+    does not touch Windows Firewall rules, and does not touch identity segmentation — whether
+    identity segmentation applies to Connector-monitored Windows assets, and how to break-glass it
+    if so, is not yet confirmed for this document.
+  </div>
+
+  <h3>Syntax</h3>
+  <div class="syntax-block">
+<span class="cmd">.\NetworkSegmentationWfpBreakGlass.ps1</span>
+  </div>
+  <p>No parameters — running the script is the entire action.</p>
+
+  <h3>Running it locally</h3>
+  <ol style="margin: 0.5rem 0 1rem 1.5rem; line-height: 2;">
+    <li>Get onto the asset itself — console, KVM, or whatever out-of-band access is available. This
+      does not use WinRM or any remote transport; it must run on the target.</li>
+    <li>Open PowerShell <strong>as Administrator</strong>. Windows PowerShell 5.1 (in-box on
+      Windows 8 / Server 2012 and later) is sufficient — the script has no
+      <code>#Requires -Version 7</code> and uses only APIs available since PowerShell 2.0 / .NET
+      Framework.</li>
+    <li>If the script was copied from another machine (USB, share, email), Windows may block it as
+      downloaded content. The internal support KB's documented fix is
+      <code>Set-ExecutionPolicy Unrestricted -Scope CurrentUser</code>; <code>Unblock-File</code> or
+      a one-off <code>-ExecutionPolicy Bypass</code> invocation both work too.</li>
+    <li>Run it and confirm the output lists the filters removed (or <code>No filters to remove</code>)
+      and ends with <code>Done.</code> To verify independently of the script's own output, run
+      <code>netsh wfp show state</code> and confirm no filters remain under the NetSeg provider.</li>
+    <li>Validate the connection that was failing.</li>
+  </ol>
+
+  <div class="example">
+    <div class="example-header">
+      <span class="ex-title">Set execution policy, then run (per the internal support KB)</span>
+    </div>
+    <pre><span class="ps-prompt">PS&gt; </span><span class="ps-cmd">Set-ExecutionPolicy</span> <span class="ps-value">Unrestricted</span> <span class="ps-switch">-Scope</span> <span class="ps-value">CurrentUser</span>
+<span class="ps-prompt">PS&gt; </span><span class="ps-cmd">.\NetworkSegmentationWfpBreakGlass.ps1</span></pre>
+  </div>
+
+  <div class="example">
+    <div class="example-header">
+      <span class="ex-title">…or run once without changing execution policy</span>
+    </div>
+    <pre><span class="ps-cmd">powershell.exe</span> <span class="ps-switch">-ExecutionPolicy</span> <span class="ps-value">Bypass</span> <span class="ps-switch">-File</span> <span class="ps-value">.\NetworkSegmentationWfpBreakGlass.ps1</span></pre>
+  </div>
+
+  <div class="callout">
+    <strong>This only sticks while the asset can't reach the Zero Networks cloud</strong>
+    The Connector runs an anti-tampering check on its WFP filters roughly every 10 minutes, plus
+    immediately on a filter-change event — internal guidance puts the reaction time at seconds, not
+    minutes, whenever the collector is actually up and connected. Per the internal FAQ: <em>"The
+    break glass script can be run to open privileged ports&#8230; or open Any&lt;-&gt;Any. When the
+    service comes back online, antitampering will disable the break glass rule."</em> In other
+    words: this is specifically for when the asset's connectivity to the Zero Networks cloud is
+    down (which is presumably why you're here instead of using the portal). Once that connectivity
+    is restored, expect Zero Networks to revert this on its own — that's by design, not a bug to
+    work around. Still confirm it actually happened rather than assuming it. This removes <em>all</em>
+    NetSeg WFP filters in one shot — there's no way to scope it to a port list the way
+    <code>-PrivilegedPort</code> does for <code>BreakGlass.ps1</code>. Document and audit every use.
+  </div>
+
+  <h2 id="conn-firewall">Windows Firewall-Based Connector Assets</h2>
+  <p>
+    Applies when the Connector agent enforces segmentation using the native Windows Firewall
+    (<code>netsh advfirewall</code> / <code>New-NetFirewallRule</code>) instead of WFP. No break-glass
+    script is currently shipped for this path — the steps below are manual, run locally as an
+    Administrator.
+  </p>
+
+  <div class="callout">
+    <strong>This only sticks while the asset can't reach the Zero Networks cloud</strong>
+    Same anti-tampering behavior as the WFP case above: while the Connector service is up and
+    connected, it disables foreign (non Zero Networks) rules and restores its own — internal
+    guidance describes this as happening within seconds. A manually-added allow rule isn't
+    competing with a specific Zero Networks block rule so much as it's competing with an agent that
+    actively re-asserts its own rule set. This procedure only makes sense when the asset genuinely
+    can't reach the cloud right now; if it can, use the portal's Cloud Break Glass instead — your
+    local change will likely be reverted before you can use it.
+  </div>
+
+  <div class="callout info">
+    <strong>Zero Networks' own rule naming (confirmed)</strong>
+    Every rule the collector creates is prefixed <code>ZN-</code>:
+    <code>ZN-Rule</code> (the actual allow rules — name also encodes rule id / protocol / checksum
+    / version), <code>ZN-RuleMeta</code> (metadata-only, no live rule), <code>ZN-Icmp</code>,
+    <code>ZN-Policy</code>, <code>ZN-Cloud-Addresses</code> (outbound access to the ZN cloud — do
+    not touch this one), and <code>ZN-Unprotected-In</code> / <code>ZN-Unprotected-Out</code> (the
+    agent's <em>own</em> allow-all rules, created automatically on a normal unsegment). Also watch
+    for <code>ZN-States</code> — it marks the asset as segmented and doubles as the inbound allow
+    for the Segment Server on WinRM 5985 and ADWS 9389, so disabling it can cut off the very
+    management path you might need later.
+  </div>
+
+  <h3>Option A — netsh advfirewall (any Windows version, any shell)</h3>
+  <p>The universal fallback — no PowerShell version dependency at all.</p>
+
+  <div class="example">
+    <div class="example-header">
+      <span class="ex-title">Add any-to-any allow rules</span>
+    </div>
+    <pre><span class="ps-cmd">netsh advfirewall firewall add rule</span> <span class="ps-param">name=</span><span class="ps-value">"ZN Break Glass - Allow All Inbound"</span> <span class="ps-param">dir=</span><span class="ps-value">in</span> <span class="ps-param">action=</span><span class="ps-value">allow</span> <span class="ps-param">protocol=</span><span class="ps-value">any</span> <span class="ps-param">remoteip=</span><span class="ps-value">any</span> <span class="ps-param">enable=</span><span class="ps-value">yes</span>
+<span class="ps-cmd">netsh advfirewall firewall add rule</span> <span class="ps-param">name=</span><span class="ps-value">"ZN Break Glass - Allow All Outbound"</span> <span class="ps-param">dir=</span><span class="ps-value">out</span> <span class="ps-param">action=</span><span class="ps-value">allow</span> <span class="ps-param">protocol=</span><span class="ps-value">any</span> <span class="ps-param">remoteip=</span><span class="ps-value">any</span> <span class="ps-param">enable=</span><span class="ps-value">yes</span></pre>
+  </div>
+
+  <p>To find Zero Networks' own rules by the confirmed <code>ZN-</code> prefix:</p>
+
+  <div class="example">
+    <div class="example-header">
+      <span class="ex-title">List Zero Networks rules, then disable one</span>
+    </div>
+    <pre><span class="ps-cmd">netsh advfirewall firewall show rule</span> <span class="ps-param">name=</span><span class="ps-value">all</span> <span class="ps-param">|</span> <span class="ps-cmd">findstr</span> <span class="ps-switch">/i</span> <span class="ps-value">"Rule Name: ZN-"</span>
+<span class="ps-cmd">netsh advfirewall firewall set rule</span> <span class="ps-param">name=</span><span class="ps-value">"&lt;exact ZN- rule name&gt;"</span> <span class="ps-param">new</span> <span class="ps-param">enable=</span><span class="ps-value">no</span></pre>
+  </div>
+
+  <h3>Option B — PowerShell (NetSecurity module, PowerShell 5.1 baseline)</h3>
+  <div class="callout info">
+    <strong>Version note</strong>
+    The <code>NetSecurity</code> module is built into Windows PowerShell 5.1 (in-box on Windows 8 /
+    Server 2012 and later) — treat 5.1 as the floor for these commands, not PowerShell 7. On
+    Windows 7 / Server 2008 R2 with only PowerShell 2.0–4.0, <code>NetSecurity</code> isn't
+    available — use the <code>netsh</code> commands in Option A instead.
+  </div>
+
+  <div class="example">
+    <div class="example-header">
+      <span class="ex-title">Review Zero Networks' rules first</span>
+    </div>
+    <pre><span class="ps-prompt">PS&gt; </span><span class="ps-cmd">Get-NetFirewallRule</span> <span class="ps-switch">-DisplayName</span> <span class="ps-value">"ZN-*"</span> <span class="ps-pipe">|</span>
+    <span class="ps-cmd">Select-Object</span> <span class="ps-value">DisplayName, Direction, Action, Enabled</span></pre>
+  </div>
+
+  <div class="example">
+    <div class="example-header">
+      <span class="ex-title">Add any-to-any allow rules (both directions)</span>
+    </div>
+    <pre><span class="ps-prompt">PS&gt; </span><span class="ps-cmd">New-NetFirewallRule</span> <span class="ps-switch">-DisplayName</span> <span class="ps-value">"ZN Break Glass - Allow All Inbound"</span> <span class="ps-switch">-Direction</span> <span class="ps-value">Inbound</span> <span class="ps-switch">-Action</span> <span class="ps-value">Allow</span> <span class="ps-switch">-Protocol</span> <span class="ps-value">Any</span> <span class="ps-switch">-RemoteAddress</span> <span class="ps-value">Any</span> <span class="ps-switch">-Enabled</span> <span class="ps-value">True</span>
+<span class="ps-prompt">PS&gt; </span><span class="ps-cmd">New-NetFirewallRule</span> <span class="ps-switch">-DisplayName</span> <span class="ps-value">"ZN Break Glass - Allow All Outbound"</span> <span class="ps-switch">-Direction</span> <span class="ps-value">Outbound</span> <span class="ps-switch">-Action</span> <span class="ps-value">Allow</span> <span class="ps-switch">-Protocol</span> <span class="ps-value">Any</span> <span class="ps-switch">-RemoteAddress</span> <span class="ps-value">Any</span> <span class="ps-switch">-Enabled</span> <span class="ps-value">True</span></pre>
+  </div>
+
+  <div class="example">
+    <div class="example-header">
+      <span class="ex-title">Disable a Zero Networks rule by its confirmed prefix (never ZN-States)</span>
+    </div>
+    <pre><span class="ps-prompt">PS&gt; </span><span class="ps-cmd">Get-NetFirewallRule</span> <span class="ps-switch">-DisplayName</span> <span class="ps-value">"ZN-Rule*"</span> <span class="ps-pipe">|</span> <span class="ps-cmd">Disable-NetFirewallRule</span></pre>
+  </div>
+
+  <h3>Option C — GUI (Windows Defender Firewall with Advanced Security)</h3>
+  <ol style="margin: 0.5rem 0 1rem 1.5rem; line-height: 2;">
+    <li>Run <code>wf.msc</code> as Administrator.</li>
+    <li>Right-click <strong>Inbound Rules</strong> &#8594; <strong>New Rule&#8230;</strong> &#8594;
+      <strong>Custom</strong> &#8594; <strong>All programs</strong> &#8594; protocol type
+      <strong>Any</strong> &#8594; leave the local/remote IP scope as <strong>Any</strong> &#8594;
+      <strong>Allow the connection</strong> &#8594; apply to all profiles &#8594; name it (e.g.
+      <code>ZN Break Glass - Allow All Inbound</code>).</li>
+    <li>Repeat under <strong>Outbound Rules</strong>.</li>
+    <li>Sort the rule list by name to find the agent's own <code>ZN-</code> rules if you need to
+      disable one directly (right-click &#8594; Disable Rule) — skip <code>ZN-States</code>, see
+      above.</li>
+  </ol>
+
+  <div class="callout">
+    <strong>If the collector is still running, none of this will hold</strong>
+    A local administrator can currently stop the Cloud Connector's own Windows service — find it
+    with <code>Get-Service | Where-Object DisplayName -like "*Zero Network*"</code> (exact service
+    name not confirmed for this document; check what it resolves to on your build before an
+    incident). Stopping it is the only way documented here to keep manually-added rules from being
+    reverted while the asset otherwise has connectivity. Disabling the firewall profile(s) entirely
+    is the blunter alternative, and removes <em>all</em> protection on the asset, not only Zero
+    Networks': <code>netsh advfirewall set allprofiles state off</code> / <code>... state on</code>
+    to restore, or in PowerShell 5.1+ <code>Set-NetFirewallProfile -All -Enabled $false</code> /
+    <code>Set-NetFirewallProfile -All -Enabled $true</code>. Either way, treat this as a last
+    resort and turn it back on as soon as the incident allows.
+  </div>
+
+  <h3>Cleaning up</h3>
+  <p>
+    Per the same internal FAQ cited above, Zero Networks' anti-tampering is expected to revert
+    manually-added rules automatically once the asset's cloud connectivity is restored — that's the
+    same mechanism that reverts the WFP case. Still, confirm it rather than assume it, especially if
+    you disabled a <code>ZN-</code> rule directly rather than only adding allow rules alongside it.
+  </p>
+
+  <div class="example">
+    <div class="example-header">
+      <span class="ex-title">Remove the break-glass rules / re-enable what you disabled</span>
+    </div>
+    <pre><span class="ps-comment"># netsh</span>
+<span class="ps-cmd">netsh advfirewall firewall delete rule</span> <span class="ps-param">name=</span><span class="ps-value">"ZN Break Glass - Allow All Inbound"</span>
+<span class="ps-cmd">netsh advfirewall firewall delete rule</span> <span class="ps-param">name=</span><span class="ps-value">"ZN Break Glass - Allow All Outbound"</span>
+
+<span class="ps-comment"># PowerShell 5.1+ NetSecurity equivalent</span>
+<span class="ps-prompt">PS&gt; </span><span class="ps-cmd">Remove-NetFirewallRule</span> <span class="ps-switch">-DisplayName</span> <span class="ps-value">"ZN Break Glass - Allow All Inbound"</span>
+<span class="ps-prompt">PS&gt; </span><span class="ps-cmd">Remove-NetFirewallRule</span> <span class="ps-switch">-DisplayName</span> <span class="ps-value">"ZN Break Glass - Allow All Outbound"</span>
+<span class="ps-prompt">PS&gt; </span><span class="ps-cmd">Get-NetFirewallRule</span> <span class="ps-switch">-DisplayName</span> <span class="ps-value">"ZN-Rule*"</span> <span class="ps-pipe">|</span> <span class="ps-cmd">Enable-NetFirewallRule</span>
+<span class="ps-comment"># and restart the Connector service if you stopped it</span></pre>
+  </div>
+
+  <h2 id="conn-other-os">macOS and Linux Connector Assets</h2>
+  <div class="callout">
+    <strong>Not yet confirmed</strong>
+    No Zero Networks-shipped break-glass script has been confirmed for Segment Connector (Linux) or
+    Cloud Connector (macOS) assets as of this writing. This section is a placeholder until one is
+    confirmed for each platform — treat everything below as general technique, not a Zero
+    Networks-verified procedure.
+  </div>
+
+  <h3>Linux (Segment Connector / Lightweight Agent)</h3>
+  <p>
+    <code>BreakGlass.ps1</code> already handles Linux assets over iptables or nftables for Segment
+    Server-monitored hosts (see <a href="#bg-syntax">BreakGlass.ps1</a> above) — the same two backend
+    families are the likely candidates for Connector-managed Linux assets, but this isn't confirmed.
+    Inspect the live ruleset before changing anything:
+  </p>
+
+  <div class="example">
+    <div class="example-header">
+      <span class="ex-title">Inspect the current ruleset</span>
+    </div>
+    <pre><span class="ps-cmd">sudo iptables -L -n -v --line-numbers</span>
+<span class="ps-cmd">sudo nft list ruleset</span></pre>
+  </div>
+
+  <p>If an iptables-style ruleset is in use, an ACCEPT-all insert mirrors what <code>BreakGlass.ps1</code> does remotely for <code>-Mode All</code>:</p>
+
+  <div class="example">
+    <div class="example-header">
+      <span class="ex-title">iptables ACCEPT-all insert</span>
+    </div>
+    <pre><span class="ps-cmd">sudo iptables -I INPUT 1 -j ACCEPT</span>
+<span class="ps-cmd">sudo iptables -I OUTPUT 1 -j ACCEPT</span></pre>
+  </div>
+
+  <p>
+    For nftables, the exact table and chain names depend on what's actually installed — confirm with
+    <code>nft list ruleset</code> first, then insert an accept rule ahead of any existing drop/reject
+    rule in the relevant chain(s).
+  </p>
+
+  <h3>macOS (Cloud Connector)</h3>
+  <p>
+    The enforcement mechanism used by the macOS Cloud Connector isn't confirmed in this documentation
+    set. macOS's native firewall stack is Packet Filter (<code>pf</code>, driven via
+    <code>pfctl</code>); if segmentation turns out to run over a <code>pf</code> anchor, disabling just
+    that anchor (once its name is confirmed) would be the targeted equivalent of the Windows and Linux
+    techniques above. Disabling <code>pf</code> entirely is the untargeted last resort — same caveat
+    as turning off Windows Firewall — since it removes all packet filtering on the host, not only
+    Zero Networks'.
+  </p>
+
+  <div class="example">
+    <div class="example-header">
+      <span class="ex-title">Inspect, then flush a confirmed anchor (or disable pf entirely)</span>
+    </div>
+    <pre><span class="ps-comment"># inspect current rules/anchors first</span>
+<span class="ps-cmd">sudo pfctl -s all</span>
+
+<span class="ps-comment"># flush a confirmed Zero Networks anchor</span>
+<span class="ps-cmd">sudo pfctl -a &lt;anchor-name&gt; -F all</span>
+
+<span class="ps-comment"># last resort: disable pf entirely</span>
+<span class="ps-cmd">sudo pfctl -d</span></pre>
+  </div>
+
+  <div class="callout info">
+    <strong>Action item</strong>
+    Confirm with Zero Networks engineering/support whether a break-glass script ships for Segment
+    Connector (Linux) and Cloud Connector (macOS) assets, and replace this section with verified
+    steps once confirmed.
+  </div>
+
+
+  <!-- ════════════════════════════════════════
        REFERENCE TABLES
   ═════════════════════════════════════════ -->
   <h2 id="modes">Mode Reference</h2>
@@ -662,7 +1184,7 @@
         <td><code>Privileged</code></td>
         <td>Windows</td>
         <td>Windows Firewall + WFP</td>
-        <td>Inbound RDP (TCP 3389) allowed; all outbound allowed</td>
+        <td>Inbound TCP 3389 (RDP), 5985 (WinRM), 5986 (WinRM HTTPS), 9389 (ADWS), 445 (SMB) allowed; all outbound allowed</td>
       </tr>
       <tr>
         <td><code>All</code></td>
@@ -673,14 +1195,14 @@
       <tr>
         <td><code>Privileged</code></td>
         <td>Linux</td>
-        <td>iptables (via python-iptables)</td>
-        <td>Inbound SSH (TCP 22) ACCEPT rule inserted at position 0 in INPUT chain</td>
+        <td>iptables or nftables (per <code>AppliedFirewallType</code>)</td>
+        <td>Inbound TCP 22 (SSH), 23 (Telnet), 445 (SMB) ACCEPT; all outbound ACCEPT</td>
       </tr>
       <tr>
         <td><code>All</code></td>
         <td>Linux</td>
-        <td>iptables (via python-iptables)</td>
-        <td>ACCEPT all rule inserted at position 0 in INPUT and OUTPUT chains</td>
+        <td>iptables or nftables (per <code>AppliedFirewallType</code>)</td>
+        <td>ACCEPT all rule inserted in INPUT and OUTPUT chains</td>
       </tr>
     </tbody>
   </table>
@@ -694,8 +1216,8 @@
       <tr><td><code>Windows</code></td><td><code>-Windows</code></td><td>Bulk Windows assets from segmentedAssets.json</td></tr>
       <tr><td><code>Linux</code></td><td><code>-Linux</code></td><td>Bulk Linux assets from segmentedAssets.json</td></tr>
       <tr><td><code>WindowsAndLinux</code></td><td><code>-WindowsAndLinux</code></td><td>Bulk Windows + Linux in one run</td></tr>
-      <tr><td><code>Asset</code></td><td><code>-Asset</code> + <code>-Windows</code> or <code>-Linux</code></td><td>Single asset by hostname or FQDN</td></tr>
-      <tr><td><code>IP</code></td><td><code>-IPAddress</code> + <code>-Windows</code> or <code>-Linux</code></td><td>Single asset by IP (PTR lookup required)</td></tr>
+      <tr><td><code>Asset</code></td><td><code>-Asset</code> + <code>-Windows</code> or <code>-Linux</code></td><td>Single asset by hostname or FQDN; does not read segmentedAssets.json</td></tr>
+      <tr><td><code>IP</code></td><td><code>-IPAddress</code> + <code>-Windows</code> or <code>-Linux</code></td><td>Single asset by IP (PTR lookup required); does not read segmentedAssets.json</td></tr>
     </tbody>
   </table>
 
@@ -703,11 +1225,14 @@
   <ul style="line-height: 2.1; margin-left: 1.5rem;">
     <li>Rules and filters added by the break glass scripts are <strong>persistent</strong> across reboots. They must be manually removed or will be cleaned up when the Zero Networks agent next synchronises policy.</li>
     <li>For Windows assets the script uses <strong>PowerShell Remoting (WinRM)</strong> with Negotiate authentication. Ensure WinRM is enabled and accessible on targets.</li>
-    <li>For Linux assets the script connects via <strong>SSH</strong> using the POSH-SSH module, escalates to root with <code>sudo su</code>, and manipulates iptables through a Zero Networks Python virtual environment bundled on the asset.</li>
+    <li>For Linux assets the script connects via <strong>SSH</strong> using the POSH-SSH module, escalates to root with <code>sudo su</code>, and manipulates the firewall through a Zero Networks Python virtual environment bundled on the asset. Both <strong>iptables</strong> (via python-iptables) and <strong>nftables</strong> (via python-nftables) backends are supported. For bulk operations, the backend is selected from <code>AppliedFirewallType</code> in <code>segmentedAssets.json</code>. For single-asset operations (<code>-Asset</code> / <code>-IPAddress</code>), both backends are attempted; a failure on one does not abort the other.</li>
     <li>Both scripts create <code>success_list.txt</code> and <code>failed_list.txt</code> (or <code>ot_success_list.txt</code> / <code>ot_failed_list.txt</code> for OT) in the working directory.</li>
     <li>Bulk operations run with <code>-ThrottleLimit 100</code> (up to 100 assets processed concurrently).</li>
-    <li>The <code>segmentedAssets.json</code> file is automatically generated and kept up to date by the Zero Networks Segment Server. It is read from <code>C:\Program Files\Zero Networks\Breakglass\</code> on the machine running the script, not on the target assets. Do not edit it manually.</li>
+    <li>The Privileged-mode port sets are defined as the <code>WindowsPrivilegedPort</code> and <code>LinuxPrivilegedPort</code> enums inside the script, and can be overridden for a single run with <code>-PrivilegedPort</code>.</li>
+    <li><code>segmentedAssets.json</code> is only loaded for bulk operations. Single-asset runs (<code>-Asset</code> / <code>-IPAddress</code>) do not read the inventory file.</li>
+    <li>The <code>segmentedAssets.json</code> file is automatically generated and kept up to date by the Zero Networks Segment Server. It is read from <code>C:\Program Files\Zero Networks\Breakglass\</code> on the machine running the script. Do not edit it manually.</li>
     <li>For OT, switch credentials are never stored; they are held in memory only for the duration of the script run and cleared afterwards.</li>
+    <li>Assets monitored by Cloud Connector or Segment Connector are never in <code>segmentedAssets.json</code> and are out of scope for <code>BreakGlass.ps1</code> entirely — see <a href="#conn-overview">Connector-Monitored Assets</a>.</li>
   </ul>
 
   <!-- ════════════════════════════════════════
@@ -717,30 +1242,73 @@
     <div class="page-header" style="margin-bottom:1rem; border-bottom:none; padding-bottom:0.5rem;">
       <h1 id="changelog">Change Manifest</h1>
       <div class="tags">
-        <span class="tag purple">Documentation</span>
+        <span class="tag">Version History</span>
       </div>
     </div>
   </div>
 
-  <p>Records changes to script behaviour that were previously undocumented, and documentation corrections applied to this reference.</p>
+  <p>
+    Functional changes to <code>BreakGlass.ps1</code> that shipped without separate release notes,
+    plus documentation corrections applied to this reference. Newest first.
+  </p>
 
   <table>
-    <thead><tr><th>Area</th><th>Change</th><th>Notes</th></tr></thead>
+    <thead><tr><th>Area</th><th>Change</th><th>Impact</th></tr></thead>
     <tbody>
       <tr>
+        <td>Linux firewall backend</td>
+        <td>Added nftables support alongside iptables. The backend is selected per-asset from <code>AppliedFirewallType</code> in <code>segmentedAssets.json</code> for bulk operations.</td>
+        <td>Required for modern Linux distributions (e.g. RHEL 10) that ship without iptables-legacy.</td>
+      </tr>
+      <tr>
+        <td>Single-asset Linux (<code>-Asset</code> / <code>-IPAddress</code>)</td>
+        <td>Both iptables and nftables backends are now attempted automatically in sequence. Each attempt is isolated; a failure on one backend does not abort the other.</td>
+        <td>Eliminates the need to know which backend is active when targeting a single Linux host manually.</td>
+      </tr>
+      <tr>
+        <td>Linux Privileged mode ports</td>
+        <td>Expanded from SSH (22) only to SSH (22), Telnet (23), and SMB (445) via <code>multiport</code> match.</td>
+        <td>Restores management access for environments that require SMB or legacy Telnet alongside SSH.</td>
+      </tr>
+      <tr>
+        <td>Windows Privileged mode ports</td>
+        <td>Expanded from RDP (3389) only to RDP (3389), WinRM HTTP (5985), WinRM HTTPS (5986), ADWS (9389), and SMB (445). Applied at both the Windows Firewall and WFP layers.</td>
+        <td>Enables PSRemoting, AD management tooling, and file access in a single Privileged-mode run — previously a second <code>-Mode All</code> run was needed to restore WinRM access.</td>
+      </tr>
+      <tr>
+        <td><code>segmentedAssets.json</code> loading</td>
+        <td>The inventory file is now only loaded for bulk operations. Single-asset runs (<code>-Asset</code> / <code>-IPAddress</code>) skip the load entirely.</td>
+        <td>Avoids a misleading error if the JSON is stale or absent when targeting a known asset directly.</td>
+      </tr>
+      <tr>
+        <td><code>-PrivilegedPort</code></td>
+        <td>New parameter. Replaces the built-in Privileged-mode port sets with an explicit TCP port list (1&#8211;65535 each) for both Windows and Linux. Warns and is ignored under <code>-Mode All</code>.</td>
+        <td>Lets an operator open a narrower set of ports than the defaults during an incident.</td>
+      </tr>
+      <tr>
+        <td><code>-LinuxSSHKeyPath</code></td>
+        <td>New parameter. Supplies the SSH private key path non-interactively; requires <code>-LinuxUseSSHKey</code> and conflicts with <code>-LinuxSvcPassword</code>. The path is validated at parameter binding.</td>
+        <td>Makes key-based Linux runs fully scriptable &#8212; no runtime prompt for the key path.</td>
+      </tr>
+      <tr>
+        <td><code>-ADSvcSecurePassword</code></td>
+        <td>New parameter. <code>SecureString</code> alternative to <code>-ADSvcPassword</code>; the two are mutually exclusive and either one satisfies <code>-ADUserName</code>.</td>
+        <td>Keeps the AD password out of the command line and session history in scripted runs.</td>
+      </tr>
+      <tr>
         <td><code>-ADUserName</code></td>
-        <td>Accepts UPN format (<code>user@domain.com</code>) in addition to <code>DOMAIN\user</code></td>
+        <td>Accepts UPN format (<code>user@domain.com</code>) in addition to <code>DOMAIN&#92;user</code>.</td>
         <td>Both formats parse correctly when supplying explicit credentials for bulk Windows operations.</td>
       </tr>
       <tr>
         <td><code>-DeploymentClusterName</code></td>
-        <td>Tab-completion reads live cluster names from <code>segmentedAssets.json</code>; parameter also validates against that list and throws a descriptive error with valid options on mismatch</td>
+        <td>Tab-completion reads live cluster names from <code>segmentedAssets.json</code>; the parameter also validates against that list and throws a descriptive error with valid options on mismatch.</td>
         <td>Tab-complete with <kbd>Tab</kbd> in PowerShell 7+. Names containing spaces are quoted automatically.</td>
       </tr>
       <tr>
         <td>Windows credential collection (bulk)</td>
-        <td>Per-OU credentials are now collected and matched at runtime</td>
-        <td>The script reads <code>OuCredentials</code> from each domain in <code>ForestsConfig</code> and prompts separately for each OU. Assets with an <code>OrganizationalUnit</code> field are matched to the appropriate OU credential before falling back to the domain credential.</td>
+        <td>Per-OU credentials are collected and matched at runtime. The script reads <code>OuCredentials</code> from each domain in <code>ForestsConfig</code> and prompts separately for each OU.</td>
+        <td>Assets with an <code>OrganizationalUnit</code> field are matched to the appropriate OU credential before falling back to the domain credential.</td>
       </tr>
     </tbody>
   </table>
@@ -748,10 +1316,8 @@
 </main>
 
 <script>
-  // Highlight active sidebar link based on scroll position
   const sections = document.querySelectorAll('[id]');
   const navLinks = document.querySelectorAll('nav.sidebar a');
-
   const observer = new IntersectionObserver(entries => {
     entries.forEach(entry => {
       if (entry.isIntersecting) {
@@ -761,10 +1327,8 @@
       }
     });
   }, { rootMargin: '-20% 0px -70% 0px' });
-
   sections.forEach(s => observer.observe(s));
 
-  // Copy buttons on code examples
   document.querySelectorAll('.example').forEach(ex => {
     const pre = ex.querySelector('pre');
     const header = ex.querySelector('.example-header');
@@ -789,4 +1353,3 @@
 
 </body>
 </html>
-
